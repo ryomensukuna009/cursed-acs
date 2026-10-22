@@ -163,6 +163,11 @@ CURSED ACS is an advanced fork derived from and built upon the open-source **And
 
 In compliance with the **GNU General Public License v3.0**, all source code modifications, scripts, and build tools remain open and licensed under GPL-3.0.
 
+
+---
+
+Source Code - Coming Soon
+
 ---
 
 ## License
