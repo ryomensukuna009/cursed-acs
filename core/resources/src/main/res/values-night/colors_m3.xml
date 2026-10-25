@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~  This file is part of AndroidCodeStudio.
+  ~
+  ~  AndroidCodeStudio is free software: you can redistribute it and/or modify
+  ~  it under the terms of the GNU General Public License as published by
+  ~  the Free Software Foundation, either version 3 of the License, or
+  ~  (at your option) any later version.
+  ~
+  ~  AndroidCodeStudio is distributed in the hope that it will be useful,
+  ~  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~  GNU General Public License for more details.
+  ~
+  ~  You should have received a copy of the GNU General Public License
+  ~   along with AndroidCodeStudio.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<resources>
+  <!-- Semantic Status Tokens (Dark Theme Overrides) -->
+  <color name="status_success">#81C995</color>
+  <color name="status_success_container">#0F381E</color>
+  <color name="status_on_success">#003915</color>
+  <color name="status_on_success_container">#A6F4C5</color>
+
+  <color name="status_warning">#FDD663</color>
+  <color name="status_warning_container">#3E2700</color>
+  <color name="status_on_warning">#442B00</color>
+  <color name="status_on_warning_container">#FFE082</color>
+
+  <color name="status_error">#F28B82</color>
+  <color name="status_error_container">#49120D</color>
+  <color name="status_on_error">#601410</color>
+  <color name="status_on_error_container">#FAD2CF</color>
+
+  <color name="status_in_progress">#8AB4F8</color>
+  <color name="status_in_progress_container">#173153</color>
+  <color name="status_on_in_progress">#042B59</color>
+  <color name="status_on_in_progress_container">#D2E3FC</color>
+
+  <color name="status_rollback">#D7AEFB</color>
+  <color name="status_rollback_container">#32144E</color>
+  <color name="status_on_rollback">#3E006A</color>
+  <color name="status_on_rollback_container">#F1DBFD</color>
+
+  <!-- Code Block Surfaces -->
+  <color name="code_block_bg">#14171F</color>
+  <color name="code_block_header_bg">#1C202B</color>
+  <color name="code_block_border">#2B303C</color>
+</resources>

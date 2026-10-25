@@ -23,12 +23,18 @@ interface IConfigHandler {
   val cardHolderId: Int
   val removeButtonId: Int
   val reinstallButtonId: Int
+  val importButtonId: Int? get() = null
+  val testButtonId: Int? get() = null
 
   fun updateStatus()
 
   fun onRemoveClick()
 
   fun onReinstallClick()
+
+  fun onImportClick() {}
+
+  fun onTestClick() {}
 
   fun initialize()
 

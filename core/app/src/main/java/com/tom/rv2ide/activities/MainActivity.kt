@@ -82,7 +82,6 @@ class MainActivity : EdgeToEdgeIDEActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     tomIDEUpdater = TomIDEUpdater(this)
-    tomIDEUpdater.checkForUpdates()
 
     openLastProject()
 
@@ -102,10 +101,6 @@ class MainActivity : EdgeToEdgeIDEActivity() {
     }
     
     onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
-    val updater = KotlinLspUpdater(this)
-    updater.checkForUpdates(LSPProperties.kotlinLspVersion)
-    
-            
   }
 
   override fun onApplySystemBarInsets(insets: Insets) {
@@ -202,6 +197,7 @@ class MainActivity : EdgeToEdgeIDEActivity() {
   }
 
   internal fun openProject(root: File) {
+    com.tom.rv2ide.templates.preferences.WizardPreferences.addRecentProject(this, root.absolutePath)
     IProjectManager.getInstance().openProject(root)
     startActivity(Intent(this, EditorActivityKt::class.java))
   }

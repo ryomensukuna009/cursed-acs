@@ -31,6 +31,7 @@ object GeneralPreferences {
   const val OPEN_PROJECTS = "idepref_general_autoOpenProjects"
   const val CONFIRM_PROJECT_OPEN = "idepref_general_confirmProjectOpen"
   const val SNOWFALL_OVERLAY = "idepref_general_snowfall"
+  const val SUKUNA_LAUNCH_ANIMATION = "idepref_general_sukuna_animation"
   const val IDE_LOGS_ENABLED = "idepref_ide_logs_enabled"
   const val TERMINAL_USE_SYSTEM_SHELL = "idepref_general_terminalShell"
   const val LAST_OPENED_PROJECT = "ide_last_project"
@@ -88,6 +89,14 @@ object GeneralPreferences {
     set(value) {
       prefManager.putBoolean(SNOWFALL_OVERLAY, value)
     }
+
+  var sukunaLaunchAnimation: Boolean
+    get() = prefManager.getBoolean(SUKUNA_LAUNCH_ANIMATION, true)
+    set(value) {
+      prefManager.putBoolean(SUKUNA_LAUNCH_ANIMATION, value)
+    }
+
+
 
   var ideLogsEnabled: Boolean
     get() = prefManager.getBoolean(IDE_LOGS_ENABLED, false)

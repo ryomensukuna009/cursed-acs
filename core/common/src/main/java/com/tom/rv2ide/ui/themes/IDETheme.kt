@@ -32,6 +32,27 @@ enum class IDETheme(
     @StringRes val title: Int,
 ) {
 
+  /** Black + Grey (Slate) theme (Default). */
+  SLATE_GREY(
+      R.style.Theme_AndroidIDE_SlateGrey,
+      R.style.Theme_AndroidIDE_SlateGrey_Dark,
+      R.string.theme_slate_grey,
+  ),
+
+  /** Cyan + Creamy White theme. */
+  CYAN_CREAM(
+      R.style.Theme_AndroidIDE_CyanCream,
+      R.style.Theme_AndroidIDE_CyanCream_Dark,
+      R.string.theme_cyan_cream,
+  ),
+
+  /** Crimson Red + Black theme. */
+  CRIMSON_BLACK(
+      R.style.Theme_AndroidIDE_CrimsonBlack,
+      R.style.Theme_AndroidIDE_CrimsonBlack_Dark,
+      R.string.theme_crimson_black,
+  ),
+
   /** Blue Wave theme. */
   BLUE_WAVE(
       R.style.Theme_AndroidIDE_BlueWave,
@@ -65,7 +86,7 @@ enum class IDETheme(
 
   companion object {
 
-    /** The default theme. */
-    val DEFAULT = SUNNY_GLOW
+    /** The default theme (Cursed ACS Crimson Black). */
+    val DEFAULT = CRIMSON_BLACK
   }
 }

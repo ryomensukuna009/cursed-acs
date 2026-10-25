@@ -157,6 +157,9 @@ public void publishDiagnostics(DiagnosticResult result) {
   }
 
   diagnostics.put(file, result.getDiagnostics());
+  try {
+    com.tom.rv2ide.problems.ProjectProblemRegistry.getInstance().updateLspDiagnostics(file, result.getDiagnostics());
+  } catch (Throwable ignored) {}
   activity.setDiagnosticsAdapter(newDiagnosticsAdapter());
 }
 
@@ -164,6 +167,12 @@ public void publishDiagnostics(DiagnosticResult result) {
   @Override
   public DiagnosticItem getDiagnosticAt(final File file, final int line, final int column) {
     return DiagnosticUtil.binarySearchDiagnostic(this.diagnostics.get(file), line, column);
+  }
+
+  public Map<File, List<DiagnosticItem>> getAllDiagnostics() {
+    synchronized (diagnostics) {
+      return new HashMap<>(diagnostics);
+    }
   }
 
   @Override

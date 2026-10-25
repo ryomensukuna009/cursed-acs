@@ -17,14 +17,27 @@
 
 package com.tom.rv2ide.ui
 
+import android.app.Activity
 import android.content.Context
+import android.graphics.Rect
 import android.util.AttributeSet
+import android.util.Log
+import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import androidx.core.view.GravityCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
 
 /**
- * A [DrawerLayout] that scales its content when navigation drawers are opened or closed.
+ * A [DrawerLayout] that scales its content when navigation drawers are opened or closed,
+ * and intercepts system back button events when the software keyboard is open inside the
+ * side panel so the keyboard is dismissed first before closing the drawer.
  *
  * @author Akash Yadav
  */
@@ -77,6 +90,210 @@ class ContentTranslatingDrawerLayout : InterceptableDrawerLayout {
 
   init {
     addDrawerListener(mListener)
+    adjustMinDrawerMargin()
+  }
+
+  private fun adjustMinDrawerMargin() {
+    try {
+      val field = DrawerLayout::class.java.getDeclaredField("mMinDrawerMargin")
+      field.isAccessible = true
+      val density = resources.displayMetrics.density
+      val swDp = resources.configuration.screenWidthDp
+      val marginDp = if (swDp <= 400) 24 else 56
+      field.setInt(this, (marginDp * density + 0.5f).toInt())
+    } catch (_: Throwable) {
+    }
+  }
+
+  override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+    adjustMinDrawerMargin()
+    super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+  }
+
+  /**
+   * Checks if any navigation drawer is currently visible (either START or END).
+   */
+  fun hasAnyVisibleDrawer(): Boolean {
+    return isDrawerVisible(GravityCompat.START) || isDrawerVisible(GravityCompat.END)
+  }
+
+  /**
+   * Determines whether the software keyboard is active or a text field is focused
+   * inside the side panel drawer or across the window.
+   */
+  fun isSidePanelKeyboardActive(): Boolean {
+    val act = context as? Activity
+    val decor = act?.window?.decorView ?: rootView
+    val currentFocus = act?.currentFocus ?: decor.findFocus() ?: findFocus()
+    val isCurrentFocusEditor = currentFocus != null && (currentFocus is EditText || currentFocus.onCheckIsTextEditor())
+
+    val isAnyEditorFocused = hasAnyFocusedTextEditor(this) || hasAnyFocusedTextEditor(decor)
+
+    val insets = ViewCompat.getRootWindowInsets(this) ?: ViewCompat.getRootWindowInsets(decor)
+    val imeBottom = insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
+    val sysBottom = insets?.getInsets(WindowInsetsCompat.Type.systemBars())?.bottom ?: 0
+    val isImeVisibleByInsets = (insets?.isVisible(WindowInsetsCompat.Type.ime()) == true) || (imeBottom > sysBottom + 80)
+
+    val r = Rect()
+    decor.getWindowVisibleDisplayFrame(r)
+    val screenHeight = decor.height.coerceAtLeast(decor.rootView.height)
+    val keypadHeight = screenHeight - r.bottom
+    val isKeypadVisible = screenHeight > 0 && keypadHeight > (screenHeight * 0.12)
+
+    val isActive = isKeypadVisible || isImeVisibleByInsets
+    Log.e(
+        "ACS_KEYBOARD_DEBUG",
+        "isSidePanelKeyboardActive: keypadHeight=$keypadHeight, isKeypadVisible=$isKeypadVisible, isImeVisibleByInsets=$isImeVisibleByInsets -> $isActive"
+    )
+    return isActive
+  }
+
+  private fun hasAnyFocusedTextEditor(root: View?): Boolean {
+    if (root == null) return false
+    if ((root.isFocused || root.hasFocus()) && (root is EditText || root.onCheckIsTextEditor())) {
+      return true
+    }
+    if (root is ViewGroup) {
+      for (i in 0 until root.childCount) {
+        if (hasAnyFocusedTextEditor(root.getChildAt(i))) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  /**
+   * Hides the software keyboard and clears focus.
+   * Returns true if the keyboard was dismissed or was open, keeping the drawer open.
+   */
+  fun dismissKeyboardIfOpen(): Boolean {
+    val wasActive = isSidePanelKeyboardActive()
+    val act = context as? Activity
+    val decor = act?.window?.decorView ?: rootView
+    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+    val focused = decor.findFocus() ?: findFocus() ?: act?.currentFocus
+
+    var dismissed = wasActive
+    if (imm != null) {
+      val token = focused?.windowToken ?: decor.windowToken ?: windowToken
+      if (token != null) {
+        if (imm.hideSoftInputFromWindow(token, 0)) {
+          dismissed = true
+        }
+      }
+      if (decor.windowToken != null && decor.windowToken != token) {
+        if (imm.hideSoftInputFromWindow(decor.windowToken, 0)) {
+          dismissed = true
+        }
+      }
+    }
+
+    if (act != null) {
+      try {
+        WindowCompat.getInsetsController(act.window, decor).hide(WindowInsetsCompat.Type.ime())
+      } catch (_: Throwable) {}
+    }
+
+    if (isSidePanelKeyboardActive()) {
+      dismissed = true
+    }
+
+    focused?.clearFocus()
+    decor.clearFocus()
+    clearFocus()
+
+    Log.e("ACS_KEYBOARD_DEBUG", "dismissKeyboardIfOpen: dismissed=$dismissed")
+    return dismissed
+  }
+
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    if (event.keyCode == KeyEvent.KEYCODE_BACK && hasAnyVisibleDrawer()) {
+      if (event.action == KeyEvent.ACTION_DOWN) {
+        if (isSidePanelKeyboardActive()) {
+          return true
+        }
+      } else if (event.action == KeyEvent.ACTION_UP) {
+        if (dismissKeyboardIfOpen()) {
+          Log.e("ACS_KEYBOARD_DEBUG", "dispatchKeyEvent: Dismissed keyboard! Keeping drawer open.")
+          return true
+        }
+      }
+    }
+    return super.dispatchKeyEvent(event)
+  }
+
+  override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    if (keyCode == KeyEvent.KEYCODE_BACK && hasAnyVisibleDrawer()) {
+      if (isSidePanelKeyboardActive()) {
+        Log.e("ACS_KEYBOARD_DEBUG", "onKeyDown: Consuming BACK for keyboard!")
+        event.startTracking()
+        return true
+      }
+    }
+    return super.onKeyDown(keyCode, event)
+  }
+
+  override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+    if (keyCode == KeyEvent.KEYCODE_BACK && hasAnyVisibleDrawer()) {
+      if (dismissKeyboardIfOpen()) {
+        Log.e("ACS_KEYBOARD_DEBUG", "onKeyUp: Dismissed keyboard! Keeping drawer open.")
+        return true
+      }
+    }
+    return super.onKeyUp(keyCode, event)
+  }
+
+  private var lastKeyboardDismissTimestamp = 0L
+
+  fun shouldInterceptDrawerCloseForKeyboard(): Boolean {
+    val now = System.currentTimeMillis()
+    if (now - lastKeyboardDismissTimestamp < 350) {
+      Log.e("ACS_KEYBOARD_DEBUG", "closeDrawer blocked: within cooldown of keyboard dismissal!")
+      return true
+    }
+    if (isSidePanelKeyboardActive()) {
+      Log.e("ACS_KEYBOARD_DEBUG", "closeDrawer intercepted: keyboard is active! Dismissing keyboard and keeping drawer open.")
+      dismissKeyboardIfOpen()
+      lastKeyboardDismissTimestamp = System.currentTimeMillis()
+      return true
+    }
+    return false
+  }
+
+  override fun closeDrawers() {
+    if (shouldInterceptDrawerCloseForKeyboard()) {
+      return
+    }
+    super.closeDrawers()
+  }
+
+  override fun closeDrawer(drawerView: View, animate: Boolean) {
+    if (shouldInterceptDrawerCloseForKeyboard()) {
+      return
+    }
+    super.closeDrawer(drawerView, animate)
+  }
+
+  override fun closeDrawer(gravity: Int, animate: Boolean) {
+    if (shouldInterceptDrawerCloseForKeyboard()) {
+      return
+    }
+    super.closeDrawer(gravity, animate)
+  }
+
+  override fun closeDrawer(drawerView: View) {
+    if (shouldInterceptDrawerCloseForKeyboard()) {
+      return
+    }
+    super.closeDrawer(drawerView)
+  }
+
+  override fun closeDrawer(gravity: Int) {
+    if (shouldInterceptDrawerCloseForKeyboard()) {
+      return
+    }
+    super.closeDrawer(gravity)
   }
 
   /** Translation behavior for content view of [ContentTranslatingDrawerLayout]. */

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/diagnosticItemRow"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="48dp"
+    android:gravity="center_vertical"
+    android:paddingStart="32dp"
+    android:paddingEnd="8dp"
+    android:paddingVertical="8dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Severity Indicator Icon -->
+    <ImageView
+        android:id="@+id/severityIcon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/ic_error"
+        app:tint="@color/status_error"
+        android:layout_marginEnd="10dp"
+        android:layout_gravity="top"
+        android:layout_marginTop="3dp" />
+
+    <!-- Error Message & Location -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/diagnosticMessageText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Unresolved reference"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurface"
+            android:lineSpacingMultiplier="1.15" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Monospace Line:Col Tag -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/diagnosticLocationTag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="L1:1"
+                android:fontFamily="monospace"
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="1dp"
+                android:background="@drawable/bg_code_tag" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/diagnosticSourceCodeTag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="[LSP]"
+                android:textAppearance="?attr/textAppearanceLabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- AI Fix Quick Action Button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnFixDiagnosticWithAi"
+        style="@style/Widget.Material3.Button.IconButton"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:minWidth="34dp"
+        android:minHeight="34dp"
+        android:layout_marginStart="4dp"
+        app:icon="@drawable/ic_nav_ai_agent_badass"
+        app:iconSize="16dp"
+        app:iconTint="?attr/colorPrimary"
+        android:contentDescription="Ask AI to Fix" />
+
+    <!-- Details Action Button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnDiagnosticDetails"
+        style="@style/Widget.Material3.Button.IconButton"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:minWidth="32dp"
+        android:minHeight="32dp"
+        app:icon="@drawable/ic_more_vert"
+        app:iconSize="16dp"
+        app:iconTint="?attr/colorOnSurfaceVariant"
+        android:contentDescription="Diagnostic details and actions" />
+
+</LinearLayout>

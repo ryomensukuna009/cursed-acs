@@ -231,24 +231,79 @@ class GradleBuildService :
 
   /** Creates a Gradle init script that injects the logger plugin into user projects. */
   private fun createLoggerInitScript(): File {
+    val repoDir = ensureLoggerMavenRepo()
+    val repoPath = repoDir.absolutePath.replace("\\", "/")
     val initScript = File(Environment.TMP_DIR, "ide-logger-init.gradle")
     initScript.writeText(
         """
-          allprojects {
-              afterEvaluate {
-                  if (plugins.hasPlugin('com.android.application') || 
-                      plugins.hasPlugin('com.android.library')) {
-                      
-                      android {
-                          compileOptions {
-                              coreLibraryDesugaringEnabled = true
+          def repoUri = new File('$repoPath').toURI()
+          gradle.ext.set('ideFailOnProjectRepos', false)
+
+          gradle.settingsEvaluated { settings ->
+              try {
+                  def drm = settings.dependencyResolutionManagement
+                  if (drm != null) {
+                      try {
+                          drm.repositories {
+                              maven {
+                                  name = 'IdeLocalLogger'
+                                  url = repoUri
+                              }
+                          }
+                      } catch (Throwable ignored) {}
+
+                      try {
+                          def mode = null
+                          if (drm.repositoriesMode instanceof org.gradle.api.provider.Provider) {
+                              mode = drm.repositoriesMode.getOrNull()
+                          } else {
+                              mode = drm.repositoriesMode
+                          }
+                          if (mode != null && mode.toString().contains('FAIL_ON_PROJECT_REPOS')) {
+                              gradle.ext.set('ideFailOnProjectRepos', true)
+                          }
+                      } catch (Throwable ignored) {}
+                  }
+              } catch (Throwable ignored) {}
+          }
+
+          gradle.allprojects { project ->
+              def failOnProjectRepos = false
+              try {
+                  if (gradle.ext.has('ideFailOnProjectRepos')) {
+                      failOnProjectRepos = (gradle.ext.get('ideFailOnProjectRepos') == true)
+                  }
+              } catch (Throwable ignored) {}
+
+              if (!failOnProjectRepos) {
+                  try {
+                      project.repositories {
+                          maven {
+                              name = 'IdeLocalLogger'
+                              url = repoUri
                           }
                       }
+                  } catch (Throwable ignored) {}
+              }
+
+              project.afterEvaluate {
+                  if (project.plugins.hasPlugin('com.android.application') || 
+                      project.plugins.hasPlugin('com.android.library')) {
                       
-                      dependencies {
-                          implementation files('${getLoggerRuntimeAar().absolutePath}')
-                          coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
-                      }
+                      try {
+                          project.android {
+                              compileOptions {
+                                  coreLibraryDesugaringEnabled = true
+                              }
+                          }
+                      } catch (Throwable ignored) {}
+                      
+                      try {
+                          project.dependencies {
+                              implementation 'com.tom.rv2ide:logger-runtime:1.0.0'
+                              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+                          }
+                      } catch (Throwable ignored) {}
                   }
               }
           }
@@ -271,17 +326,72 @@ class GradleBuildService :
   private fun getLoggerRuntimeAar(): File {
     val aar = File(getLoggerPluginDir(), "logger-runtime.aar")
     if (!aar.exists()) {
-      // Extract from assets
-      if (
-          !ResourceUtils.copyFileFromAssets(
-              ToolsManager.getCommonAsset("logger-runtime.aar"),
-              aar.absolutePath,
-          )
-      ) {
-        log.error("Failed to extract logger-runtime.aar from assets")
+      // First try extracting directly from assets root
+      val extracted =
+          try {
+            ResourceUtils.copyFileFromAssets("logger-runtime.aar", aar.absolutePath)
+          } catch (t: Throwable) {
+            false
+          }
+      if (!extracted) {
+        // Fallback to data/common asset location
+        if (
+            !ResourceUtils.copyFileFromAssets(
+                ToolsManager.getCommonAsset("logger-runtime.aar"),
+                aar.absolutePath,
+            )
+        ) {
+          log.error("Failed to extract logger-runtime.aar from assets")
+        }
       }
     }
     return aar
+  }
+
+  /** Ensures the local Maven repository for logger-runtime exists and returns its root directory. */
+  private fun ensureLoggerMavenRepo(): File {
+    val loggerDir = getLoggerPluginDir()
+    val repoDir = File(loggerDir, "repo")
+    val artifactDir = File(repoDir, "com/tom/rv2ide/logger-runtime/1.0.0")
+    if (!artifactDir.exists()) {
+      artifactDir.mkdirs()
+    }
+
+    val sourceAar = getLoggerRuntimeAar()
+    val targetAar = File(artifactDir, "logger-runtime-1.0.0.aar")
+    if (sourceAar.exists()) {
+      if (!targetAar.exists() || targetAar.length() != sourceAar.length() || targetAar.lastModified() < sourceAar.lastModified()) {
+        try {
+          sourceAar.copyTo(targetAar, overwrite = true)
+        } catch (e: Exception) {
+          log.error("Failed to copy logger AAR to local Maven repo", e)
+        }
+      }
+    }
+
+    val pomFile = File(artifactDir, "logger-runtime-1.0.0.pom")
+    if (!pomFile.exists()) {
+      try {
+        pomFile.writeText(
+            """<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.tom.rv2ide</groupId>
+  <artifactId>logger-runtime</artifactId>
+  <version>1.0.0</version>
+  <packaging>aar</packaging>
+  <description>Android Code Studio Logger Runtime</description>
+</project>
+""".trimIndent()
+        )
+      } catch (e: Exception) {
+        log.error("Failed to write logger POM to local Maven repo", e)
+      }
+    }
+
+    return repoDir
   }
 
   /** Check if tasks include debug builds (not release-only). */

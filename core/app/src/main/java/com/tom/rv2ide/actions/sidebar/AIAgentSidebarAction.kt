@@ -42,8 +42,8 @@ class AIAgentSidebarAction(context: Context, override val order: Int) : Abstract
   init {
     label = context.getString(R.string.ai_agent_title)
     subtitle = "v0.1-preview"
-    icon = ContextCompat.getDrawable(context, R.drawable.ic_ai_agent)
-    iconRes = R.drawable.ic_ai_agent
+    icon = ContextCompat.getDrawable(context, com.tom.rv2ide.resources.R.drawable.ic_agent_cursed)
+    iconRes = com.tom.rv2ide.resources.R.drawable.ic_agent_cursed
   }
 
   companion object {

@@ -64,25 +64,43 @@
           android:layout_width="match_parent"
           android:layout_height="match_parent">
 
+          <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/no_editor_logo"
+            android:layout_width="84dp"
+            android:layout_height="84dp"
+            android:layout_marginBottom="16dp"
+            android:src="@drawable/logo_dual_aura"
+            android:scaleType="centerCrop"
+            android:elevation="4dp"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
+            app:strokeWidth="2dp"
+            app:strokeColor="#FF2A55"
+            app:layout_constraintBottom_toTopOf="@id/no_editor_title"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
           <TextView
             android:id="@+id/no_editor_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/app_name"
+            android:text="UNLEASH THE CURSED CODE"
             android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
-            android:textColor="?attr/colorOnSurface"
+            android:textColor="#FF2A55"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.4" />
+            app:layout_constraintVertical_bias="0.44" />
 
           <TextView
             android:id="@+id/no_editor_summary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="12dp"
             android:gravity="center"
+            android:lineSpacingExtra="4dp"
             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
             android:textColor="?attr/colorSecondaryVariant"
             android:textSize="13sp"

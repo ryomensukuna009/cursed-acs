@@ -26,6 +26,7 @@ import android.content.Context
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.tom.rv2ide.R
 import com.tom.rv2ide.activities.editor.EditorHandlerActivity
+import com.tom.rv2ide.preferences.internal.BuildPreferences
 import com.tom.rv2ide.preferences.internal.GeneralPreferences
 import com.tom.rv2ide.projects.IProjectManager
 import com.tom.rv2ide.resources.R.string
@@ -51,6 +52,7 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
   private var enabled = true
   private var activityReference: WeakReference<EditorHandlerActivity> = WeakReference(null)
   private var ndkCheckPerformed = false
+  private val buildOutputBuffer = StringBuilder()
 
   companion object {
 
@@ -73,10 +75,18 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
     activityReference.clear()
     this.enabled = false
     this.ndkCheckPerformed = false
+    synchronized(buildOutputBuffer) { buildOutputBuffer.setLength(0) }
   }
 
   override fun prepareBuild(buildInfo: BuildInfo) {
     checkActivity("prepareBuild") ?: return
+
+    synchronized(buildOutputBuffer) { buildOutputBuffer.setLength(0) }
+    try {
+      val projectDir = com.tom.rv2ide.projects.IProjectManager.getInstance()?.projectDir
+      com.tom.rv2ide.problems.ProjectProblemRegistry.getInstance().setProjectRoot(projectDir)
+      com.tom.rv2ide.problems.ProjectProblemRegistry.getInstance().onBuildStarted()
+    } catch (_: Throwable) {}
 
     val isFirstBuild = GeneralPreferences.isFirstBuild
     activity.setStatus(
@@ -103,6 +113,12 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
   override fun onBuildSuccessful(tasks: List<String?>) {
     checkActivity("onBuildSuccessful") ?: return
 
+    try {
+      val output = synchronized(buildOutputBuffer) { buildOutputBuffer.toString() }
+      val projectDir = com.tom.rv2ide.projects.IProjectManager.getInstance()?.projectDir
+      com.tom.rv2ide.problems.ProjectProblemRegistry.getInstance().recordBuildOutput(output, projectDir, "GRADLE")
+    } catch (_: Throwable) {}
+
     analyzeCurrentFile()
 
     GeneralPreferences.isFirstBuild = false
@@ -122,6 +138,12 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
   override fun onBuildFailed(tasks: List<String?>) {
     checkActivity("onBuildFailed") ?: return
 
+    try {
+      val output = synchronized(buildOutputBuffer) { buildOutputBuffer.toString() }
+      val projectDir = com.tom.rv2ide.projects.IProjectManager.getInstance()?.projectDir
+      com.tom.rv2ide.problems.ProjectProblemRegistry.getInstance().recordBuildOutput(output, projectDir, "GRADLE")
+    } catch (_: Throwable) {}
+
     analyzeCurrentFile()
 
     GeneralPreferences.isFirstBuild = false
@@ -133,7 +155,12 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
   override fun onOutput(line: String?) {
     checkActivity("onOutput") ?: return
 
-    line?.let { activity.appendBuildOutput(it) }
+    line?.let {
+      activity.appendBuildOutput(it)
+      synchronized(buildOutputBuffer) {
+        buildOutputBuffer.appendLine(it)
+      }
+    }
     // TODO This can be handled better when ProgressEvents are received from Tooling API server
     if (line!!.contains("BUILD SUCCESSFUL") || line.contains("BUILD FAILED")) {
       activity.setStatus(line)
@@ -148,12 +175,21 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
 
     ndkCheckPerformed = true
 
+    if (BuildPreferences.isOfflineNdkBuild) {
+      return
+    }
+
     try {
       val projectManager = IProjectManager.getInstance()
       val projectRoot = File(projectManager.projectDirPath)
 
-      if (hasNativeFiles(projectRoot) && !isNdkInstalled()) {
-        showNdkNotInstalledDialog(activity)
+      if (com.tom.rv2ide.ndk.NdkResolver.hasNativeFiles(projectRoot)) {
+        val activeNdk = com.tom.rv2ide.ndk.NdkResolver.findActiveNdkDir(projectRoot)
+        if (activeNdk == null) {
+          com.tom.rv2ide.ndk.NdkResolver.showNdkNotInstalledDialog(activity)
+        } else {
+          com.tom.rv2ide.ndk.NdkResolver.ensureLocalProperties(projectRoot, activeNdk)
+        }
       }
     } catch (e: Exception) {
       log.warn("Failed to check NDK requirements", e)
@@ -162,33 +198,17 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
 
   /** Check if the project contains native files that require NDK */
   private fun hasNativeFiles(projectRoot: File): Boolean {
-    val androidMkFile = File(projectRoot, "app/src/main/jni/Android.mk")
-    val cmakeListsFile = File(projectRoot, "app/src/main/jni/CMakeLists.txt")
-    return androidMkFile.exists() || cmakeListsFile.exists()
+    return com.tom.rv2ide.ndk.NdkResolver.hasNativeFiles(projectRoot)
   }
 
   /** Check if NDK is installed */
   private fun isNdkInstalled(): Boolean {
-    val ndkBuildFile = File(Environment.ANDROID_HOME, "ndk/28.2.13676358/ndk-build")
-    return ndkBuildFile.exists()
+    return com.tom.rv2ide.ndk.NdkResolver.isNdkInstalled()
   }
 
   /** Show dialog when NDK is not installed but required */
   private fun showNdkNotInstalledDialog(context: Context, onDismiss: () -> Unit = {}) {
-    MaterialAlertDialogBuilder(context)
-        .setTitle("NDK Not Found")
-        .setMessage(
-            "A compatible NDK (version 28.2.13676358) is not installed.\n\n" +
-                "Native code features will be disabled for this project.\n\n" +
-                "To enable native development, please install NDK version 28.2.13676358 " +
-                "open a terminal then run: 'idesetup -y -c -wn'."
-        )
-        .setPositiveButton("OK") { dialog, _ ->
-          dialog.dismiss()
-          onDismiss()
-        }
-        .setCancelable(false)
-        .show()
+    com.tom.rv2ide.ndk.NdkResolver.showNdkNotInstalledDialog(context, onDismiss)
   }
 
   private fun analyzeCurrentFile() {

@@ -22,7 +22,9 @@ import androidx.core.content.ContextCompat
 import com.tom.rv2ide.actions.ActionData
 import com.tom.rv2ide.actions.BaseBuildAction
 import com.tom.rv2ide.fragments.RunTasksDialogFragment
+import com.tom.rv2ide.preferences.internal.BuildPreferences
 import com.tom.rv2ide.resources.R
+import com.tom.rv2ide.utils.flashInfo
 
 /** @author Akash Yadav */
 class RunTasksAction(context: Context, override val order: Int) : BaseBuildAction() {
@@ -35,6 +37,9 @@ class RunTasksAction(context: Context, override val order: Int) : BaseBuildActio
   }
 
   override suspend fun execAction(data: ActionData): Any {
+    if (BuildPreferences.isOfflineNdkBuild) {
+      return false
+    }
     dialog?.dismiss()
     dialog = null
     dialog = RunTasksDialogFragment()
@@ -42,6 +47,11 @@ class RunTasksAction(context: Context, override val order: Int) : BaseBuildActio
   }
 
   override fun postExec(data: ActionData, result: Any) {
+    if (BuildPreferences.isOfflineNdkBuild) {
+      data.getActivity()?.flashInfo("Offline NDK mode is active. Tap the Play button to build, or switch Build Mode in Settings to Gradle.")
+      return
+    }
+
     if (result !is RunTasksDialogFragment) {
       return
     }

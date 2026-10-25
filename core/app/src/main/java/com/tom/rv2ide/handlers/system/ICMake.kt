@@ -19,8 +19,11 @@ package com.tom.rv2ide.handlers.system
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.view.View
 import android.widget.Toast
 import androidx.lifecycle.LifecycleCoroutineScope
@@ -83,23 +86,31 @@ class ICMake(
       availableVersions.isEmpty() -> {
         statusText = "Not installed"
         color = Color.RED
-        removeBtn?.visibility = View.GONE
+        removeBtn?.visibility = View.VISIBLE
+        removeBtn?.isEnabled = false
+        removeBtn?.alpha = 0.4f
       }
       availableVersions.size == 1 -> {
         statusText = "${availableVersions.first()}"
         color = if (isDarkTheme) Color.GREEN else Color.rgb(0, 75, 0)
         removeBtn?.visibility = View.VISIBLE
+        removeBtn?.isEnabled = true
+        removeBtn?.alpha = 1.0f
       }
       availableVersions.size == 2 -> {
         statusText = "${availableVersions.joinToString(" & ")}"
         color = if (isDarkTheme) Color.GREEN else Color.rgb(0, 75, 0)
         removeBtn?.visibility = View.VISIBLE
+        removeBtn?.isEnabled = true
+        removeBtn?.alpha = 1.0f
       }
       else -> {
         statusText =
             "${availableVersions.first()}...${availableVersions.last()} (${availableVersions.size} versions)"
         color = if (isDarkTheme) Color.GREEN else Color.rgb(0, 75, 0)
         removeBtn?.visibility = View.VISIBLE
+        removeBtn?.isEnabled = true
+        removeBtn?.alpha = 1.0f
       }
     }
 
@@ -180,10 +191,30 @@ class ICMake(
 
   private fun removeCmakeVersion(version: String) {
     val utils = IDEUtils()
-    MaterialAlertDialogBuilder(context)
-        .setTitle("Remove CMake")
-        .setMessage("Are you sure you want to remove CMake version $version?")
-        .setPositiveButton("Remove") { dialog, _ ->
+    val message = SpannableStringBuilder().apply {
+      val warnHeader = "⚠️ WARNING: PERMANENT CMAKE DELETION\n\n"
+      val sWarn = length
+      append(warnHeader)
+      setSpan(ForegroundColorSpan(Color.parseColor("#E53935")), sWarn, length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
+      setSpan(StyleSpan(Typeface.BOLD), sWarn, length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+      append("Deleting CMake version $version will remove CMake binaries, Ninja build generator, and toolchain configurations.\n\n")
+
+      val damageHeader = "DAMAGES & CONSEQUENCES:\n"
+      val sDam = length
+      append(damageHeader)
+      setSpan(ForegroundColorSpan(Color.parseColor("#E53935")), sDam, length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
+      setSpan(StyleSpan(Typeface.BOLD), sDam, length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+      append("❌ Native C/C++ Android projects using CMakeLists.txt cannot configure or generate build files.\n")
+      append("❌ Gradle externalNativeBuild tasks will fail until CMake is re-downloaded.\n\n")
+      append("Do you want to proceed with permanent deletion?")
+    }
+
+    val dialog = MaterialAlertDialogBuilder(context)
+        .setTitle("Remove CMake $version?")
+        .setMessage(message)
+        .setPositiveButton("Permanently Delete") { d, _ ->
           if (utils.deleteCMake(context, version)) {
             Toast.makeText(context, "Successfully removed CMake $version", Toast.LENGTH_SHORT)
                 .show()
@@ -191,11 +222,13 @@ class ICMake(
           } else {
             Toast.makeText(context, "Failed to remove CMake $version", Toast.LENGTH_SHORT).show()
           }
-          dialog.dismiss()
+          d.dismiss()
         }
-        .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+        .setNegativeButton("Cancel") { d, _ -> d.dismiss() }
         .create()
-        .show()
+
+    dialog.show()
+    dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#E53935"))
   }
 
   private fun showVersionSelectionDialog(

@@ -37,7 +37,7 @@
 
   </com.tom.rv2ide.ui.SwipeRevealLayout>
 
-  <com.google.android.material.navigation.NavigationView
+  <com.tom.rv2ide.ui.SidePanelNavView
     android:id="@+id/startNav"
     android:layout_width="wrap_content"
     android:layout_height="match_parent"
@@ -50,6 +50,6 @@
       android:layout_width="match_parent"
       android:layout_height="match_parent" />
 
-  </com.google.android.material.navigation.NavigationView>
+  </com.tom.rv2ide.ui.SidePanelNavView>
 
 </com.tom.rv2ide.ui.ContentTranslatingDrawerLayout>

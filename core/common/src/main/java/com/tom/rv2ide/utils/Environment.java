@@ -81,7 +81,7 @@ public final class Environment {
         LIB_DIR = mkdirIfNotExits(new File(PREFIX, "lib"));
         PROJECTS_DIR = mkdirIfNotExits(new File(FileUtil.getExternalStorageDir(), PROJECTS_FOLDER));
         AT_ACSHOME_PROJECTS = mkdirIfNotExits(new File(HOME, "ACSProjects"));
-        ANDROID_JAR = mkdirIfNotExits(new File(ANDROIDIDE_HOME, "android.jar"));
+        ANDROID_JAR = new File(ANDROIDIDE_HOME, "android.jar");
         TOOLING_API_JAR = new File(mkdirIfNotExits(new File(ANDROIDIDE_HOME, "tooling-api")),
         "tooling-api-all.jar");
         AAPT2 = new File(ANDROIDIDE_HOME, "aapt2");
@@ -157,6 +157,33 @@ public final class Environment {
         env.put("LD_LIBRARY_PATH", LIB_DIR.getAbsolutePath() + ":" + 
                 new File(JAVA_HOME, "lib").getAbsolutePath());
         env.put("TMPDIR", TMP_DIR.getAbsolutePath());
+
+        File ndkDir = new File(ANDROID_HOME, "ndk");
+        if (ndkDir.exists() && ndkDir.isDirectory()) {
+            File[] files = ndkDir.listFiles();
+            if (files != null && files.length > 0) {
+                File chosen = null;
+                for (File f : files) {
+                    if (f.isDirectory() && (f.getName().contains("aide_ndk") || f.getName().contains("android-ndk"))) {
+                        chosen = f;
+                        break;
+                    }
+                }
+                if (chosen == null) {
+                    for (File f : files) {
+                        if (f.isDirectory() && new File(f, "ndk-build").exists()) {
+                            chosen = f;
+                            break;
+                        }
+                    }
+                }
+                if (chosen != null) {
+                    env.put("ANDROID_NDK_ROOT", chosen.getAbsolutePath());
+                    env.put("ANDROID_NDK_HOME", chosen.getAbsolutePath());
+                    env.put("NDK_ROOT", chosen.getAbsolutePath());
+                }
+            }
+        }
         
         // add user envs for non-failsafe sessions
         if (!forFailsafe) {

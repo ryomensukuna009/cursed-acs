@@ -55,6 +55,17 @@ import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode.MAIN
 import com.tom.rv2ide.activities.FileBrowserActivity
 import com.tom.rv2ide.fragments.sidebar.utils.FileTree.DialogProjectSettings
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.tom.rv2ide.activities.editor.EditorHandlerActivity
+import com.tom.rv2ide.databinding.DialogFileSearchBinding
+import com.tom.rv2ide.databinding.ItemSearchFileBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class FileTreeFragment :
     BottomSheetDialogFragment(), TreeNodeClickListener, TreeNodeLongClickListener {
@@ -92,6 +103,9 @@ class FileTreeFragment :
     }
     binding?.projectSettings?.setOnClickListener {
         DialogProjectSettings(requireContext()).show()
+    }
+    binding?.fileSearchBtn?.setOnClickListener {
+        showFileSearchDialog()
     }
   }
 
@@ -295,6 +309,103 @@ class FileTreeFragment :
       }
       i++
     }
+  }
+
+  private fun showFileSearchDialog() {
+    val projectDirPath = IProjectManager.getInstance().projectDirPath ?: return
+    val projectDir = File(projectDirPath)
+    if (!projectDir.exists() || !projectDir.isDirectory) return
+
+    val dialogBinding = DialogFileSearchBinding.inflate(layoutInflater)
+    val dialog = MaterialAlertDialogBuilder(requireContext())
+        .setTitle("Search Project Files")
+        .setView(dialogBinding.root)
+        .setNegativeButton(android.R.string.cancel, null)
+        .create()
+
+    class SearchAdapter(
+        private var items: List<File>,
+        private val onSelect: (File) -> Unit
+    ) : RecyclerView.Adapter<SearchAdapter.VH>() {
+        inner class VH(val b: ItemSearchFileBinding) : RecyclerView.ViewHolder(b.root)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val b = ItemSearchFileBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            return VH(b)
+        }
+
+        override fun getItemCount() = items.size
+
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            val file = items[position]
+            holder.b.fileName.text = file.name
+            val relPath = file.absolutePath.removePrefix(projectDir.absolutePath).trimStart(File.separatorChar)
+            holder.b.filePath.text = relPath
+            holder.b.root.setOnClickListener { onSelect(file) }
+        }
+
+        fun submitList(newItems: List<File>) {
+            items = newItems
+            notifyDataSetChanged()
+        }
+    }
+
+    val adapter = SearchAdapter(emptyList()) { selectedFile ->
+        dialog.dismiss()
+        val event = FileClickEvent(selectedFile)
+        event.put(Context::class.java, requireContext())
+        EventBus.getDefault().post(event)
+        (activity as? EditorHandlerActivity)?.openFile(selectedFile)
+    }
+
+    dialogBinding.searchResultsList.layoutManager = LinearLayoutManager(requireContext())
+    dialogBinding.searchResultsList.adapter = adapter
+
+    var allFiles: List<File> = emptyList()
+    var searchJob: Job? = null
+    val scope = lifecycleScope
+
+    scope.launch(Dispatchers.IO) {
+        val files = mutableListOf<File>()
+        fun scan(dir: File) {
+            val list = dir.listFiles() ?: return
+            for (f in list) {
+                if (f.name.startsWith(".") || f.name == "build" || f.name == ".gradle" || f.name == ".git") continue
+                if (f.isDirectory) {
+                    scan(f)
+                } else {
+                    files.add(f)
+                }
+            }
+        }
+        scan(projectDir)
+        allFiles = files
+        withContext(Dispatchers.Main) {
+            adapter.submitList(allFiles.take(50))
+        }
+    }
+
+    dialogBinding.searchInput.addTextChangedListener(object : android.text.TextWatcher {
+        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        override fun afterTextChanged(s: android.text.Editable?) {
+            val q = s?.toString()?.trim() ?: ""
+            searchJob?.cancel()
+            searchJob = scope.launch(Dispatchers.Default) {
+                val filtered = if (q.isEmpty()) {
+                    allFiles.take(50)
+                } else {
+                    allFiles.filter { it.name.contains(q, ignoreCase = true) || it.path.contains(q, ignoreCase = true) }.take(100)
+                }
+                withContext(Dispatchers.Main) {
+                    adapter.submitList(filtered)
+                    dialogBinding.noResultsText.visibility = if (filtered.isEmpty() && q.isNotEmpty()) View.VISIBLE else View.GONE
+                }
+            }
+        }
+    })
+
+    dialog.show()
   }
 
   companion object {

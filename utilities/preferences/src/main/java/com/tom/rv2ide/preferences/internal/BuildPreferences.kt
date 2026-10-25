@@ -21,6 +21,36 @@ package com.tom.rv2ide.preferences.internal
 @Suppress("MemberVisibilityCanBePrivate")
 object BuildPreferences {
 
+  const val BUILD_MODE = "idepref_build_mode"
+  const val BUILD_MODE_GRADLE = "gradle"
+  const val BUILD_MODE_OFFLINE_NDK = "offline_ndk"
+
+  /**
+   * The current build mode.
+   * Can be either [BUILD_MODE_GRADLE] or [BUILD_MODE_OFFLINE_NDK].
+   * Defaults to [BUILD_MODE_GRADLE] for missing, empty, or invalid stored values.
+   */
+  var buildMode: String
+    get() {
+      val value = prefManager.getString(BUILD_MODE, BUILD_MODE_GRADLE)
+      return resolveBuildMode(value)
+    }
+    set(value) {
+      prefManager.putString(BUILD_MODE, resolveBuildMode(value))
+    }
+
+  /**
+   * Helper function to normalize or validate a build mode string.
+   * Missing, empty, or unrecognized values always fall back to [BUILD_MODE_GRADLE].
+   */
+  fun resolveBuildMode(value: String?): String {
+    return if (value == BUILD_MODE_OFFLINE_NDK) BUILD_MODE_OFFLINE_NDK else BUILD_MODE_GRADLE
+  }
+
+  /** Whether the build mode is currently set to [BUILD_MODE_OFFLINE_NDK]. */
+  val isOfflineNdkBuild: Boolean
+    get() = buildMode == BUILD_MODE_OFFLINE_NDK
+
   const val STACKTRACE = "idepref_gradleCmd_stacktrace"
   const val DEBUG = "idepref_gradleCmd_debug"
   const val SCAN = "idepref_gradleCmd_scan"
@@ -45,7 +75,7 @@ object BuildPreferences {
     set(value) = prefManager.putBoolean(KT_INDEXING_NOTIFICATION, value)
 
   var isDependenciesUpdaterEnabled: Boolean
-    get() = prefManager.getBoolean(DEPENDENCIES_UPDATER, true)
+    get() = prefManager.getBoolean(DEPENDENCIES_UPDATER, false)
     set(value) = prefManager.putBoolean(DEPENDENCIES_UPDATER, value)
 
   var isBuildOutputEnabled: Boolean

@@ -17,8 +17,8 @@
 
   <color name="color_picker_default_color">#f44336</color>
 
-  <color name="splash_bg">@android:color/white</color>
-  <color name="splash_icon_tint">@android:color/black</color>
+  <color name="splash_bg">#0B0F15</color>
+  <color name="splash_icon_tint">#FF2A55</color>
 
     <color name="warm_grey">#8e8e8e</color>
     <color name="shadow_color">#94444444</color>
@@ -26,6 +26,5 @@
     <color name="modal">#80272727</color>
     <color name="slate_black">#FF333333</color>
     <color name="yellow">#FFEB3B</color>
-    
-    
+
 </resources>

@@ -16,6 +16,6 @@
   -->
 
 <resources>
-  <color name="splash_bg">@color/primaryColor</color>
-  <color name="splash_icon_tint">@color/primaryIconColor</color>
+  <color name="splash_bg">#0B0F15</color>
+  <color name="splash_icon_tint">#FF2A55</color>
 </resources>

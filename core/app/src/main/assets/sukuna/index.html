@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cursed ACS - Sukuna Domain Expansion (13.65s Mobile 60FPS)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000000;
+      color: #f5f5f7;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    .hud { display: none !important; }
+    #stageWrap {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      background: #000;
+    }
+</style>
+</head>
+<body>
+
+  <div class="hud">
+    <label for="audioFile">🎵 Load 13.65s Audio</label>
+    <input type="file" id="audioFile" accept="audio/*,video/*">
+    <button id="playBtn">▶ Play</button>
+    <button id="aspectBtn">📐 16:9 / 9:16</button>
+    <button id="splashBtn">📱 App Splash Mode</button>
+    <input type="range" id="scrubber" class="scrubber" min="0" max="13.65" step="0.01" value="1.50">
+    <span class="timer" id="timer">01.50s / 13.65s</span>
+    <button class="jump-btn" onclick="jumpTo(1.50)">SS1: Pose</button>
+    <button class="jump-btn" onclick="jumpTo(3.50)">SS2: V-Slash</button>
+    <button class="jump-btn" onclick="jumpTo(3.80)">SS3: 4-Eyes</button>
+    <button class="jump-btn" onclick="jumpTo(4.20)">SS4-6: Zoom Rush</button>
+    <button class="jump-btn" onclick="jumpTo(7.60)">SS7: Ting Ripple</button>
+    <button class="jump-btn" onclick="jumpTo(11.80)">SS8: Shrine</button>
+  </div>
+
+  <div id="stageWrap">
+    <canvas id="stage" width="1280" height="720"></canvas>
+  </div>
+  <audio id="audioEl" crossorigin="anonymous" preload="auto"></audio>
+
+<script>
+// ============================================================================
+// MOBILE-OPTIMIZED 60FPS ENGINE (NO REALTIME BLUR FILTERS - OFFSCREEN BAKING)
+// ============================================================================
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+// Internal virtual coordinate system is 1280x720 (exact screenshot aspect ratio)
+// When switched to 9:16 mobile portrait mode, camera smartly frames the center!
+let isPortrait = false;
+const VW = 1280;
+const VH = 720;
+const DURATION = 13.65;
+
+const vCanvas = document.createElement('canvas');
+vCanvas.width = VW;
+vCanvas.height = VH;
+const vCtx = vCanvas.getContext('2d', { alpha: false });
+
+// Pre-baked caches for 60FPS mobile performance
+const sukunaBgCache = document.createElement('canvas');
+sukunaBgCache.width = VW; sukunaBgCache.height = VH;
+
+const shrineTopCache = document.createElement('canvas');
+shrineTopCache.width = VW; shrineTopCache.height = 365;
+
+const shrineReflCache = document.createElement('canvas');
+shrineReflCache.width = VW; shrineReflCache.height = 355;
+
+const audioFile = document.getElementById('audioFile');
+const audioEl = document.getElementById('audioEl');
+const playBtn = document.getElementById('playBtn');
+const aspectBtn = document.getElementById('aspectBtn');
+const splashBtn = document.getElementById('splashBtn');
+const scrubber = document.getElementById('scrubber');
+const timer = document.getElementById('timer');
+
+let isPlaying = false;
+let startTime = 0;
+let rafId = null;
+
+if (new URLSearchParams(location.search).get('splash') === '1') {
+  document.body.classList.add('splash-mode');
+  setAspect(true);
+}
+
+function setAspect(portrait) {
+  isPortrait = portrait;
+  if (isPortrait) {
+    canvas.width = 540;
+    canvas.height = 960;
+  } else {
+    canvas.width = 1280;
+    canvas.height = 720;
+  }
+  renderMaster(parseFloat(scrubber.value));
+}
+
+aspectBtn.addEventListener('click', () => setAspect(!isPortrait));
+splashBtn.addEventListener('click', () => {
+  document.body.classList.toggle('splash-mode');
+  setAspect(document.body.classList.contains('splash-mode'));
+  startPlay();
+});
+canvas.addEventListener('click', () => {
+  if (document.body.classList.contains('splash-mode')) {
+    document.body.classList.remove('splash-mode');
+    setAspect(false);
+  }
+});
+
+audioFile.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) audioEl.src = URL.createObjectURL(file);
+});
+
+function jumpTo(sec) {
+  isPlaying = false;
+  audioEl.pause();
+  scrubber.value = sec;
+  timer.textContent = `${sec.toFixed(2).padStart(5, '0')}s / ${DURATION}s`;
+  renderMaster(sec);
+}
+
+scrubber.addEventListener('input', (e) => jumpTo(parseFloat(e.target.value)));
+
+// ============================================================================
+// PROCEDURAL SYNTH AUDIO FALLBACK (Matches all cues when MP3 isn't loaded)
+// ============================================================================
+function playFallbackSoundtrack() {
+  // Silenced as requested by user; native Android MediaPlayer plays audio track
+}
+
+function startPlay() {
+  cancelAnimationFrame(rafId);
+  isPlaying = true;
+  startTime = performance.now();
+  if (audioEl.src) {
+    audioEl.currentTime = 0;
+    audioEl.play().catch(() => {});
+  } else {
+    playFallbackSoundtrack();
+  }
+  rafId = requestAnimationFrame(loop);
+}
+
+playBtn.addEventListener('click', startPlay);
+
+// ============================================================================
+// PRE-BAKE 1: SUKUNA BACKGROUND WALL & MALEVOLENT SHRINE (SCREENSHOT 1 & 8)
+// ============================================================================
+function bakeStaticAssets() {
+  // 1A. Screenshot 1 Dark Teal-Slate Tiled Prison Wall Background
+  const bg = sukunaBgCache.getContext('2d');
+  const wallGrad = bg.createRadialGradient(VW/2, VH*0.45, 80, VW/2, VH*0.5, 760);
+  wallGrad.addColorStop(0, '#13242b');
+  wallGrad.addColorStop(0.55, '#0a141a');
+  wallGrad.addColorStop(1, '#04080b');
+  bg.fillStyle = wallGrad;
+  bg.fillRect(0, 0, VW, VH);
+
+  // Subtle dark slate stone blocks behind Sukuna
+  bg.strokeStyle = 'rgba(5, 10, 14, 0.75)';
+  bg.lineWidth = 6;
+  [180, 420, 880, 1110].forEach(x => {
+    bg.beginPath(); bg.moveTo(x, 0); bg.lineTo(x, VH); bg.stroke();
+  });
+  [175, 440].forEach(y => {
+    bg.beginPath(); bg.moveTo(0, y); bg.lineTo(VW, y); bg.stroke();
+  });
+
+  // 1B. Screenshot 8 Malevolent Shrine Top Half (0 to 365px)
+  const g = shrineTopCache.getContext('2d');
+  const hz = 365;
+  g.fillStyle = '#040102';
+  g.fillRect(0, 0, VW, hz);
+
+  // Blood-red rolling cursed sky clouds (exact Screenshot 8 pattern)
+  const clouds = [
+    [160, 45, 220, 75], [460, 30, 260, 80], [820, 35, 250, 75], [1120, 50, 230, 80],
+    [90, 135, 190, 60], [320, 165, 210, 65], [960, 155, 220, 65], [1180, 140, 200, 60],
+    [150, 250, 240, 75], [390, 285, 190, 60], [890, 280, 190, 60], [1130, 245, 240, 75]
+  ];
+  clouds.forEach(([cx, cy, rx, ry]) => {
+    g.save();
+    g.translate(cx, cy);
+    g.scale(1, ry / rx);
+    const cg = g.createRadialGradient(0, 0, 8, 0, 0, rx);
+    cg.addColorStop(0, 'rgba(138, 12, 16, 0.82)');
+    cg.addColorStop(0.5, 'rgba(72, 5, 8, 0.45)');
+    cg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    g.fillStyle = cg;
+    g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.fill();
+    g.restore();
+  });
+
+  const cx = VW / 2; // 640
+
+  // 4 Giant Curved Bull Horns on Shrine Roof (Screenshot 8)
+  [-1, 1].forEach(dir => {
+    // Outer Horn
+    g.fillStyle = '#6f7991';
+    g.strokeStyle = '#12151f';
+    g.lineWidth = 2.5;
+    g.beginPath();
+    g.moveTo(cx + dir * 95, 152);
+    g.bezierCurveTo(cx + dir * 150, 132, cx + dir * 145, 68, cx + dir * 108, 46);
+    g.bezierCurveTo(cx + dir * 126, 78, cx + dir * 120, 122, cx + dir * 78, 142);
+    g.closePath();
+    g.fill(); g.stroke();
+
+    // Inner Horn
+    g.fillStyle = '#8d98b3';
+    g.beginPath();
+    g.moveTo(cx + dir * 64, 142);
+    g.bezierCurveTo(cx + dir * 108, 118, cx + dir * 104, 60, cx + dir * 66, 42);
+    g.bezierCurveTo(cx + dir * 84, 72, cx + dir * 82, 112, cx + dir * 48, 134);
+    g.closePath();
+    g.fill(); g.stroke();
+  });
+
+  // Main Dark Curved Temple Roof & Gable
+  g.fillStyle = '#0b1014';
+  g.strokeStyle = '#3d5259';
+  g.lineWidth = 2.2;
+  g.beginPath();
+  g.moveTo(cx - 178, 162);
+  g.quadraticCurveTo(cx - 82, 134, cx, 78);
+  g.quadraticCurveTo(cx + 82, 134, cx + 178, 162);
+  g.closePath();
+  g.fill(); g.stroke();
+
+  // Glowing Cyan Skull/Crest inside Gable Peak
+  const skullGlow = g.createRadialGradient(cx, 134, 2, cx, 134, 24);
+  skullGlow.addColorStop(0, '#d4ffff');
+  skullGlow.addColorStop(0.45, '#5ce6ff');
+  skullGlow.addColorStop(1, 'rgba(0, 180, 220, 0)');
+  g.fillStyle = skullGlow;
+  g.beginPath(); g.arc(cx, 134, 24, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#092229';
+  g.lineWidth = 2;
+  for (let i = -2; i <= 2; i++) {
+    g.beginPath(); g.moveTo(cx + i * 4.5, 124); g.lineTo(cx + i * 4.5, 144); g.stroke();
+  }
+
+  // Green Eaves Line + Blazing Golden-Orange Rafter Row (Screenshot 8 signature!)
+  g.strokeStyle = '#55b899';
+  g.lineWidth = 2.5;
+  g.beginPath(); g.moveTo(cx - 176, 158); g.lineTo(cx + 176, 158); g.stroke();
+
+  const rafterGrad = g.createLinearGradient(cx - 170, 160, cx + 170, 188);
+  rafterGrad.addColorStop(0, '#5e1604');
+  rafterGrad.addColorStop(0.22, '#e86810');
+  rafterGrad.addColorStop(0.5, '#ffe270');
+  rafterGrad.addColorStop(0.78, '#e86810');
+  rafterGrad.addColorStop(1, '#5e1604');
+  g.fillStyle = rafterGrad;
+  g.beginPath();
+  g.moveTo(cx - 174, 160);
+  g.lineTo(cx + 174, 160);
+  g.lineTo(cx + 150, 186);
+  g.lineTo(cx - 150, 186);
+  g.closePath();
+  g.fill();
+
+  g.strokeStyle = '#290701';
+  g.lineWidth = 1.8;
+  for (let rx = cx - 160; rx <= cx + 160; rx += 7.5) {
+    g.beginPath();
+    g.moveTo(rx, 160);
+    g.lineTo(rx + (rx < cx ? 4 : -4), 186);
+    g.stroke();
+  }
+
+  // Vermilion Red Shrine Lintels & Pillars
+  g.fillStyle = '#9e1912';
+  g.fillRect(cx - 138, 188, 276, 12);
+  g.fillStyle = '#d9321c';
+  g.fillRect(cx - 108, 200, 216, 14);
+
+  // Dark Inner Sanctum Void
+  g.fillStyle = '#040507';
+  g.fillRect(cx - 88, 214, 176, 132);
+
+  // Twisted Dark Branches & Bull Skulls on Left/Right Exterior of Shrine
+  g.strokeStyle = '#5c5346';
+  g.lineWidth = 2.2;
+  [-1, 1].forEach(dir => {
+    for (let b = 0; b < 6; b++) {
+      g.beginPath();
+      g.moveTo(cx + dir * 88, 240 + b * 14);
+      g.quadraticCurveTo(cx + dir * 124, 232 + b * 14, cx + dir * 136, 256 + b * 14);
+      g.stroke();
+    }
+  });
+
+  // Glowing Vermilion-Orange Columns (Left & Right)
+  [-1, 1].forEach(dir => {
+    const px = cx + dir * 82;
+    const pg = g.createLinearGradient(px - 9, 214, px + 9, 342);
+    pg.addColorStop(0, '#c42212');
+    pg.addColorStop(0.55, '#ff5620');
+    pg.addColorStop(1, '#ffaa55');
+    g.fillStyle = pg;
+    g.fillRect(px - 8, 214, 16, 126);
+  });
+
+  // Giant Monstrous Mouth & Teeth Inside the Shrine (Screenshot 8 center)
+  g.fillStyle = '#9abdc9';
+  g.beginPath();
+  g.moveTo(cx - 48, 266);
+  g.quadraticCurveTo(cx - 48, 224, cx, 224);
+  g.quadraticCurveTo(cx + 48, 224, cx + 48, 266);
+  g.lineTo(cx + 39, 266);
+  g.quadraticCurveTo(cx + 39, 236, cx, 236);
+  g.quadraticCurveTo(cx - 39, 236, cx - 39, 266);
+  g.closePath();
+  g.fill();
+
+  // Lower jaw teeth row behind Sukuna
+  g.fillStyle = '#6d92a3';
+  for (let tx = cx - 44; tx <= cx + 44; tx += 9) {
+    g.fillRect(tx - 2.5, 292, 5, 16);
+  }
+
+  // Tiny Sukuna standing in White Kimono in the center of the Shrine
+  const sy = 334;
+  g.fillStyle = '#dce8f0';
+  g.beginPath();
+  g.moveTo(cx - 12, sy);
+  g.lineTo(cx - 10, sy - 38);
+  g.lineTo(cx - 16, sy - 24);
+  g.lineTo(cx - 8, sy - 44);
+  g.lineTo(cx + 8, sy - 44);
+  g.lineTo(cx + 16, sy - 24);
+  g.lineTo(cx + 10, sy - 38);
+  g.lineTo(cx + 12, sy);
+  g.closePath();
+  g.fill();
+
+  g.strokeStyle = '#141820';
+  g.lineWidth = 1.8;
+  g.beginPath();
+  g.moveTo(cx - 4, sy - 44); g.lineTo(cx, sy - 31); g.lineTo(cx + 4, sy - 44);
+  g.moveTo(cx - 5, sy - 28); g.lineTo(cx - 6, sy);
+  g.moveTo(cx + 5, sy - 28); g.lineTo(cx + 6, sy);
+  g.stroke();
+
+  g.fillStyle = '#d8b298';
+  g.beginPath(); g.arc(cx, sy - 49, 5, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#b87078';
+  g.beginPath(); g.arc(cx, sy - 51, 5, Math.PI, 0); g.fill();
+
+  // Dark craggy island base under Shrine
+  g.fillStyle = '#070c10';
+  g.beginPath();
+  g.moveTo(cx - 210, hz);
+  g.quadraticCurveTo(cx - 120, hz - 28, cx, hz - 24);
+  g.quadraticCurveTo(cx + 120, hz - 28, cx + 210, hz);
+  g.closePath();
+  g.fill();
+
+  // 1C. Pre-bake Screenshot 8 Bottom Water Reflection + Cyan Stone Pillars
+  const r = shrineReflCache.getContext('2d');
+  const rh = 355;
+  r.fillStyle = '#031017';
+  r.fillRect(0, 0, VW, rh);
+
+  // Cyan-blue underwater stone wall & two bright vertical cyan-lit pillars (Screenshot 8)
+  const leftPillarX = 315;
+  const rightPillarX = VW - 315;
+
+  // Ambient cyan patches on the tiled wall
+  [
+    [120, 110, 180], [leftPillarX, 160, 140], [rightPillarX, 160, 140], [VW - 120, 110, 180],
+    [80, 260, 150], [VW - 80, 260, 150]
+  ].forEach(([px, py, rad]) => {
+    const cg = r.createRadialGradient(px, py, 8, px, py, rad);
+    cg.addColorStop(0, 'rgba(38, 218, 245, 0.52)');
+    cg.addColorStop(0.55, 'rgba(10, 92, 118, 0.28)');
+    cg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    r.fillStyle = cg;
+    r.fillRect(0, 0, VW, rh);
+  });
+
+  // Two vertical glowing cyan pillars (exact Screenshot 8 feature!)
+  [leftPillarX, rightPillarX].forEach(px => {
+    const pg = r.createLinearGradient(px - 34, 0, px + 34, 0);
+    pg.addColorStop(0, 'rgba(4, 24, 34, 0.8)');
+    pg.addColorStop(0.25, 'rgba(28, 175, 205, 0.75)');
+    pg.addColorStop(0.55, 'rgba(145, 245, 255, 0.92)');
+    pg.addColorStop(0.85, 'rgba(18, 120, 148, 0.7)');
+    pg.addColorStop(1, 'rgba(3, 18, 26, 0.85)');
+    r.fillStyle = pg;
+    r.fillRect(px - 34, 0, 68, rh);
+  });
+
+  //Upside-down flipped reflection of the Malevolent Shrine in the center
+  r.save();
+  r.translate(0, rh);
+  r.scale(1, -1);
+  r.globalAlpha = 0.88;
+  r.drawImage(shrineTopCache, 0, 12, VW, rh, 0, 0, VW, rh);
+  r.restore();
+
+  // Stone grid lines across the submerged reflection chamber
+  r.strokeStyle = 'rgba(2, 12, 18, 0.55)';
+  r.lineWidth = 2;
+  for (let x = 60; x < VW; x += 85) {
+    r.beginPath(); r.moveTo(x, 0); r.lineTo(x, rh); r.stroke();
+  }
+  for (let y = 35; y < rh; y += 52) {
+    r.beginPath(); r.moveTo(0, y); r.lineTo(VW, y); r.stroke();
+  }
+}
+
+// ============================================================================
+// SCENE 1 (0.00s - 3.15s): STUDIO MAPPA SUKUNA POSE (EXACT SCREENSHOT 1)
+// ============================================================================
+function drawScene1_SukunaPose(g, t) {
+  g.drawImage(sukunaBgCache, 0, 0);
+
+  // Subtle camera push-in + micro impact shake at 1.10s when eyes snap open
+  const camZoom = 1.0 + (t / 3.15) * 0.045;
+  let sx = 0, sy = 0;
+  if (t >= 1.10 && t <= 1.32) {
+    const p = 1 - (t - 1.10) / 0.22;
+    sx = Math.sin(t * 95) * 5 * p;
+    sy = Math.cos(t * 82) * 5 * p;
+  }
+
+  g.save();
+  g.translate(VW / 2 + sx, VH / 2 + sy);
+  g.scale(camZoom, camZoom);
+  g.translate(-VW / 2, -VH / 2);
+
+  const cx = VW / 2; // 640
+
+  // 1. DARK NAVY JACKET SHOULDERS & SCULPTED RED HOODIE COLLAR (Screenshot 1)
+  g.lineWidth = 3.5;
+  g.lineJoin = 'round';
+  g.strokeStyle = '#0d0608';
+
+  // Navy blue outer shoulders
+  g.fillStyle = '#12182b';
+  g.beginPath();
+  g.moveTo(cx - 560, 720);
+  g.quadraticCurveTo(cx - 470, 620, cx - 350, 625);
+  g.lineTo(cx + 350, 625);
+  g.quadraticCurveTo(cx + 470, 620, cx + 560, 720);
+  g.closePath();
+  g.fill(); g.stroke();
+
+  // Inner neck shadow
+  g.fillStyle = '#241814';
+  g.fillRect(cx - 170, 440, 340, 200);
+
+  // Neck cylinder + sternocleidomastoid shadows
+  g.fillStyle = '#876a54';
+  g.fillRect(cx - 135, 450, 270, 175);
+  g.fillStyle = '#5c4535';
+  g.beginPath();
+  g.moveTo(cx - 135, 460);
+  g.quadraticCurveTo(cx, 565, cx + 135, 460);
+  g.lineTo(cx + 135, 545);
+  g.quadraticCurveTo(cx, 620, cx - 135, 545);
+  g.closePath();
+  g.fill();
+
+  // Sculpted Red Hoodie Collar (Exact folds from Screenshot 1)
+  // Back collar rim
+  g.fillStyle = '#4a090d';
+  g.beginPath();
+  g.moveTo(cx - 315, 560);
+  g.bezierCurveTo(cx - 295, 445, cx - 185, 440, cx - 135, 485);
+  g.lineTo(cx + 135, 485);
+  g.bezierCurveTo(cx + 185, 440, cx + 295, 445, cx + 315, 560);
+  g.closePath();
+  g.fill(); g.stroke();
+
+  // Mid red hood folds
+  g.fillStyle = '#7c1419';
+  g.beginPath();
+  g.moveTo(cx - 485, 720);
+  g.quadraticCurveTo(cx - 430, 565, cx - 305, 555);
+  g.bezierCurveTo(cx - 295, 465, cx - 220, 465, cx - 185, 530);
+  g.quadraticCurveTo(cx - 110, 600, cx, 610);
+  g.quadraticCurveTo(cx + 110, 600, cx + 185, 530);
+  g.bezierCurveTo(cx + 220, 465, cx + 295, 465, cx + 305, 555);
+  g.quadraticCurveTo(cx + 430, 565, cx + 485, 720);
+  g.closePath();
+  g.fill(); g.stroke();
+
+  // Deep crimson shadow pockets inside hoodie collar
+  g.fillStyle = '#380508';
+  [-1, 1].forEach(dir => {
+    g.beginPath();
+    g.moveTo(cx + dir * 285, 505);
+    g.quadraticCurveTo(cx + dir * 220, 545, cx + dir * 135, 595);
+    g.lineTo(cx + dir * 265, 635);
+    g.quadraticCurveTo(cx + dir * 320, 575, cx + dir * 285, 505);
+    g.closePath();
+    g.fill();
+
+    // Lower collar fold shadow
+    g.beginPath();
+    g.moveTo(cx + dir * 425, 645);
+    g.quadraticCurveTo(cx + dir * 290, 615, cx + dir * 165, 665);
+    g.lineTo(cx + dir * 165, 720);
+    g.lineTo(cx + dir * 455, 720);
+    g.closePath();
+    g.fill();
+  });
+
+  // 2. ANIME EARS (Proportional & Angled like Screenshot 1)
+  [-1, 1].forEach(dir => {
+    g.fillStyle = '#b8987a';
+    g.strokeStyle = '#170d0a';
+    g.lineWidth = 3.2;
+    g.beginPath();
+    g.moveTo(cx + dir * 222, 232);
+    g.bezierCurveTo(cx + dir * 276, 198, cx + dir * 296, 265, cx + dir * 272, 345);
+    g.bezierCurveTo(cx + dir * 255, 398, cx + dir * 228, 418, cx + dir * 198, 405);
+    g.closePath();
+    g.fill(); g.stroke();
+
+    // Inner ear shadow folds
+    g.fillStyle = '#7d6048';
+    g.beginPath();
+    g.moveTo(cx + dir * 232, 252);
+    g.bezierCurveTo(cx + dir * 264, 242, cx + dir * 268, 305, cx + dir * 248, 355);
+    g.lineTo(cx + dir * 216, 365);
+    g.closePath();
+    g.fill(); g.stroke();
+  });
+
+  // 3. SUKUNA'S SHARP V-TAPERED FACE CONTOUR & MAPPA SHADING (Screenshot 1)
+  g.save();
+  g.fillStyle = '#d5b696';
+  g.strokeStyle = '#140b09';
+  g.lineWidth = 3.5;
+
+  g.beginPath();
+  g.moveTo(cx - 226, 110);
+  g.lineTo(cx - 222, 245);
+  g.bezierCurveTo(cx - 220, 315, cx - 204, 378, cx - 180, 435);
+  g.bezierCurveTo(cx - 150, 495, cx - 85, 560, cx, 585);
+  g.bezierCurveTo(cx + 85, 560, cx + 150, 495, cx + 180, 435);
+  g.bezierCurveTo(cx + 204, 378, cx + 220, 315, cx + 222, 245);
+  g.lineTo(cx + 226, 110);
+  g.closePath();
+  g.fill();
+
+  g.save();
+  g.clip();
+
+  // Left-side face shadow (Screenshot 1 lighting: darker tone on viewer's left)
+  g.fillStyle = '#b49273';
+  g.beginPath();
+  g.moveTo(cx - 240, 70);
+  g.lineTo(cx - 125, 70);
+  g.bezierCurveTo(cx - 165, 195, cx - 175, 345, cx - 135, 485);
+  g.lineTo(cx - 80, 585);
+  g.lineTo(cx - 240, 585);
+  g.closePath();
+  g.fill();
+
+  // Right temple edge shadow
+  g.beginPath();
+  g.moveTo(cx + 240, 70);
+  g.lineTo(cx + 185, 70);
+  g.quadraticCurveTo(cx + 210, 240, cx + 190, 430);
+  g.lineTo(cx + 240, 430);
+  g.closePath();
+  g.fill();
+
+  // Brow & Glabella Nose-Bridge Shadow Shapes (Crucial for Sukuna's fierce glare!)
+  g.fillStyle = '#967358';
+  [-1, 1].forEach(dir => {
+    g.beginPath();
+    g.moveTo(cx + dir * 28, 224);
+    g.quadraticCurveTo(cx + dir * 115, 192, cx + dir * 204, 168);
+    g.lineTo(cx + dir * 195, 226);
+    g.lineTo(cx + dir * 82, 232);
+    g.lineTo(cx + dir * 42, 278);
+    g.lineTo(cx + dir * 18, 268);
+    g.closePath();
+    g.fill();
+  });
+
+  // Deeper inner eye-socket core shadow
+  g.fillStyle = '#6e4f3a';
+  [-1, 1].forEach(dir => {
+    g.beginPath();
+    g.moveTo(cx + dir * 32, 224);
+    g.lineTo(cx + dir * 88, 212);
+    g.lineTo(cx + dir * 78, 242);
+    g.lineTo(cx + dir * 38, 258);
+    g.closePath();
+    g.fill();
+  });
+
+  g.restore();
+  g.stroke();
+  g.restore();
+
+  // 4. SUKUNA'S FACIAL TATTOOS (Forehead, Nose Bridge, & Jagged Cheek Hooks)
+  g.fillStyle = '#140b0d';
+  // Central forehead oval
+  g.beginPath();
+  g.ellipse(cx, 126, 14, 20, 0, 0, Math.PI * 2);
+  g.fill();
+
+  // Left & Right Forehead Blade Markings (Exact Screenshot 1 geometry)
+  [-1, 1].forEach(dir => {
+    g.beginPath();
+    g.moveTo(cx + dir * 42, 68);
+    g.lineTo(cx + dir * 78, 152);
+    g.lineTo(cx + dir * 38, 162);
+    g.quadraticCurveTo(cx + dir * 18, 192, cx + dir * 6, 218);
+    g.quadraticCurveTo(cx + dir * 12, 168, cx + dir * 30, 114);
+    g.lineTo(cx + dir * 36, 142);
+    g.lineTo(cx + dir * 56, 138);
+    g.closePath();
+    g.fill();
+  });
+
+  // Winged Nose-Bridge Tattoo (peeking behind the Enmaten fingertips)
+  [-1, 1].forEach(dir => {
+    g.beginPath();
+    g.moveTo(cx + dir * 18, 326);
+    g.lineTo(cx + dir * 52, 344);
+    g.lineTo(cx + dir * 102, 318);
+    g.lineTo(cx + dir * 56, 356);
+    g.lineTo(cx + dir * 18, 338);
+    g.closePath();
+    g.fill();
+  });
+
+  // Cheek Jagged Double-Hooks & Jawline Stripes
+  [-1, 1].forEach(dir => {
+    // Upper jagged Z-hook under outer eye
+    g.beginPath();
+    g.moveTo(cx + dir * 204, 308);
+    g.lineTo(cx + dir * 186, 354);
+    g.lineTo(cx + dir * 154, 344);
+    g.lineTo(cx + dir * 172, 364);
+    g.lineTo(cx + dir * 196, 368);
+    g.lineTo(cx + dir * 212, 324);
+    g.closePath();
+    g.fill();
+
+    // Lower jagged Z-hook & long jawline curve
+    g.beginPath();
+    g.moveTo(cx + dir * 198, 372);
+    g.lineTo(cx + dir * 156, 386);
+    g.lineTo(cx + dir * 174, 404);
+    g.bezierCurveTo(cx + dir * 160, 452, cx + dir * 134, 492, cx + dir * 96, 532);
+    g.lineTo(cx + dir * 108, 544);
+    g.bezierCurveTo(cx + dir * 150, 500, cx + dir * 178, 455, cx + dir * 192, 396);
+    g.closePath();
+    g.fill();
+  });
+
+  // 5. EYEBROWS, MAIN CRIMSON EYES, & SECONDARY UNDER-EYES (Screenshot 1)
+  // Sharp Angry Eyebrows
+  g.fillStyle = '#12080a';
+  [-1, 1].forEach(dir => {
+    g.beginPath();
+    g.moveTo(cx + dir * 28, 224);
+    g.quadraticCurveTo(cx + dir * 116, 188, cx + dir * 208, 154);
+    g.quadraticCurveTo(cx + dir * 116, 198, cx + dir * 34, 230);
+    g.closePath();
+    g.fill();
+  });
+
+  // Glabella frown lines
+  g.strokeStyle = '#1c0e0b';
+  g.lineWidth = 2.2;
+  g.beginPath();
+  g.moveTo(cx - 10, 194); g.lineTo(cx - 7, 228);
+  g.moveTo(cx + 10, 194); g.lineTo(cx + 7, 228);
+  g.stroke();
+
+  // Eye Open Animation at t = 1.10s ("Ryoiki Tenkai" / "Domain Expansion.")
+  const rawOpen = Math.max(0, Math.min(1, (t - 1.06) / 0.12));
+  const eyeOpen = rawOpen === 1 ? 1.0 : (rawOpen > 0.7 ? 1.06 : rawOpen);
+
+  [-1, 1].forEach(dir => {
+    const inX   = cx + dir * 56;
+    const inTop = cx + dir * 78;
+    const outTop= cx + dir * 174;
+    const outTip= cx + dir * 194;
+    const outBot= cx + dir * 166;
+    const inBot = cx + dir * 86;
+    const cy    = 254;
+
+    // Upper eyelid crease line
+    g.strokeStyle = '#2b1812';
+    g.lineWidth = 2.4;
+    g.beginPath();
+    g.moveTo(cx + dir * 74, 222 - eyeOpen * 4);
+    g.lineTo(cx + dir * 172, 212 - eyeOpen * 4);
+    g.stroke();
+
+    if (eyeOpen < 0.08) {
+      // Closed Eyes (0.00s - 1.06s)
+      g.fillStyle = '#14090b';
+      g.beginPath();
+      g.moveTo(inX, cy + 10);
+      g.quadraticCurveTo(cx + dir * 126, cy + 22, outTip, cy - 4);
+      g.quadraticCurveTo(cx + dir * 126, cy + 14, inX, cy + 4);
+      g.closePath();
+      g.fill();
+    } else {
+      // Wide-Open Intense Anime Eyes (Exact Screenshot 1 look!)
+      g.save();
+      const ty1 = cy + (230 - cy) * eyeOpen;
+      const ty2 = cy + (222 - cy) * eyeOpen;
+      const tipY= cy + (230 - cy) * eyeOpen;
+      const by1 = cy + (280 - cy) * eyeOpen;
+      const by2 = cy + (284 - cy) * eyeOpen;
+      const iy  = cy + (272 - cy) * eyeOpen;
+
+      g.beginPath();
+      g.moveTo(inX, iy);
+      g.lineTo(inTop, ty1);
+      g.lineTo(outTop, ty2);
+      g.lineTo(outTip, tipY);
+      g.quadraticCurveTo(outBot, by1, inBot, by2);
+      g.closePath();
+
+      g.fillStyle = '#dde0e8';
+      g.fill();
+
+      g.save();
+      g.clip();
+
+      // Top sclera shadow band
+      g.fillStyle = '#989ca8';
+      g.fillRect(cx + dir * 40, ty2 - 5, dir * 170, 22);
+
+      // Crimson-Burgundy Iris (Centered cleanly in the sclera like Screenshot 1)
+      const ix = cx + dir * 120;
+      const iyCenter = 255;
+      const ir = 20.5;
+
+      g.fillStyle = '#1c0508';
+      g.beginPath(); g.arc(ix, iyCenter, ir, 0, Math.PI * 2); g.fill();
+
+      const ig = g.createRadialGradient(ix, iyCenter + 4, 2, ix, iyCenter, ir - 2);
+      ig.addColorStop(0, '#c92435');
+      ig.addColorStop(0.65, '#78141f');
+      ig.addColorStop(1, '#2b060a');
+      g.fillStyle = ig;
+      g.beginPath(); g.arc(ix, iyCenter, ir - 2.2, 0, Math.PI * 2); g.fill();
+
+      // Dark pupil
+      g.fillStyle = '#090203';
+      g.beginPath(); g.arc(ix, iyCenter, 7.2, 0, Math.PI * 2); g.fill();
+
+      // Crisp white specular highlight (top-left of iris, exact Screenshot 1)
+      g.fillStyle = '#ffffff';
+      g.beginPath(); g.arc(ix - 6.5, iyCenter - 6, 4.2, 0, Math.PI * 2); g.fill();
+
+      g.restore();
+
+      // Lower lash line
+      g.strokeStyle = '#170a0c';
+      g.lineWidth = 2.6;
+      g.beginPath();
+      g.moveTo(inX, iy);
+      g.quadraticCurveTo(inBot, by2, outBot, by1);
+      g.lineTo(outTip, tipY);
+      g.stroke();
+
+      // Thick black upper eyelash bar
+      g.fillStyle = '#120608';
+      g.beginPath();
+      g.moveTo(inX - dir * 3, iy + 1);
+      g.lineTo(inTop - dir * 3, ty1 - 6);
+      g.lineTo(outTop + dir * 5, ty2 - 7);
+      g.lineTo(outTip + dir * 7, tipY - 1);
+      g.lineTo(outTip - dir * 1, tipY + 3);
+      g.lineTo(outTop, ty2 + 2);
+      g.lineTo(inTop, ty1 + 2);
+      g.closePath();
+      g.fill();
+      g.restore();
+    }
+
+    // Secondary Under-Eye Slits (Exact Screenshot 1 detail with tiny corner iris & lash ticks!)
+    g.fillStyle = '#b08c6d';
+    g.beginPath();
+    g.moveTo(cx + dir * 76, 292);
+    g.quadraticCurveTo(cx + dir * 144, 314, cx + dir * 204, 244);
+    g.quadraticCurveTo(cx + dir * 150, 326, cx + dir * 76, 292);
+    g.closePath();
+    g.fill();
+
+    g.fillStyle = '#d4c8b2';
+    g.strokeStyle = '#1f100c';
+    g.lineWidth = 2.2;
+    g.beginPath();
+    g.moveTo(cx + dir * 82, 294);
+    g.quadraticCurveTo(cx + dir * 144, 310, cx + dir * 200, 248);
+    g.quadraticCurveTo(cx + dir * 148, 320, cx + dir * 82, 294);
+    g.closePath();
+    g.fill(); g.stroke();
+
+    // Tiny dark-red iris tucked in outer corner of secondary under-eye
+    g.fillStyle = '#5e141c';
+    g.beginPath();
+    g.arc(cx + dir * 168, 283, 4.5, 0, Math.PI * 2);
+    g.fill();
+
+    // 4 short lash ticks along under-eye
+    g.lineWidth = 1.8;
+    for (let h = 1; h <= 4; h++) {
+      const hx = cx + dir * (148 + h * 11);
+      const hy = 300 - h * 10;
+      g.beginPath();
+      g.moveTo(hx, hy);
+      g.lineTo(hx + dir * 6, hy + 5);
+      g.stroke();
+    }
+  });
+
+  // 6. SALMON-PINK SPIKY HAIR & DARK UNDERCUT ROOTS (Overlapping forehead like Screenshot 1)
+  const wind = Math.sin(t * 5) * 2.5;
+  g.save();
+  // Dark undercut roots on left & right temples
+  g.fillStyle = '#1d1215';
+  g.strokeStyle = '#0e0709';
+  g.lineWidth = 2.6;
+  [-1, 1].forEach(dir => {
+    g.beginPath();
+    g.moveTo(cx + dir * 222, 240);
+    g.lineTo(cx + dir * 255, 222);
+    g.lineTo(cx + dir * 228, 204);
+    g.lineTo(cx + dir * 260, 186);
+    g.lineTo(cx + dir * 232, 168);
+    g.lineTo(cx + dir * 215, 110);
+    g.lineTo(cx + dir * 222, 240);
+    g.closePath();
+    g.fill(); g.stroke();
+  });
+
+  // Main Spiky Salmon-Pink Hair Crown & Side Spikes (Exact Screenshot 1 silhouette)
+  g.fillStyle = '#bf7c84';
+  g.beginPath();
+  g.moveTo(cx - 218, 175);
+  const leftSpikes = [
+    [-295 + wind, 170], [-245, 132], [-325 + wind, 112], [-265, 76],
+    [-355 + wind, 42], [-275, 18], [-335 + wind, -28], [-220, -10],
+    [-160, 48], [-195, -25], [-115, 36], [-125, -35], [-55, 28],
+    [-40, -35], [0, 24]
+  ];
+  leftSpikes.forEach(([dx, dy]) => g.lineTo(cx + dx, dy));
+  [...leftSpikes].reverse().forEach(([dx, dy]) => g.lineTo(cx - dx, dy));
+  g.lineTo(cx + 218, 175);
+  // Hairline across top of forehead with jagged root locks
+  const foreheadLine = [
+    [195, 118], [170, 92], [155, 108], [122, 68], [105, 86],
+    [72, 48], [45, 68], [18, 38], [0, 56]
+  ];
+  foreheadLine.forEach(([dx, dy]) => g.lineTo(cx + dx, dy));
+  [...foreheadLine].reverse().forEach(([dx, dy]) => g.lineTo(cx - dx, dy));
+  g.closePath();
+  g.fill(); g.stroke();
+
+  // Darker rose-pink hair shading bands inside spikes
+  g.fillStyle = '#94575f';
+  [-1, 1].forEach(dir => {
+    g.beginPath();
+    g.moveTo(cx + dir * 85, 55);
+    g.quadraticCurveTo(cx + dir * 185, 15, cx + dir * 290, 68);
+    g.lineTo(cx + dir * 235, 98);
+    g.quadraticCurveTo(cx + dir * 165, 55, cx + dir * 85, 55);
+    g.closePath();
+    g.fill();
+
+    g.beginPath();
+    g.moveTo(cx + dir * 145, 98);
+    g.quadraticCurveTo(cx + dir * 225, 92, cx + dir * 295, 135);
+    g.lineTo(cx + dir * 230, 152);
+    g.closePath();
+    g.fill();
+  });
+  g.restore();
+
+  // 7. ENMATEN MUDRA HANDS (Exact Screenshot 1 Finger Geometry & Dark Nails!)
+  g.save();
+  const handY = (1 - t / 3.15) * 6;
+  g.translate(0, handY);
+  g.strokeStyle = '#170d0a';
+  g.lineWidth = 3.2;
+  g.lineJoin = 'round';
+  g.lineCap = 'round';
+
+  // Inner shadow cavity between palms
+  g.fillStyle = '#3b281c';
+  g.beginPath();
+  g.moveTo(cx - 110, 440);
+  g.lineTo(cx, 325);
+  g.lineTo(cx + 110, 440);
+  g.lineTo(cx + 135, 720);
+  g.lineTo(cx - 135, 720);
+  g.closePath();
+  g.fill();
+
+  // Interlocked Ring & Pinky Knuckles tucked inside the mudra center
+  for (let row = 0; row < 2; row++) {
+    const ky = 472 + row * 58;
+    g.fillStyle = '#806048';
+    g.beginPath(); g.roundRect(cx - 52, ky, 52, 54, 14); g.fill(); g.stroke();
+    g.fillStyle = '#997458';
+    g.beginPath(); g.roundRect(cx, ky, 52, 54, 14); g.fill(); g.stroke();
+  }
+
+  // Outer Palms / Wrists (Left & Right)
+  [-1, 1].forEach(dir => {
+    g.fillStyle = dir === -1 ? '#bf9d7e' : '#d4b394';
+    g.beginPath();
+    g.moveTo(cx + dir * 128, 505);
+    g.bezierCurveTo(cx + dir * 172, 515, cx + dir * 184, 575, cx + dir * 168, 660);
+    g.lineTo(cx + dir * 155, 730);
+    g.lineTo(cx + dir * 75, 730);
+    g.lineTo(cx + dir * 88, 595);
+    g.closePath();
+    g.fill(); g.stroke();
+  });
+
+  // Extended Middle Fingers (Pressed together vertically at nose bridge + dark purple nails!)
+  [-1, 1].forEach(dir => {
+    g.fillStyle = dir === -1 ? '#c4a284' : '#d9b89a';
+    g.beginPath();
+    g.moveTo(cx, 322);
+    g.bezierCurveTo(cx + dir * 8, 308, cx + dir * 32, 310, cx + dir * 40, 342);
+    g.lineTo(cx + dir * 66, 495);
+    g.lineTo(cx + dir * 22, 510);
+    g.lineTo(cx, 472);
+    g.closePath();
+    g.fill();
+
+    // Inner shadow strip along middle finger
+    g.fillStyle = '#997559';
+    g.beginPath();
+    g.moveTo(cx, 322);
+    g.lineTo(cx + dir * 14, 330);
+    g.lineTo(cx + dir * 18, 478);
+    g.lineTo(cx, 472);
+    g.closePath();
+    g.fill();
+
+    g.beginPath();
+    g.moveTo(cx, 322);
+    g.bezierCurveTo(cx + dir * 8, 308, cx + dir * 32, 310, cx + dir * 40, 342);
+    g.lineTo(cx + dir * 66, 495);
+    g.moveTo(cx, 322);
+    g.lineTo(cx, 472);
+    g.stroke();
+
+    // Dark Purple-Black Sharp Fingernail (Exact Screenshot 1 placement!)
+    g.save();
+    g.translate(cx + dir * 30, 344);
+    g.rotate(dir * 0.14);
+    g.fillStyle = '#260b16';
+    g.beginPath();
+    g.ellipse(0, 0, 6, 14, 0, 0, Math.PI * 2);
+    g.fill(); g.stroke();
+    g.restore();
+  });
+
+  // Bent Index Fingers flanking the Middle Fingers (Forming the triangular mudra slope)
+  [-1, 1].forEach(dir => {
+    g.fillStyle = dir === -1 ? '#c9a788' : '#dec0a2';
+    g.beginPath();
+    g.moveTo(cx + dir * 38, 342);
+    g.bezierCurveTo(cx + dir * 56, 338, cx + dir * 70, 355, cx + dir * 76, 388);
+    g.lineTo(cx + dir * 150, 618);
+    g.lineTo(cx + dir * 88, 652);
+    g.lineTo(cx + dir * 30, 388);
+    g.closePath();
+    g.fill();
+
+    // Shade along index finger inner edge
+    g.fillStyle = '#a17d61';
+    g.beginPath();
+    g.moveTo(cx + dir * 30, 388);
+    g.lineTo(cx + dir * 45, 388);
+    g.lineTo(cx + dir * 105, 638);
+    g.lineTo(cx + dir * 88, 652);
+    g.closePath();
+    g.fill();
+
+    g.beginPath();
+    g.moveTo(cx + dir * 38, 342);
+    g.bezierCurveTo(cx + dir * 56, 338, cx + dir * 70, 355, cx + dir * 76, 388);
+    g.lineTo(cx + dir * 150, 618);
+    g.moveTo(cx + dir * 30, 388);
+    g.lineTo(cx + dir * 88, 652);
+    g.stroke();
+
+    // Knuckle crease lines
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(cx + dir * 46, 426); g.lineTo(cx + dir * 72, 434);
+    g.moveTo(cx + dir * 68, 510); g.lineTo(cx + dir * 96, 520);
+    g.stroke();
+    g.lineWidth = 3.2;
+  });
+
+  // Foreground Thumbs & Lower Palm Base
+  [-1, 1].forEach(dir => {
+    g.fillStyle = dir === -1 ? '#c29f80' : '#d6b597';
+    g.beginPath();
+    g.moveTo(cx, 608);
+    g.quadraticCurveTo(cx + dir * 72, 595, cx + dir * 138, 626);
+    g.lineTo(cx + dir * 162, 730);
+    g.lineTo(cx, 730);
+    g.closePath();
+    g.fill(); g.stroke();
+  });
+  g.restore();
+
+  g.restore(); // End Camera Transform
+
+  // Subtle dark cinema vignette
+  const vig = g.createRadialGradient(VW/2, VH/2, 260, VW/2, VH/2, 740);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.52)');
+  g.fillStyle = vig;
+  g.fillRect(0, 0, VW, VH);
+
+  // Subtitle: "Domain Expansion." (Exact Screenshot 1 font style & position)
+  if (t >= 1.10) {
+    drawAnimeSubtitle(g, 'Domain Expansion.', 642);
+  }
+}
+
+// ============================================================================
+// SCENE 2 (3.15s - 6.20s): THE 5-STAGE EYES AURA RUSH (EXACT SS 2, 3, 4, 5, 6)
+// Hardware-Accelerated Multi-Pass Additive Polygon Renderer (0% Blur Filter Lag!)
+// ============================================================================
+function drawLayeredFlamePoly(g, pts, alphaScale, holePolys = [], t) {
+  if (alphaScale <= 0.01) return;
+
+  function traceSmooth(poly, expand = 0) {
+    // Calculate centroid for outward expansion (replaces expensive blur filter!)
+    let cx = 0, cy = 0;
+    poly.forEach(p => { cx += p[0]; cy += p[1]; });
+    cx /= poly.length; cy /= poly.length;
+
+    const displaced = poly.map(([px, py, amp = 8], i) => {
+      const dx = px - cx, dy = py - cy;
+      const len = Math.hypot(dx, dy) || 1;
+      const wx = Math.sin(t * 28 + i * 2.1) * amp;
+      const wy = Math.cos(t * 24 + i * 1.7) * amp;
+      return [
+        px + (dx / len) * expand + wx,
+        py + (dy / len) * expand + wy
+      ];
+    });
+
+    g.beginPath();
+    const n = displaced.length;
+    g.moveTo((displaced[n - 1][0] + displaced[0][0]) / 2, (displaced[n - 1][1] + displaced[0][1]) / 2);
+    for (let i = 0; i < n; i++) {
+      const next = displaced[(i + 1) % n];
+      g.quadraticCurveTo(
+        displaced[i][0], displaced[i][1],
+        (displaced[i][0] + next[0]) / 2, (displaced[i][1] + next[1]) / 2
+      );
+    }
+    g.closePath();
+  }
+
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+
+  // 5 Concentric Expanded Additive Layers = Butter-Smooth Mobile Glow (No ctx.filter!)
+  const layers = [
+    { exp: 22, col: `rgba(145, 0, 22, ${0.28 * alphaScale})` },
+    { exp: 13, col: `rgba(220, 12, 42, ${0.45 * alphaScale})` },
+    { exp: 6,  col: `rgba(255, 55, 82, ${0.72 * alphaScale})` },
+    { exp: 1.5,col: `rgba(255, 138, 152, ${0.92 * alphaScale})` },
+    { exp: -3, col: `rgba(255, 228, 232, ${0.95 * alphaScale})` }
+  ];
+  layers.forEach(L => {
+    g.fillStyle = L.col;
+    traceSmooth(pts, L.exp);
+    g.fill();
+  });
+  g.restore();
+
+  // Pitch-Black Void Pupils & Ragged Dark Tears Inside the Eyes (SS 3, 4, 5, 6)
+  holePolys.forEach(hPoly => {
+    g.fillStyle = '#45020c';
+    traceSmooth(hPoly, 4);
+    g.fill();
+    g.fillStyle = '#040001';
+    traceSmooth(hPoly, 0);
+    g.fill();
+  });
+}
+
+function drawScene2_EyesAuraSequence(g, t) {
+  g.fillStyle = '#000000';
+  g.fillRect(0, 0, VW, VH);
+
+  // Stage 0 (3.15s - 3.38s): Dark abyss with ominous bottom red glow ([00:00:04])
+  if (t < 3.38) {
+    const p = (t - 3.15) / 0.23;
+    const rg = g.createRadialGradient(VW/2, VH*0.95, 20, VW/2, VH*0.85, 520);
+    rg.addColorStop(0, `rgba(165, 10, 25, ${0.65 * Math.sin(p * Math.PI)})`);
+    rg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    g.fillStyle = rg;
+    g.fillRect(0, 0, VW, VH);
+    return;
+  }
+
+  // Stage 1 (3.38s - 3.62s): SCREENSHOT 2 (frame_0_48_5f.jpeg)
+  // The V-shaped crimson/pink flame slash ignites FIRST in upper-center!
+  if (t < 3.62) {
+    const p = (t - 3.38) / 0.24;
+    const vSlash = [
+      [425, 8, 5], [475, 55, 7], [525, 155, 8], [585, 235, 9],
+      [645, 228, 8], [705, 105, 8], [728, 175, 8], [685, 315, 9],
+      [652, 378, 7], [595, 325, 8], [525, 215, 8], [458, 108, 7]
+    ];
+    const hole = [[[615, 245, 4], [662, 248, 4], [652, 335, 4], [612, 305, 4]]];
+    drawLayeredFlamePoly(g, vSlash, Math.min(1, p * 1.4), hole, t);
+    return;
+  }
+
+  // Stage 2, 3, 4 (3.62s - 5.22s): SCREENSHOTS 3 -> 4 -> 5 -> 6 PROGRESSION!
+  // Let's compute the exact camera rush zoom & vertical shift across SS3 -> SS4 -> SS5 -> SS6:
+  // - 3.62s - 3.95s (SS 3): Full 4-eyes + V-grin + side crimson wisps at scale 1.0
+  // - 3.95s - 4.35s (SS 4): Aggressive zoom-in to scale 1.48, V-grin drops to bottom edge
+  // - 4.35s - 4.78s (SS 5): Extreme rush to scale 2.05, V-grin off-screen, 4 giant eyes with black holes fill frame
+  // - 4.78s - 5.22s (SS 6): Eyes shred into diagonal streaks flying outward at scale 2.55
+  if (t < 5.22) {
+    const rt = (t - 3.62) / (5.22 - 3.62); // 0.0 -> 1.0
+    const zoom = 1.0 + Math.pow(rt, 1.55) * 1.65;
+    const panY = Math.pow(rt, 1.4) * 175; // Shifts down as we rush into the 4 eyes (SS4 -> SS5)
+    const shakeX = Math.sin(t * 75) * (6 + rt * 8);
+    const shakeY = Math.cos(t * 68) * (6 + rt * 8);
+    const fadeOut = rt > 0.78 ? Math.max(0, 1 - (rt - 0.78) / 0.22) : 1.0;
+
+    g.save();
+    g.translate(VW / 2 + shakeX, VH * 0.42 + panY + shakeY);
+    g.scale(zoom, zoom);
+    g.translate(-VW / 2, -VH * 0.42);
+
+    // Side Crimson Wisps (Visible in Screenshot 3 on left & top-right edges)
+    if (rt < 0.45) {
+      const wispA = (1 - rt / 0.45) * 0.65;
+      drawLayeredFlamePoly(g, [
+        [75, 375, 8], [165, 425, 10], [275, 435, 10], [295, 515, 8], [185, 485, 9]
+      ], wispA, [], t);
+      drawLayeredFlamePoly(g, [
+        [995, 145, 8], [1045, 25, 8], [1085, 95, 8], [1015, 175, 8]
+      ], wispA, [], t);
+    }
+
+    // UPPER-LEFT EYE (Slanted Flame Eye with dark pupil slit)
+    drawLayeredFlamePoly(g, [
+      [372, -15, 6], [455, -15, 6], [518, 118, 9], [552, 208, 7],
+      [485, 168, 8], [418, 85, 8]
+    ], fadeOut, [
+      [[435, 22, 4], [488, 65, 5], [498, 128, 5], [448, 92, 4]]
+    ], t);
+
+    // UPPER-RIGHT EYE (Slanted Flame Eye with prominent round black pupil void)
+    drawLayeredFlamePoly(g, [
+      [795, -15, 6], [875, -15, 6], [818, 125, 9], [735, 205, 8],
+      [682, 235, 7], [705, 118, 9]
+    ], fadeOut, [
+      [[755, 62, 5], [798, 58, 5], [785, 128, 5], [742, 125, 5]]
+    ], t);
+
+    // LOWER-LEFT EYE (Large Slanted Eye; tears open larger black pupil cavities in SS4-SS6)
+    const lowerLeftHoles = rt < 0.55
+      ? [[[435, 232, 5], [482, 255, 5], [468, 288, 5], [422, 265, 5]]]
+      : [
+          [[395, 195, 6], [435, 212, 6], [425, 245, 6], [388, 222, 6]],
+          [[465, 275, 8], [522, 315, 8], [505, 378, 8], [452, 325, 8]]
+        ];
+    drawLayeredFlamePoly(g, [
+      [368, 148, 7], [445, 198, 10], [512, 285, 10], [552, 392, 8],
+      [498, 365, 9], [435, 278, 9], [382, 205, 8]
+    ], fadeOut, lowerLeftHoles, t);
+
+    // LOWER-RIGHT EYE (Massive Hero Flame Eye with ragged double black pupil voids in SS4 & SS5)
+    const lowerRightHoles = rt < 0.25
+      ? [[[742, 288, 5], [782, 295, 5], [765, 348, 5], [728, 335, 5]]]
+      : [
+          [[815, 185, 7], [865, 205, 7], [835, 278, 7], [792, 252, 7]],
+          [[738, 278, 8], [792, 295, 8], [772, 368, 8], [718, 345, 8]]
+        ];
+    drawLayeredFlamePoly(g, [
+      [878, 138, 8], [892, 215, 9], [838, 305, 11], [778, 385, 10],
+      [698, 435, 8], [722, 335, 10], [775, 242, 10], [832, 175, 9]
+    ], fadeOut, lowerRightHoles, t);
+
+    // BOTTOM V-SHAPED JAGGED DEMONIC GRIN (Prominent in SS3 & SS4; rushes past bottom in SS5)
+    drawLayeredFlamePoly(g, [
+      [518, 478, 7], [575, 518, 9], [618, 542, 8], [665, 508, 9],
+      [735, 458, 8], [705, 528, 9], [648, 568, 8], [618, 578, 7],
+      [575, 558, 8], [535, 518, 8]
+    ], fadeOut, [], t);
+
+    g.restore();
+    return;
+  }
+
+  // Stage 5 (5.22s - 6.20s): Brief Ominous Glimpse of Red Cursed Clouds & Sukuna's Spiky Hair ([00:00:06]-[00:00:07])
+  const st = t - 5.22;
+  if (st < 0.48) {
+    // Red cursed clouds band at top of black void
+    const cg = g.createLinearGradient(0, 0, 0, 240);
+    cg.addColorStop(0, 'rgba(135, 8, 16, 0.78)');
+    cg.addColorStop(0.6, 'rgba(45, 2, 5, 0.35)');
+    cg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    g.fillStyle = cg;
+    g.fillRect(0, 0, VW, 240);
+  } else {
+    // Quick cut of Sukuna's spiky crown & forehead tattoo dropping into darkness
+    const hp = (st - 0.48) / 0.50;
+    const dropY = hp * 160;
+    g.save();
+    g.translate(0, 260 + dropY);
+    g.fillStyle = '#917882';
+    g.strokeStyle = '#120a0d';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(340, 460);
+    const crown = [
+      [290, 380], [350, 355], [305, 285], [385, 290], [365, 215],
+      [455, 250], [470, 175], [545, 235], [585, 165], [640, 225],
+      [695, 165], [735, 235], [810, 175], [825, 250], [915, 215],
+      [895, 290], [975, 285], [930, 355], [990, 380], [940, 460]
+    ];
+    crown.forEach(([x, y]) => g.lineTo(x, y));
+    g.closePath();
+    g.fill(); g.stroke();
+
+    g.fillStyle = '#baa089';
+    g.beginPath();
+    g.arc(640, 470, 185, Math.PI * 1.15, Math.PI * 1.85);
+    g.fill(); g.stroke();
+
+    // Forehead tattoo dot peeking at bottom edge
+    g.fillStyle = '#12090b';
+    g.beginPath(); g.ellipse(640, 415, 14, 22, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+}
+
+// ============================================================================
+// SCENE 3 (6.20s - 9.60s): ABYSSAL WATER CHAMBER & 7.55s "TING" RIPPLE (SCREENSHOT 7)
+// ============================================================================
+function drawScene3_WaterTingRipple(g, t) {
+  // Exact Screenshot 7 (frame_0_52_12f.jpeg) dark blue-teal underwater stone grid background
+  const bg = g.createRadialGradient(VW/2, VH*0.48, 40, VW/2, VH*0.5, 720);
+  bg.addColorStop(0, '#071b26');
+  bg.addColorStop(0.55, '#030d17');
+  bg.addColorStop(1, '#010409');
+  g.fillStyle = bg;
+  g.fillRect(0, 0, VW, VH);
+
+  // Submerged stone wall grid blocks (Screenshot 7 texture)
+  g.strokeStyle = 'rgba(12, 42, 58, 0.28)';
+  g.lineWidth = 2;
+  for (let x = 140; x < VW; x += 110) {
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, VH); g.stroke();
+  }
+  for (let y = 80; y < VH; y += 85) {
+    g.beginPath(); g.moveTo(0, y); g.lineTo(VW, y); g.stroke();
+  }
+
+  // Horizon step line in the submerged floor
+  const cx = VW / 2;
+  const cy = VH * 0.545; // 392px (Exact center of Screenshot 7 ripple!)
+  g.fillStyle = 'rgba(2, 8, 14, 0.45)';
+  g.fillRect(0, cy - 8, VW, VH - cy + 8);
+
+  // At t = 7.55s: The Crystal "TING" Sound & Exact Screenshot 7 Elliptical Water Crown Ripple!
+  if (t >= 7.42 && t < 7.55) {
+    // Tiny subtle water bead falling right before impact
+    const p = (t - 7.42) / 0.13;
+    const dy = (cy - 180) + p * 180;
+    g.fillStyle = 'rgba(180, 230, 255, 0.65)';
+    g.beginPath(); g.ellipse(cx, dy, 2.5, 7, 0, 0, Math.PI * 2); g.fill();
+  } else if (t >= 7.55) {
+    const rt = t - 7.55; // 0.0s to 2.05s
+
+    // 1. Primary Screenshot 7 Raised Water Ring / Splash Crown in the center
+    if (rt < 1.35) {
+      const crownP = rt / 1.35;
+      const rx = 28 + crownP * 95;
+      const ry = 11 + crownP * 34;
+      const alpha = Math.pow(1 - crownP, 1.3);
+
+      // Outer soft water swell
+      const rg = g.createRadialGradient(cx, cy, rx * 0.4, cx, cy, rx * 1.25);
+      rg.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
+      rg.addColorStop(0.65, `rgba(95, 165, 195, ${0.42 * alpha})`);
+      rg.addColorStop(0.85, `rgba(190, 238, 255, ${0.68 * alpha})`);
+      rg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      g.save();
+      g.translate(cx, cy);
+      g.scale(1, ry / rx);
+      g.fillStyle = rg;
+      g.beginPath(); g.arc(0, 0, rx * 1.25, 0, Math.PI * 2); g.fill();
+      g.restore();
+
+      // Crisp specular highlight arcs on top & bottom lip of the water crown (Exact Screenshot 7 look!)
+      g.strokeStyle = `rgba(210, 245, 255, ${0.82 * alpha})`;
+      g.lineWidth = 2.2;
+      g.beginPath();
+      g.ellipse(cx, cy, rx * 0.88, ry * 0.88, 0, 0.15 * Math.PI, 0.85 * Math.PI);
+      g.stroke();
+
+      g.strokeStyle = `rgba(140, 200, 225, ${0.55 * alpha})`;
+      g.beginPath();
+      g.ellipse(cx, cy, rx * 0.82, ry * 0.82, 0, 1.15 * Math.PI, 1.85 * Math.PI);
+      g.stroke();
+    }
+
+    // 2. Concentric Secondary Ripples Expanding Smoothly Across the Dark Water
+    for (let i = 1; i <= 3; i++) {
+      const p = (rt - i * 0.18) / 1.75;
+      if (p > 0 && p < 1) {
+        const rx = 45 + p * 380;
+        const ry = 16 + p * 115;
+        const a = Math.pow(1 - p, 1.6) * 0.45;
+        g.strokeStyle = `rgba(125, 210, 240, ${a})`;
+        g.lineWidth = 1.8;
+        g.beginPath();
+        g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        g.stroke();
+      }
+    }
+  }
+}
+
+// ============================================================================
+// SCENE 4 (9.60s - 13.65s): "MALEVOLENT SHRINE!" & FULL REVEAL (SCREENSHOT 8)
+// ============================================================================
+function drawScene4_MalevolentShrine(g, t) {
+  const hz = 365;
+  const cx = VW / 2;
+
+  // Phase 4A (9.60s - 10.75s): Pre-Shrine Dark Cut ("Fukuma Mizushi" / "Malevolent Shrine!" [00:00:12])
+  // Only dark crimson clouds, dim cyan water horizon, and tiny white-kimono Sukuna appear first!
+  if (t < 10.75) {
+    const pt = (t - 9.60) / 1.15;
+    g.fillStyle = '#030102';
+    g.fillRect(0, 0, VW, VH);
+
+    // Dim crimson sky clouds at top
+    g.save();
+    g.globalAlpha = 0.45;
+    g.drawImage(shrineTopCache, 0, 0, VW, 160, 0, 0, VW, 160);
+    g.restore();
+
+    // Dim cyan water glow below horizon
+    const wg = g.createLinearGradient(0, hz, 0, VH);
+    wg.addColorStop(0, '#072836');
+    wg.addColorStop(0.35, '#041822');
+    wg.addColorStop(1, '#01060a');
+    g.fillStyle = wg;
+    g.fillRect(0, hz, VW, VH - hz);
+
+    // Tiny white-kimono Sukuna + his water reflection standing in the dark
+    g.drawImage(shrineTopCache, cx - 28, 275, 56, 70, cx - 28, 275, 56, 70);
+    g.save();
+    g.globalAlpha = 0.45;
+    g.translate(0, hz * 2 + 18);
+    g.scale(1, -1);
+    g.drawImage(shrineTopCache, cx - 28, 275, 56, 70, cx - 28, 275, 56, 70);
+    g.restore();
+
+    drawAnimeSubtitle(g, 'Malevolent Shrine!', 642);
+    return;
+  }
+
+  // Phase 4B (10.75s - 13.65s): FULL MALEVOLENT SHRINE SLAM REVEAL (EXACT SCREENSHOT 8!)
+  const st = t - 10.75;
+  const impactP = Math.max(0, 1 - st / 0.38);
+  const camZoom = 1.0 + impactP * 0.06 + (st / 2.9) * 0.035;
+  const sx = Math.sin(t * 90) * 9 * impactP;
+  const sy = Math.cos(t * 78) * 9 * impactP;
+
+  g.save();
+  g.translate(VW / 2 + sx, VH / 2 + sy);
+  g.scale(camZoom, camZoom);
+  g.translate(-VW / 2, -VH / 2);
+
+  // 1. Draw Pre-Baked Top Half (Malevolent Shrine + Crimson Clouds)
+  g.drawImage(shrineTopCache, 0, 0);
+
+  // 2. Draw Pre-Baked Bottom Half (Water Reflection + Two Glowing Cyan Stone Pillars)
+  g.drawImage(shrineReflCache, 0, hz);
+
+  // 3. Lightweight Animated Water Ripples Over the Reflection (Zero lag: only 12 horizontal wave bands!)
+  for (let i = 0; i < 12; i++) {
+    const ry = hz + 18 + i * 28;
+    const shiftX = Math.sin(t * 6 + i * 0.9) * (2.5 + i * 0.4);
+    g.drawImage(shrineReflCache, 0, 18 + i * 28, VW, 10, shiftX, ry, VW, 10);
+  }
+
+  // 4. Rolling Grey-Black Cursed Mist Along the Water Horizon (Exact Screenshot 8 separator)
+  const mist = g.createLinearGradient(0, hz - 26, 0, hz + 32);
+  mist.addColorStop(0, 'rgba(6, 10, 14, 0)');
+  mist.addColorStop(0.42, 'rgba(14, 22, 26, 0.92)');
+  mist.addColorStop(0.58, 'rgba(12, 24, 30, 0.92)');
+  mist.addColorStop(1, 'rgba(6, 16, 22, 0)');
+  g.fillStyle = mist;
+  g.fillRect(0, hz - 26, VW, 58);
+
+  g.restore();
+
+  // Impact Flash right at 10.75s Shrine Slam
+  if (impactP > 0) {
+    g.fillStyle = `rgba(255, 35, 55, ${impactP * 0.38})`;
+    g.fillRect(0, 0, VW, VH);
+  }
+
+  // Keep "Malevolent Shrine!" subtitle visible through 12.60s
+  if (t < 12.65) {
+    drawAnimeSubtitle(g, 'Malevolent Shrine!', 642);
+  }
+}
+
+// ============================================================================
+// ANIME SUBTITLE HELPER (Exact White Bold Sans-Serif with Thick Black Outline)
+// ============================================================================
+function drawAnimeSubtitle(g, text, y) {
+  g.save();
+  g.font = '900 38px "Trebuchet MS", system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.lineJoin = 'round';
+  g.strokeStyle = '#000000';
+  g.lineWidth = 9;
+  g.strokeText(text, VW / 2, y);
+  g.fillStyle = '#ffffff';
+  g.fillText(text, VW / 2, y);
+  g.restore();
+}
+
+// ============================================================================
+// MASTER COMPOSITOR (Supports both 16:9 Original & 9:16 Mobile Portrait Splash)
+// ============================================================================
+
+let firstFrameNotified = false;
+
+function notifySkip() {
+  if (window.AndroidBridge && typeof window.AndroidBridge.onUserSkip === 'function') {
+    window.AndroidBridge.onUserSkip();
+  }
+}
+window.addEventListener('click', notifySkip);
+window.addEventListener('touchstart', notifySkip);
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth || 540;
+  canvas.height = window.innerHeight || 960;
+  renderMaster(parseFloat(scrubber ? scrubber.value : 0) || 0);
+}
+window.addEventListener('resize', resizeCanvas);
+
+function renderMaster(t) {
+  vCtx.clearRect(0, 0, VW, VH);
+
+  if (t < 3.15) {
+    drawScene1_SukunaPose(vCtx, t);
+  } else if (t < 6.20) {
+    drawScene2_EyesAuraSequence(vCtx, t);
+  } else if (t < 9.60) {
+    drawScene3_WaterTingRipple(vCtx, t);
+  } else {
+    drawScene4_MalevolentShrine(vCtx, t);
+  }
+
+  // Blit onto visible canvas with aspect-fill cover
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const scale = Math.max(canvas.width / VW, canvas.height / VH);
+  const drawW = VW * scale;
+  const drawH = VH * scale;
+  const drawX = (canvas.width - drawW) / 2;
+  const drawY = (canvas.height - drawH) / 2;
+  ctx.drawImage(vCanvas, 0, 0, VW, VH, drawX, drawY, drawW, drawH);
+
+  if (!firstFrameNotified) {
+    firstFrameNotified = true;
+    if (window.AndroidBridge && typeof window.AndroidBridge.onFirstFrameRendered === 'function') {
+      window.AndroidBridge.onFirstFrameRendered();
+    }
+  }
+}
+
+function loop(now) {
+  if (!isPlaying) return;
+  const elapsed = (now - startTime) / 1000;
+
+  if (elapsed >= DURATION) {
+    renderMaster(DURATION - 0.05);
+    isPlaying = false;
+    if (window.AndroidBridge && typeof window.AndroidBridge.onAnimationFinished === 'function') {
+      window.AndroidBridge.onAnimationFinished();
+    }
+    return;
+  }
+
+  renderMaster(elapsed);
+  rafId = requestAnimationFrame(loop);
+}
+
+// Bake static layers and auto-start immediately
+bakeStaticAssets();
+resizeCanvas();
+startPlay();
+</script>
+</body>
+</html>

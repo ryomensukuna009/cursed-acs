@@ -18,7 +18,7 @@
 <resources>
   <!--  Required by F-Droid-->
   <!-- <string name="app_name" translatable="false">AndroidIDE</string> -->
-  <string name="app_name" translatable="false">Android Code Studio</string>
+  <string name="app_name" translatable="false">CURSED ACS</string>
   
   <!-- Asset Studio -->
   <string name="asset_studio_title">Asset Studio</string>
@@ -59,6 +59,13 @@
 
   <string name="edit">Edit</string>
 
+  <!-- Build Mode Preferences -->
+  <string name="idepref_build_mode_category">Build System</string>
+  <string name="idepref_build_mode_title">Build mode</string>
+  <string name="build_mode_gradle">Standard Gradle</string>
+  <string name="build_mode_offline_ndk">Offline NDK Build</string>
+  <string name="build_mode_offline_ndk_not_ready">Offline NDK Builder is not ready yet. Effective build mode remains Standard Gradle.</string>
 
-
+  <string name="title_sukuna_launch_animation">Sukuna Launch Experience</string>
+  <string name="msg_sukuna_launch_animation">Play the 13.65s Domain Expansion sequence and Japanese audio at launch</string>
 </resources>

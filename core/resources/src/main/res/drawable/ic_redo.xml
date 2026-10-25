@@ -4,8 +4,10 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+
+    <!-- Solid Chunky Curved Redo Arrow with Rounded Arrowhead -->
     <path
-        android:fillColor="#ffffff"
-        android:pathData="M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.54,15.22L3.9,16C4.95,12.81 7.95,10.5 11.5,10.5C13.45,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z" />
+        android:fillColor="@android:color/white"
+        android:pathData="M11.5,7 C15.2,7 18.5,8.6 20.7,11.2 L22.8,9.1 C23.4,8.5 24,8.9 24,9.7 V16.5 C24,17.1 23.6,17.5 23,17.5 H16.2 C15.4,17.5 15,16.9 15.6,16.3 L17.8,14.1 C16.1,12.2 13.9,11 11.5,11 C7.4,11 4,13.8 2.8,17.6 C2.6,18.1 2,18.4 1.5,18.2 L0.5,17.9 C-0.1,17.7 -0.3,17.1 -0.1,16.5 C1.6,11 6.1,7 11.5,7 Z" />
 
 </vector>

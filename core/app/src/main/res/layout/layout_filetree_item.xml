@@ -32,8 +32,8 @@
 
   <ImageView
     android:id="@+id/filetree_icon"
-    android:layout_width="25dp"
-    android:layout_height="25dp"
+    android:layout_width="28dp"
+    android:layout_height="28dp"
     android:layout_marginEnd="8dp"
     app:tint="?attr/colorPrimary"
     tools:src="@drawable/ic_language_java" />

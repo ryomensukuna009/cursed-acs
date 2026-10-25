@@ -18,9 +18,13 @@ package com.tom.rv2ide.handlers.system
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.LifecycleCoroutineScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -39,6 +43,12 @@ import com.tom.rv2ide.utils.IBuildSystemUtils
 import com.tom.rv2ide.utils.flashError
 import com.tom.rv2ide.utils.flashProgress
 import com.tom.rv2ide.utils.flashSuccess
+import android.net.Uri
+import com.tom.rv2ide.ndk.NdkArchiveImporter
+import com.tom.rv2ide.ndk.NdkSmokeTester
+import com.tom.rv2ide.ndk.NdkToolchainClassifier
+import com.tom.rv2ide.ndk.SafeNdkDeleteResult
+import com.tom.rv2ide.ndk.SafeNdkDeleter
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -57,45 +67,86 @@ class INdk(
   override val cardHolderId: Int = R.id.ndkCardHolder
   override val removeButtonId: Int = R.id.remove_btn
   override val reinstallButtonId: Int = R.id.reinstall_btn
+  override val importButtonId: Int = R.id.import_btn
+  override val testButtonId: Int = R.id.test_ndk_btn
 
   private val NDK_DIR = File(Environment.HOME, "android-sdk/ndk")
   private val ACS_DIR = File(Environment.HOME, "acs")
 
   private external fun processNdkInstall(version: String, arch: String, filename: String)
 
-  override fun updateStatus() {
+  companion object {
+    private const val PREF_CACHED_NDK_SIZE = "cached_ndk_total_size"
+  }
 
+  private var sizeCalculationJob: kotlinx.coroutines.Job? = null
+
+  override fun updateStatus() {
+    val activity = context as? IDEConfigurations
+    val deleter = SafeNdkDeleter(baseNdkDir = NDK_DIR, prefManager = prefManager)
+    val availableVersions = deleter.getInstalledVersions()
+    val activeVersion = deleter.getActiveNdkVersion()
+
+    // 1. Get cached size first - instant, NO disk scan on main thread!
+    val cachedSizeBytes = prefManager.getLong(PREF_CACHED_NDK_SIZE, -1L)
+
+    // 2. Render UI immediately with cached size (or no size badge if not yet calculated)
+    renderStatusSummary(availableVersions, activeVersion, if (cachedSizeBytes >= 0) cachedSizeBytes else null)
+
+    // 3. Update active NDK dropdown in UI
+    updateActiveNdkDropdown(activity, availableVersions, activeVersion)
+
+    // 4. Trigger asynchronous background size calculation if needed
+    triggerAsyncSizeCalculation(deleter, availableVersions, activeVersion)
+  }
+
+  private fun renderStatusSummary(
+      availableVersions: List<String>,
+      activeVersion: String?,
+      totalSizeBytes: Long?
+  ) {
     val activity = context as? IDEConfigurations
     val cardHolder = activity?.findViewById<CustomizableCardView>(R.id.ndkCardHolder)
+    val removeBtn = (context as? android.app.Activity)?.findViewById<View>(removeButtonId)
+    val testBtn = (context as? android.app.Activity)?.findViewById<View>(testButtonId)
 
-    val listedVersions = GeneralFileUtils.listDirsInDirectory(NDK_DIR)
-    val availableVersions = listedVersions.map { it.name }.sorted()
+    val errorColor = try {
+      androidx.core.content.ContextCompat.getColor(context, R.color.status_error)
+    } catch (_: Throwable) {
+      Color.RED
+    }
+    val successColor = try {
+      androidx.core.content.ContextCompat.getColor(context, R.color.status_success)
+    } catch (_: Throwable) {
+      if (isDarkTheme) Color.GREEN else Color.rgb(0, 75, 0)
+    }
+
+    val sizeBadge = if (totalSizeBytes != null && totalSizeBytes > 0) {
+      " (${SafeNdkDeleter.formatBytes(totalSizeBytes)})"
+    } else ""
 
     val statusText: String
     val color: Int
-    val removeBtn = (context as? android.app.Activity)?.findViewById<View>(removeButtonId)
 
     when {
       availableVersions.isEmpty() -> {
         statusText = "Not installed"
-        color = Color.RED
+        color = errorColor
         removeBtn?.visibility = View.GONE
+        testBtn?.visibility = View.GONE
       }
       availableVersions.size == 1 -> {
-        statusText = "${availableVersions.first()}"
-        color = if (isDarkTheme) Color.GREEN else Color.rgb(0, 75, 0)
+        statusText = "${availableVersions.first()}$sizeBadge"
+        color = successColor
         removeBtn?.visibility = View.VISIBLE
-      }
-      availableVersions.size == 2 -> {
-        statusText = "${availableVersions.joinToString(" & ")}"
-        color = if (isDarkTheme) Color.GREEN else Color.rgb(0, 75, 0)
-        removeBtn?.visibility = View.VISIBLE
+        testBtn?.visibility = View.VISIBLE
       }
       else -> {
-        statusText =
-            "${availableVersions.first()}...${availableVersions.last()} (${availableVersions.size} versions)"
-        color = if (isDarkTheme) Color.GREEN else Color.rgb(0, 75, 0)
+        val activePrefix = if (!activeVersion.isNullOrBlank()) "Active: $activeVersion" else availableVersions.first()
+        statusText = "$activePrefix (${availableVersions.size} installed)$sizeBadge"
+        color = successColor
         removeBtn?.visibility = View.VISIBLE
+        testBtn?.visibility = View.VISIBLE
       }
     }
 
@@ -114,11 +165,206 @@ class INdk(
     }
 
     cardHolder?.setCardSummary(spannableString)
+
+    // Restore the green-colored status line directly above active NDK dropdown selector
+    val tvActiveNdkInfo = (context as? android.app.Activity)?.findViewById<TextView>(R.id.tvActiveNdkInfo)
+    tvActiveNdkInfo?.text = spannableString
+  }
+
+  fun updateActiveNdkDropdown(activity: IDEConfigurations?, availableVersions: List<String>, activeVersion: String?) {
+    if (activity == null) return
+    val activeDropdown = activity.findViewById<android.widget.AutoCompleteTextView>(R.id.active_ndk_dropdown) ?: return
+
+    if (availableVersions.isEmpty()) {
+      activeDropdown.setText("No NDK installed", false)
+      activeDropdown.setAdapter(null)
+      activeDropdown.isEnabled = false
+      return
+    }
+
+    activeDropdown.isEnabled = true
+    val items = availableVersions.map { ver ->
+      if (ver.equals(activeVersion, ignoreCase = true)) "$ver [Active]" else ver
+    }
+
+    val adapter = android.widget.ArrayAdapter(context, R.layout.dropdown_item, items)
+    activeDropdown.setAdapter(adapter)
+
+    val activeDisplay = if (!activeVersion.isNullOrBlank() && availableVersions.contains(activeVersion)) {
+      "$activeVersion [Active]"
+    } else {
+      "${availableVersions.last()} [Active]"
+    }
+    activeDropdown.setText(activeDisplay, false)
+
+    activeDropdown.setOnItemClickListener { _, _, position, _ ->
+      val selectedRaw = availableVersions.getOrNull(position) ?: return@setOnItemClickListener
+      setActiveNdk(selectedRaw)
+    }
+  }
+
+  private fun triggerAsyncSizeCalculation(
+      deleter: SafeNdkDeleter,
+      availableVersions: List<String>,
+      activeVersion: String?,
+      forceRecalculate: Boolean = false
+  ) {
+    if (availableVersions.isEmpty()) {
+      prefManager.putLong(PREF_CACHED_NDK_SIZE, 0L)
+      return
+    }
+
+    val cachedSize = prefManager.getLong(PREF_CACHED_NDK_SIZE, -1L)
+    if (cachedSize >= 0L && !forceRecalculate) {
+      return
+    }
+
+    if (sizeCalculationJob?.isActive == true) {
+      return
+    }
+
+    sizeCalculationJob = lifecycleScope.launch(Dispatchers.IO) {
+      try {
+        val totalBytes = deleter.calculateTotalNdkSize()
+        prefManager.putLong(PREF_CACHED_NDK_SIZE, totalBytes)
+        withContext(Dispatchers.Main) {
+          renderStatusSummary(availableVersions, activeVersion, totalBytes)
+        }
+      } catch (t: Throwable) {
+        android.util.Log.w("INdk", "Failed to calculate total NDK size: ${t.message}")
+      }
+    }
+  }
+
+  fun setActiveNdk(version: String) {
+    val targetDir = File(NDK_DIR, version)
+    if (!SafeNdkDeleter.isValidNdkDir(targetDir)) {
+      flashError("Cannot select '$version': Missing valid NDK markers.")
+      return
+    }
+
+    try {
+      IBuildSystemUtils.setNdkVersion(version)
+      prefManager.putString("bs_native_kit_version", version)
+      prefManager.putBoolean("ndk_installed", true)
+      flashSuccess("Active NDK set to: $version")
+      updateStatus()
+    } catch (e: Exception) {
+      flashError("Failed to set active NDK: ${e.message}")
+    }
+  }
+
+  fun showActiveNdkSelectionDialog() {
+    val deleter = SafeNdkDeleter(baseNdkDir = NDK_DIR, prefManager = prefManager)
+    val installed = deleter.getInstalledVersions()
+    if (installed.isEmpty()) {
+      flashError("No installed NDK versions available.")
+      return
+    }
+
+    val currentActive = deleter.getActiveNdkVersion()
+    val displayItems = installed.map { ver ->
+      if (ver.equals(currentActive, ignoreCase = true)) "$ver [Active]" else ver
+    }.toTypedArray()
+
+    val checkedItem = installed.indexOfFirst { it.equals(currentActive, ignoreCase = true) }.coerceAtLeast(0)
+
+    MaterialAlertDialogBuilder(context)
+        .setTitle("Select Active NDK for Build System")
+        .setSingleChoiceItems(displayItems, checkedItem) { dialog, which ->
+          val selected = installed[which]
+          setActiveNdk(selected)
+          dialog.dismiss()
+        }
+        .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+        .show()
+  }
+
+  override fun onTestClick() {
+    testCurrentNdk()
+  }
+
+  private fun testCurrentNdk() {
+    val deleter = SafeNdkDeleter(baseNdkDir = NDK_DIR, prefManager = prefManager)
+    val availableVersions = deleter.getInstalledVersions()
+    val activeVersion = deleter.getActiveNdkVersion()
+
+    when {
+      availableVersions.isEmpty() -> {
+        flashError("No NDK installed. Please import or download an NDK first.")
+      }
+      availableVersions.size == 1 -> {
+        runSmokeTestForVersion(availableVersions.first())
+      }
+      else -> {
+        showVersionSelectionDialog(
+            title = "Select NDK Version to Test",
+            versions = availableVersions,
+            activeVersion = activeVersion,
+            onVersionSelected = { selectedVersion -> runSmokeTestForVersion(selectedVersion) },
+        )
+      }
+    }
+  }
+
+  private fun runSmokeTestForVersion(version: String) {
+    val targetNdk = File(NDK_DIR, version)
+    flashProgress(configure = { message("Testing NDK compiler ($version)...") }) { progressFlashbar ->
+      lifecycleScope.launch(Dispatchers.Main) {
+        try {
+          val tester = NdkSmokeTester(context)
+          val result = withContext(Dispatchers.IO) { tester.runSmokeTest(targetNdk) }
+          progressFlashbar.dismiss()
+
+          val dialogTitle = if (result.success) "NDK Test Passed" else "NDK Test Failed"
+          val messageContent = buildString {
+            appendLine("NDK Version: $version")
+            appendLine("Status: ${if (result.success) "SUCCESS" else "FAILED"}")
+            appendLine("Exit Code: ${result.exitCode}")
+            appendLine("Execution Time: ${result.durationMs} ms")
+            val libName = result.libraryName ?: result.outputLibrary?.name ?: "libndk_smoke.so"
+            appendLine("Library: $libName (${result.librarySizeBytes} bytes)")
+            if (result.elfArchitecture != null) {
+              appendLine("Architecture: ${result.elfArchitecture}")
+            }
+            appendLine("ELF Valid: ${result.isElfValid}")
+            if (result.preservedLibraryFile != null) {
+              appendLine("Preserved File: ${result.preservedLibraryFile.absolutePath}")
+            }
+            if (!result.errorMessage.isNullOrEmpty()) {
+              appendLine()
+              appendLine("Error Message:")
+              appendLine(result.errorMessage)
+            }
+            if (result.stdout.isNotBlank()) {
+              appendLine()
+              appendLine("--- ndk-build stdout ---")
+              appendLine(result.stdout.take(1500))
+            }
+            if (result.stderr.isNotBlank()) {
+              appendLine()
+              appendLine("--- ndk-build stderr ---")
+              appendLine(result.stderr.take(1500))
+            }
+          }
+
+          MaterialAlertDialogBuilder(context)
+              .setTitle(dialogTitle)
+              .setMessage(messageContent)
+              .setPositiveButton("OK") { d, _ -> d.dismiss() }
+              .show()
+        } catch (e: Exception) {
+          progressFlashbar.dismiss()
+          flashError("Test execution error: ${e.message}")
+        }
+      }
+    }
   }
 
   override fun onRemoveClick() {
-    val listedVersions = GeneralFileUtils.listDirsInDirectory(NDK_DIR)
-    val availableVersions = listedVersions.map { it.name }.sorted()
+    val deleter = SafeNdkDeleter(baseNdkDir = NDK_DIR, prefManager = prefManager)
+    val availableVersions = deleter.getInstalledVersions()
+    val activeVersion = deleter.getActiveNdkVersion()
 
     when {
       availableVersions.isEmpty() -> {
@@ -131,6 +377,7 @@ class INdk(
         showVersionSelectionDialog(
             title = "Select NDK Version to Remove",
             versions = availableVersions,
+            activeVersion = activeVersion,
             onVersionSelected = { selectedVersion -> removeNdkVersion(selectedVersion) },
         )
       }
@@ -166,44 +413,228 @@ class INdk(
     initializeAcs("android-native-kit", selectedVersion)
   }
 
+  override fun onImportClick() {
+    val activity = context as? IDEConfigurations
+    if (activity != null) {
+      val mimeTypes =
+          arrayOf(
+              "application/zip",
+              "application/x-zip-compressed",
+              "application/gzip",
+              "application/x-gzip",
+              "application/x-tar",
+              "application/x-xz",
+              "application/octet-stream",
+              "*/*",
+          )
+      activity.importNdkLauncher.launch(mimeTypes)
+    } else {
+      flashError("Cannot launch file picker: activity not available")
+    }
+  }
+
+  fun importNdkArchive(uri: Uri) {
+    flashProgress(configure = { message("Importing NDK archive...") }) { progressFlashbar ->
+      lifecycleScope.launch(Dispatchers.Main) {
+        try {
+          val result =
+              withContext(Dispatchers.IO) {
+                NdkArchiveImporter().importFromUri(
+                    context = context,
+                    uri = uri,
+                    targetBaseDir = NDK_DIR,
+                )
+              }
+
+          progressFlashbar.dismiss()
+
+          if (result.success && result.installedDir != null) {
+            prefManager.putBoolean("ndk_installed", true)
+            IBuildSystemUtils.setNdkVersion(result.installedDir.name)
+            prefManager.putString("bs_native_kit_version", result.installedDir.name)
+            prefManager.remove(PREF_CACHED_NDK_SIZE)
+            flashSuccess("Successfully imported NDK: ${result.installedDir.name}")
+            updateStatus()
+
+            val classification = result.classification
+            val details = buildString {
+              appendLine("Installation Directory: ${result.installedDir.name}")
+              if (classification != null) {
+                appendLine("Classification: ${classification.description}")
+                appendLine(
+                    "Host Architecture: ${classification.hostArchitecture ?: "Unknown"} (Bionic Native: ${classification.isBionicNative})",
+                )
+                if (classification.targetAbis.isNotEmpty()) {
+                  appendLine("Target ABIs: ${classification.targetAbis.joinToString(", ")}")
+                }
+                if (classification.apiLevels.isNotEmpty()) {
+                  appendLine(
+                      "Supported API Levels: android-${classification.apiLevels.first()} to android-${classification.apiLevels.last()}",
+                  )
+                }
+                if (classification.warnings.isNotEmpty()) {
+                  appendLine()
+                  appendLine("Warnings:")
+                  classification.warnings.forEach { appendLine("• $it") }
+                }
+              }
+            }
+
+            MaterialAlertDialogBuilder(context)
+                .setTitle("NDK Imported Successfully")
+                .setMessage(details)
+                .setPositiveButton("OK") { d, _ -> d.dismiss() }
+                .show()
+          } else {
+            flashError("Import failed: ${result.errorMessage}")
+            showErrorDialog(
+                ctx = context,
+                title = "NDK Import Failed",
+                message = result.errorMessage ?: "Unknown error during NDK import.",
+                negativeBtnTitle = "OK",
+            )
+          }
+        } catch (e: Exception) {
+          progressFlashbar.dismiss()
+          flashError("Import error: ${e.message}")
+          e.printStackTrace()
+        }
+      }
+    }
+  }
+
   override fun initialize() {
     // Initialize NDK if needed
   }
 
   override fun cleanup() {
-    // Cleanup NDK resources if needed
+    sizeCalculationJob?.cancel()
+    sizeCalculationJob = null
   }
 
   private fun removeNdkVersion(version: String) {
-    val utils = IDEUtils()
-    MaterialAlertDialogBuilder(context)
-        .setTitle("Remove NDK")
-        .setMessage("Are you sure you want to remove NDK version $version?")
-        .setPositiveButton("Remove") { dialog, _ ->
-          if (utils.deleteNdk(context, version)) {
-            if (version == getVersion()) {
-              prefManager.putBoolean("ndk_installed", false)
-            }
-            Toast.makeText(context, "Successfully removed NDK $version", Toast.LENGTH_SHORT).show()
-            updateStatus()
+    val deleter = SafeNdkDeleter(NDK_DIR, prefManager)
+    val inspection = deleter.inspectNdkForDeletion(version)
+
+    when (inspection) {
+      is SafeNdkDeleteResult.Rejected -> {
+        MaterialAlertDialogBuilder(context)
+            .setTitle("Cannot Remove NDK")
+            .setMessage(inspection.reason + (inspection.details?.let { "\n\n$it" } ?: ""))
+            .setPositiveButton("OK") { d, _ -> d.dismiss() }
+            .show()
+      }
+      is SafeNdkDeleteResult.Error -> {
+        flashError("Error inspecting NDK: ${inspection.message}")
+      }
+      is SafeNdkDeleteResult.ValidationSummary -> {
+        val message = SpannableStringBuilder().apply {
+          val warnHeader = "⚠️ WARNING: PERMANENT NDK DELETION\n\n"
+          val sWarn = length
+          append(warnHeader)
+          setSpan(ForegroundColorSpan(Color.parseColor("#E53935")), sWarn, length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
+          setSpan(StyleSpan(Typeface.BOLD), sWarn, length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+          append("NDK Version: ${inspection.version}\n")
+          append("Disk Space Freed: ${inspection.formattedSize}\n")
+          append("Location: ${inspection.targetPath}\n\n")
+
+          val damageHeader = "DAMAGES & CONSEQUENCES:\n"
+          val sDam = length
+          append(damageHeader)
+          setSpan(ForegroundColorSpan(Color.parseColor("#E53935")), sDam, length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
+          setSpan(StyleSpan(Typeface.BOLD), sDam, length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+          if (inspection.isLastNdk) {
+            append("❌ This is your ONLY installed NDK version!\n")
+            append("❌ Deleting it will completely disable offline C/C++ compilation in CURSED ACS.\n")
+            append("❌ Native builds and ndk-build will fail until an NDK archive is re-imported.\n")
+          } else if (inspection.isActive) {
+            val fallback = inspection.remainingVersionsAfterDelete.lastOrNull()
+            append("⚠️ This is currently your active NDK compiler.\n")
+            append("• Active NDK will automatically switch to '$fallback'.\n")
+            append("• Projects configured explicitly for ${inspection.version} may fail until reconfigured.\n")
           } else {
-            Toast.makeText(context, "Failed to remove NDK $version", Toast.LENGTH_SHORT).show()
+            append("• All Clang compilers, sysroots, and libraries for ${inspection.version} will be permanently erased.\n")
           }
-          dialog.dismiss()
+          append("\nDo you want to proceed with permanent deletion?")
         }
-        .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-        .create()
-        .show()
+
+        val positiveBtnText = when {
+          inspection.isLastNdk -> "Permanently Delete (Disable NDK)"
+          inspection.isActive -> "Switch & Delete"
+          else -> "Permanently Delete"
+        }
+
+        val dialog = MaterialAlertDialogBuilder(context)
+            .setTitle("Confirm NDK Deletion")
+            .setMessage(message)
+            .setPositiveButton(positiveBtnText) { d, _ ->
+              d.dismiss()
+              executeNdkDeletion(deleter, inspection)
+            }
+            .setNegativeButton("Cancel") { d, _ -> d.dismiss() }
+            .create()
+
+        dialog.show()
+        dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#E53935"))
+      }
+      else -> Unit
+    }
+  }
+
+  private fun executeNdkDeletion(deleter: SafeNdkDeleter, summary: SafeNdkDeleteResult.ValidationSummary) {
+    flashProgress(configure = { message("Deleting NDK ${summary.version}...") }) { progressFlashbar ->
+      lifecycleScope.launch(Dispatchers.Main) {
+        try {
+          val result = withContext(Dispatchers.IO) {
+            deleter.deleteNdkSafely(
+                version = summary.version,
+                forceDeleteActive = summary.isActive,
+                allowDeleteLast = summary.isLastNdk
+            )
+          }
+          progressFlashbar.dismiss()
+
+          when (result) {
+            is SafeNdkDeleteResult.Success -> {
+              val msg = "Successfully removed NDK ${result.version} (Freed ${SafeNdkDeleter.formatBytes(result.freedBytes)})"
+              flashSuccess(msg)
+              if (result.newActiveVersion != null) {
+                Toast.makeText(context, "Active NDK switched to ${result.newActiveVersion}", Toast.LENGTH_LONG).show()
+              }
+              prefManager.remove(PREF_CACHED_NDK_SIZE)
+              updateStatus()
+            }
+            is SafeNdkDeleteResult.Rejected -> {
+              flashError("Deletion rejected: ${result.reason}")
+            }
+            is SafeNdkDeleteResult.Error -> {
+              flashError("Failed to remove NDK: ${result.message}")
+            }
+            else -> Unit
+          }
+        } catch (e: Exception) {
+          progressFlashbar.dismiss()
+          flashError("Deletion failed: ${e.message}")
+        }
+      }
+    }
   }
 
   private fun showVersionSelectionDialog(
       title: String,
       versions: List<String>,
+      activeVersion: String? = null,
       onVersionSelected: (String) -> Unit,
   ) {
+    val displayItems = versions.map { ver ->
+      if (ver.equals(activeVersion, ignoreCase = true)) "$ver [Active]" else ver
+    }.toTypedArray()
+
     MaterialAlertDialogBuilder(context)
         .setTitle(title)
-        .setItems(versions.toTypedArray()) { dialog, which ->
+        .setItems(displayItems) { dialog, which ->
           val selectedVersion = versions[which]
           onVersionSelected(selectedVersion)
           dialog.dismiss()
@@ -298,6 +729,9 @@ class INdk(
                                     withContext(Dispatchers.Main) {
                                       extractFlashbar.dismiss()
                                       prefManager.putBoolean("ndk_installed", true)
+                                      IBuildSystemUtils.setNdkVersion(version)
+                                      prefManager.putString("bs_native_kit_version", version)
+                                      prefManager.remove(PREF_CACHED_NDK_SIZE)
                                       flashSuccess("Installation completed successfully!")
                                       renameDir(NDK_DIR.absolutePath, "$version")
                                       updateNdkBuild(version)

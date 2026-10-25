@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- File Header Row (Expand/Collapse Trigger) -->
+    <LinearLayout
+        android:id="@+id/groupHeaderRow"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/chevronIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="?attr/colorOnSurfaceVariant"
+            android:layout_marginEnd="6dp" />
+
+        <ImageView
+            android:id="@+id/fileTypeIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_code"
+            app:tint="?attr/colorPrimary"
+            android:layout_marginEnd="8dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/fileNameText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MainActivity.kt"
+                android:textAppearance="?attr/textAppearanceLabelLarge"
+                android:textStyle="bold" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/filePathText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="app/src/main/java/com/tom/rv2ide"
+                android:textAppearance="?attr/textAppearanceLabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:singleLine="true"
+                android:ellipsize="middle" />
+
+        </LinearLayout>
+
+        <!-- Count Badges (Errors & Warnings) -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/errorCountPill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:text="2"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="@color/status_on_error_container"
+            android:background="@drawable/bg_count_pill_error"
+            android:layout_marginEnd="4dp" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/warningCountPill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:text="1"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="@color/status_on_warning_container"
+            android:background="@drawable/bg_count_pill_warning" />
+
+    </LinearLayout>
+
+    <!-- Child Diagnostics List -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/childDiagnosticsRecycler"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:nestedScrollingEnabled="false"
+        android:visibility="visible" />
+
+    <com.google.android.material.divider.MaterialDivider
+        android:layout_width="match_parent"
+        android:layout_height="1dp" />
+
+</LinearLayout>

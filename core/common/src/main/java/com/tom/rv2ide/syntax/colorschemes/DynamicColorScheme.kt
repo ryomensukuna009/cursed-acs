@@ -32,9 +32,10 @@ open class DynamicColorScheme : SchemeAndroidIDE() {
   private var isInDarkMode: Boolean = true
 
   fun apply(context: Context) {
-    this.isInDarkMode = context.isSystemInDarkMode()
     val secondaryVariant = context.resolveAttr(attr.colorSecondaryVariant)
     val surface = context.resolveAttr(attr.colorSurface)
+    val isLight = androidx.core.graphics.ColorUtils.calculateLuminance(surface) > 0.45
+    this.isInDarkMode = !isLight
     val surfaceVariant = context.resolveAttr(attr.colorSurfaceVariant)
     val onSurface = context.resolveAttr(attr.colorOnSurface)
     val onSurfaceVariant = context.resolveAttr(attr.colorOnSurfaceVariant)
@@ -68,6 +69,7 @@ open class DynamicColorScheme : SchemeAndroidIDE() {
   }
 
   private fun applyLightColors() {
+    setColor(TEXT_NORMAL, 0xff1a1c1e)
     setColor(KEYWORD, 0xffd32f2f)
     setColor(OPERATOR, 0xff1976d2)
     setColor(LITERAL, 0xff558b2f)

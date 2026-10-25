@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="?attr/colorSurface">
+
+    <!-- Header: Severity Icon + Title + Close -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/dialogSeverityIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_error"
+            app:tint="@color/status_error"
+            android:layout_marginEnd="10dp" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/dialogSeverityTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Compiler Error"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnSurface" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/dialogCloseBtn"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            app:icon="@drawable/ic_close"
+            app:iconSize="20dp"
+            android:contentDescription="Close dialog" />
+
+    </LinearLayout>
+
+    <!-- Location & Source Chips -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="10dp">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/dialogLocationChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:text="app/src/main/AndroidManifest.xml:14:1"
+            android:fontFamily="monospace"
+            android:textSize="11sp"
+            android:textColor="?attr/colorPrimary"
+            android:background="@drawable/bg_code_tag"
+            android:singleLine="true"
+            android:ellipsize="middle"
+            android:layout_marginEnd="8dp" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/dialogSourceChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:text="AAPT2"
+            android:textSize="11sp"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:background="@drawable/bg_code_tag" />
+
+    </LinearLayout>
+
+    <!-- Full Diagnostic Message -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="180dp"
+        android:layout_marginTop="12dp">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/dialogFullMessageText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="error: duplicate attribute."
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurface"
+            android:textIsSelectable="true"
+            android:lineSpacingMultiplier="1.2" />
+
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Source Snippet (if available) -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/dialogSourceSnippet"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:fontFamily="monospace"
+        android:textSize="10.5sp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:background="@drawable/bg_code_tag"
+        android:padding="8dp"
+        android:visibility="gone" />
+
+    <com.google.android.material.divider.MaterialDivider
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="16dp" />
+
+    <!-- Action Buttons Row 1: Primary Action (Ask AI to Fix) -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/dialogBtnAiFix"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:text="Ask AI to Fix"
+        android:textAllCaps="false"
+        app:icon="@drawable/ic_nav_ai_agent_badass"
+        app:iconGravity="textStart"
+        app:iconSize="18dp"
+        app:cornerRadius="10dp" />
+
+    <!-- Action Buttons Row 2: Secondary Actions -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/dialogBtnJumpToSource"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="Open in Editor"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_code"
+            app:iconSize="16dp"
+            app:cornerRadius="8dp"
+            android:layout_marginEnd="6dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/dialogBtnCopyContext"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="Copy Context"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_content_copy"
+            app:iconSize="16dp"
+            app:cornerRadius="8dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

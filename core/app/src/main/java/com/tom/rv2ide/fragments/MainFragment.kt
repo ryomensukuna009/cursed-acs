@@ -48,6 +48,7 @@ import com.tom.rv2ide.models.MainScreenAction
 import com.tom.rv2ide.resources.R.string
 import com.tom.rv2ide.tasks.runOnUiThread
 import com.tom.rv2ide.templates.preferences.WizardPreferences
+import com.tom.rv2ide.utils.AppLogoManager
 import com.tom.rv2ide.utils.DialogUtils
 import com.tom.rv2ide.utils.Environment
 import com.tom.rv2ide.utils.GeneralFileUtils
@@ -141,6 +142,12 @@ class MainFragment : BaseFragment() {
         }
 
     binding!!.actions.adapter = MainActionsListAdapter(actions)
+    binding?.mainImage?.let { AppLogoManager.bindLogo(it) }
+  }
+
+  override fun onResume() {
+    super.onResume()
+    binding?.mainImage?.let { AppLogoManager.bindLogo(it) }
   }
 
   override fun onDestroyView() {
@@ -162,28 +169,27 @@ class MainFragment : BaseFragment() {
 
     val projectDirProjects =
         GeneralFileUtils.listDirsInDirectory(Environment.PROJECTS_DIR).filter {
-          isValidAndroidProject(it)
+          isValidAndroidProject(it) && !WizardPreferences.isProjectHidden(requireContext(), it.canonicalPath)
         }
 
     val recentProjectPaths = WizardPreferences.getRecentProjects(requireContext())
     val recentProjectFiles =
         recentProjectPaths.mapNotNull { path ->
           val file = File(path)
-          if (file.exists() && file.isDirectory && isValidAndroidProject(file)) file else null
+          if (file.exists() && file.isDirectory) file else null
         }
 
     val allProjectsMap = mutableMapOf<String, File>()
 
-    recentProjectFiles.forEach { file -> allProjectsMap[file.absolutePath] = file }
-
-    projectDirProjects.forEach { file -> allProjectsMap[file.absolutePath] = file }
+    recentProjectFiles.forEach { file -> allProjectsMap[file.canonicalPath] = file }
+    projectDirProjects.forEach { file -> allProjectsMap[file.canonicalPath] = file }
 
     val projectDirs =
         allProjectsMap.values
             .toList()
             .sortedWith(
                 compareBy<File> { project ->
-                      val recentIndex = recentProjectPaths.indexOf(project.absolutePath)
+                      val recentIndex = WizardPreferences.getRecentProjectRank(requireContext(), project.canonicalPath)
                       if (recentIndex >= 0) recentIndex else Int.MAX_VALUE
                     }
                     .thenByDescending { it.lastModified() }
@@ -209,23 +215,23 @@ class MainFragment : BaseFragment() {
                 showProjectOptionsDialog(project) {
                   val updatedProjectDirProjects =
                       GeneralFileUtils.listDirsInDirectory(Environment.PROJECTS_DIR).filter {
-                        isValidAndroidProject(it)
+                        isValidAndroidProject(it) && !WizardPreferences.isProjectHidden(requireContext(), it.canonicalPath)
                       }
                   val updatedRecentProjectPaths =
                       WizardPreferences.getRecentProjects(requireContext())
                   val updatedRecentProjectFiles =
                       updatedRecentProjectPaths.mapNotNull { path ->
                         val file = File(path)
-                        if (file.exists() && file.isDirectory && isValidAndroidProject(file)) file
+                        if (file.exists() && file.isDirectory) file
                         else null
                       }
 
                   val updatedAllProjectsMap = mutableMapOf<String, File>()
                   updatedRecentProjectFiles.forEach { file ->
-                    updatedAllProjectsMap[file.absolutePath] = file
+                    updatedAllProjectsMap[file.canonicalPath] = file
                   }
                   updatedProjectDirProjects.forEach { file ->
-                    updatedAllProjectsMap[file.absolutePath] = file
+                    updatedAllProjectsMap[file.canonicalPath] = file
                   }
 
                   val updatedDirs =
@@ -234,7 +240,7 @@ class MainFragment : BaseFragment() {
                           .sortedWith(
                               compareBy<File> { proj ->
                                     val recentIndex =
-                                        updatedRecentProjectPaths.indexOf(proj.absolutePath)
+                                        WizardPreferences.getRecentProjectRank(requireContext(), proj.canonicalPath)
                                     if (recentIndex >= 0) recentIndex else Int.MAX_VALUE
                                   }
                                   .thenByDescending { it.lastModified() }
@@ -284,24 +290,56 @@ class MainFragment : BaseFragment() {
   }
 
   private fun showProjectOptionsDialog(project: File, onActionComplete: () -> Unit) {
-    val options = arrayOf("Backup project", "Delete project", "Rename")
+    val options = arrayOf(
+        "Remove from IDE (Keep Files)",
+        "Backup project",
+        "Delete project (Permanent)",
+        "Rename"
+    )
 
     val builder = DialogUtils.newMaterialDialogBuilder(requireContext())
     builder.setTitle(project.name)
     builder.setItems(options) { dialog, which ->
       when (which) {
         0 -> {
-          backupProject(project, onActionComplete)
+          showRemoveFromIdeConfirmation(project, onActionComplete)
         }
         1 -> {
-          showDeleteProjectConfirmation(project, onActionComplete)
+          backupProject(project, onActionComplete)
         }
         2 -> {
+          showDeleteProjectConfirmation(project, onActionComplete)
+        }
+        3 -> {
           showRenameDialog(project, onActionComplete)
         }
       }
       dialog.dismiss()
     }
+    builder.show()
+  }
+
+  private fun showRemoveFromIdeConfirmation(project: File, onActionComplete: () -> Unit) {
+    val builder = DialogUtils.newMaterialDialogBuilder(requireContext())
+    builder.setTitle("Remove from IDE")
+    builder.setMessage(
+        "Remove '${project.name}' from Recent Projects and the IDE project list?\n\n" +
+        "NOTE: This will NOT delete any project files, directories, or build assets from storage. " +
+        "You can reopen this project at any time via 'Open an existing project'."
+    )
+    builder.setPositiveButton("Remove from IDE") { dialog, _ ->
+      dialog.dismiss()
+      WizardPreferences.removeRecentProject(requireContext(), project.absolutePath)
+      try {
+        WizardPreferences.removeRecentProject(requireContext(), project.canonicalPath)
+        WizardPreferences.hideProject(requireContext(), project.canonicalPath)
+      } catch (_: Throwable) {
+        WizardPreferences.hideProject(requireContext(), project.absolutePath)
+      }
+      flashSuccess("Project '${project.name}' removed from IDE (files preserved)")
+      onActionComplete()
+    }
+    builder.setNegativeButton(android.R.string.cancel, null)
     builder.show()
   }
 
@@ -415,9 +453,12 @@ class MainFragment : BaseFragment() {
 
   private fun showDeleteProjectConfirmation(project: File, onDeleted: () -> Unit) {
     val builder = DialogUtils.newMaterialDialogBuilder(requireContext())
-    builder.setTitle(getString(string.delete_project_title))
-    builder.setMessage(getString(string.delete_project_message, project.name))
-    builder.setPositiveButton(getString(string.delete)) { dialog, _ ->
+    builder.setTitle("⚠️ Delete Project Permanently")
+    builder.setMessage(
+        "Are you sure you want to PERMANENTLY DELETE '" + project.name + "' and ALL of its files and directories from storage?\n\n" +
+        "DANGER: This action CANNOT be undone! If you only want to stop seeing it in the IDE list, choose 'Remove from IDE' instead."
+    )
+    builder.setPositiveButton("Permanent Delete") { dialog, _ ->
       deleteProject(project, onDeleted)
       dialog.dismiss()
     }
@@ -509,15 +550,24 @@ class MainFragment : BaseFragment() {
   }
 
   private fun isValidAndroidProject(dir: File): Boolean {
-    if (!dir.isDirectory) return false
-
-    val gradleWrapper = File(dir, "gradle/wrapper/gradle-wrapper.properties")
-    if (!gradleWrapper.exists()) return false
+    if (!dir.exists() || !dir.isDirectory) return false
 
     val buildGradle = File(dir, "build.gradle")
     val buildGradleKts = File(dir, "build.gradle.kts")
+    val settingsGradle = File(dir, "settings.gradle")
+    val settingsGradleKts = File(dir, "settings.gradle.kts")
+    val gradleWrapper = File(dir, "gradle/wrapper/gradle-wrapper.properties")
+    val cmakeLists = File(dir, "CMakeLists.txt")
+    val jniCmake = File(dir, "app/src/main/cpp/CMakeLists.txt")
+    val androidMk = File(dir, "jni/Android.mk")
+    val manifest = File(dir, "AndroidManifest.xml")
+    val appManifest = File(dir, "app/src/main/AndroidManifest.xml")
 
-    return buildGradle.exists() || buildGradleKts.exists()
+    return buildGradle.exists() || buildGradleKts.exists() ||
+        settingsGradle.exists() || settingsGradleKts.exists() ||
+        gradleWrapper.exists() || cmakeLists.exists() ||
+        jniCmake.exists() || androidMk.exists() ||
+        manifest.exists() || appManifest.exists()
   }
 
   private fun deleteProject(project: File, onDeleted: () -> Unit) {
@@ -707,7 +757,17 @@ class MainFragment : BaseFragment() {
             withContext(Dispatchers.Main) {
               getDialog?.invoke()?.also { dialog ->
                 if (dialog.isShowing) dialog.dismiss()
-                if (success) flashSuccess(string.git_clone_success)
+                if (success) {
+                  flashSuccess(string.git_clone_success)
+                  com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                      .setTitle("Repository Cloned")
+                      .setMessage("Repository successfully cloned to '${targetDir.name}'. Open project now?")
+                      .setPositiveButton("Open Project") { _, _ ->
+                        openProject(targetDir)
+                      }
+                      .setNegativeButton("Later", null)
+                      .show()
+                }
               }
             }
           }

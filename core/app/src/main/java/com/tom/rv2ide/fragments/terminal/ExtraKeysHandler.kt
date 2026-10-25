@@ -95,7 +95,13 @@ class ExtraKeysHandler(
                 setTextColor(Color.WHITE)
             } else {
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(context.getColor(android.R.color.darker_gray))
+                val typedValue = android.util.TypedValue()
+                val onSurface = if (context.theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true)) {
+                    typedValue.data
+                } else {
+                    context.getColor(android.R.color.darker_gray)
+                }
+                setTextColor(onSurface)
             }
         }
     }

@@ -77,7 +77,7 @@ class NavigationRailManager(
         
         overlayView.isVisible = true
         overlayView.animate()
-            .alpha(1f)
+            .alpha(0.6f)
             .setDuration(300)
             .start()
         

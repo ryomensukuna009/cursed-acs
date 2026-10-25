@@ -49,7 +49,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-
+import com.tom.rv2ide.builder.offline.OfflineBuildEngine
+import com.tom.rv2ide.builder.offline.OfflineBuildProgressListener
+import com.tom.rv2ide.builder.offline.OfflineBuildStage
+import com.tom.rv2ide.builder.offline.OfflineStageResult
+import com.tom.rv2ide.builder.SharedBuildOrchestrator
+import com.tom.rv2ide.builder.BuildMode
+import com.tom.rv2ide.builder.BuildProgressListener
+import com.tom.rv2ide.preferences.internal.BuildPreferences
+import com.tom.rv2ide.projects.IProjectManager
+import com.tom.rv2ide.utils.flashInfo
+import com.tom.rv2ide.utils.flashSuccess
+import kotlinx.coroutines.Job
 const val INSTALL_VIA_SHIZUKU = "ide.build.run.installViaShizuku"
 
 /**
@@ -65,6 +76,9 @@ class QuickRunWithCancellationAction(context: Context, override val order: Int) 
 
   private val prefManager: PreferenceManager
     get() = BaseApplication.getBaseInstance().prefManager
+
+  private var isOfflineBuildRunning = false
+  private var offlineBuildJob: Job? = null
 
   companion object {
 
@@ -121,6 +135,10 @@ class QuickRunWithCancellationAction(context: Context, override val order: Int) 
   }
 
   private fun quickRun(data: ActionData): Boolean {
+    if (BuildPreferences.isOfflineNdkBuild) {
+      return runOfflineBuild(data)
+    }
+
     openApplicationModuleChooser(data) { module ->
       val activity = data.requireActivity()
 
@@ -193,6 +211,15 @@ class QuickRunWithCancellationAction(context: Context, override val order: Int) 
   }
 
   private fun cancelBuild(): Boolean {
+    if (isOfflineBuildRunning || SharedBuildOrchestrator.isBuildRunning()) {
+      log.info("Sending offline build cancellation request...")
+      SharedBuildOrchestrator.cancelCurrentBuild()
+      offlineBuildJob?.cancel()
+      isOfflineBuildRunning = false
+      flashInfo("Offline build cancelled.")
+      return true
+    }
+
     log.info("Sending build cancellation request...")
     val builder = Lookup.getDefault().lookup(BuildService.KEY_BUILD_SERVICE)
     if (builder?.isToolingServerStarted() != true) {
@@ -300,6 +327,18 @@ class QuickRunWithCancellationAction(context: Context, override val order: Int) 
 
             override fun onSuccess(status: Int, message: String) {
               activity.runOnUiThread { installingDialog?.dismiss() }
+              if (BuildPreferences.isOfflineNdkBuild) {
+                val pkg = try {
+                  OfflineBuildEngine().inspectProject(IProjectManager.getInstance().projectDir)?.packageName
+                } catch (e: Exception) {
+                  null
+                }
+                if (pkg != null) {
+                  log.info("Launching offline application via Shizuku: {}", pkg)
+                  IntentUtils.launchApp(data.requireActivity(), pkg, logError = false)
+                  return
+                }
+              }
               openApplicationModuleChooser(data) { app ->
                 val variant = app.getSelectedVariant()
 
@@ -350,7 +389,162 @@ class QuickRunWithCancellationAction(context: Context, override val order: Int) 
     }
   }
 
+  private fun runOfflineBuild(data: ActionData): Boolean {
+    val activity = data.getActivity()
+        ?: run {
+          flashError("Cannot run build. Activity instance is not available.")
+          return false
+        }
+
+    val projectDir = try {
+      IProjectManager.getInstance().projectDir
+    } catch (e: Exception) {
+      null
+    }
+
+    if (projectDir == null || !projectDir.exists()) {
+      activity.flashError("Cannot start offline build. No active project directory found.")
+      return false
+    }
+
+    isOfflineBuildRunning = true
+    activity.editorViewModel.isBuildInProgress = true
+    activity.invalidateOptionsMenu()
+
+    activity.runOnUiThread {
+      activity.showBuildOutput()
+      activity.content.bottomSheet.clearBuildOutput()
+      activity.setStatus("Offline Build: Starting...")
+      activity.appendBuildOutput(
+          "======================================================================\n" +
+          "Offline NDK Builder: ${projectDir.name}\n" +
+          "======================================================================\n"
+      )
+    }
+
+    offlineBuildJob = actionScope.launch(Dispatchers.Default) {
+      SharedBuildOrchestrator.registerActiveJob(offlineBuildJob)
+      try {
+        activity.saveAllResult()
+
+        val customTmp = File(activity.cacheDir, "offline_build_tmp")
+        try {
+          com.tom.rv2ide.problems.ProjectProblemRegistry.getInstance().setProjectRoot(projectDir)
+          com.tom.rv2ide.problems.ProjectProblemRegistry.getInstance().onBuildStarted()
+        } catch (_: Throwable) {}
+        val result = SharedBuildOrchestrator.executeBuild(
+            projectDir = projectDir,
+            customTmpDir = customTmp,
+            requestedMode = BuildMode.OFFLINE_NDK,
+            listener = object : BuildProgressListener {
+              override fun onStageStarted(stage: String, description: String) {
+                log.info("[OfflineBuild] [Stage Started: {}] {}", stage, description)
+                activity.runOnUiThread {
+                  activity.setStatus("Building: $stage")
+                  activity.appendBuildOutput("\n> Task :${stage.lowercase()}\n$description\n")
+                }
+              }
+
+              override fun onStageLog(stage: String, line: String) {
+                log.debug("[OfflineBuild] [{}] {}", stage, line)
+                activity.runOnUiThread {
+                  activity.appendBuildOutput("$line\n")
+                }
+              }
+
+              override fun onStageCompleted(stage: String, success: Boolean, durationMs: Long, message: String?) {
+                log.info(
+                    "[OfflineBuild] [Stage Done: {}] Success={} in {}ms",
+                    stage,
+                    success,
+                    durationMs,
+                )
+                activity.runOnUiThread {
+                  if (success) {
+                    activity.appendBuildOutput(
+                        "[SUCCESS] $stage completed in ${durationMs}ms\n"
+                    )
+                  } else {
+                    activity.appendBuildOutput(
+                        "[FAILED] $stage: ${message ?: "failed"}\n"
+                    )
+                  }
+                }
+              }
+            }
+        )
+
+        try {
+          val rawLog = SharedBuildOrchestrator.getRawLog(result.runId, 2000)
+          com.tom.rv2ide.problems.ProjectProblemRegistry.getInstance().recordBuildOutput(rawLog, projectDir, "OFFLINE_NDK")
+        } catch (_: Throwable) {}
+
+        withContext(Dispatchers.Main) {
+          if (result.isSuccess && result.apkFile != null) {
+            activity.setStatus("BUILD SUCCESSFUL")
+            activity.appendBuildOutput(
+                "\n======================================================================\n" +
+                "BUILD SUCCESSFUL in ${result.durationMs}ms\n" +
+                "Output APK: ${result.apkFile.absolutePath}\n" +
+                "Size: ${result.apkSizeBytes} bytes\n" +
+                "======================================================================\n"
+            )
+            activity.flashSuccess(
+                "Offline Build Succeeded! APK: ${result.apkFile.name} (${result.apkSizeBytes} bytes)"
+            )
+            install(data, result.apkFile)
+          } else {
+            val err = result.errorMessage ?: "Build failed without details."
+            log.error("Offline build failed: {}", err)
+            activity.setStatus("BUILD FAILED")
+            activity.appendBuildOutput(
+                "\n======================================================================\n" +
+                "BUILD FAILED in ${result.durationMs}ms\n" +
+                "Stage: ${result.failedStage ?: "Unknown"}\n" +
+                "Error: $err\n" +
+                "======================================================================\n"
+            )
+            activity.flashError("Offline build failed: $err")
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                .setTitle("Offline Build Failed")
+                .setMessage("Stage: ${result.failedStage ?: "Unknown"}\n\n$err")
+                .setPositiveButton(android.R.string.ok) { d, _ -> d.dismiss() }
+                .show()
+          }
+        }
+      } catch (e: kotlinx.coroutines.CancellationException) {
+        log.info("Offline build was cancelled by user.")
+        withContext(Dispatchers.Main) {
+          activity.setStatus("BUILD CANCELLED")
+          activity.appendBuildOutput("\nBUILD CANCELLED by user.\n")
+          activity.flashInfo("Offline build cancelled.")
+        }
+      } catch (e: Exception) {
+        log.error("Offline build execution error", e)
+        withContext(Dispatchers.Main) {
+          activity.setStatus("BUILD ERROR")
+          activity.appendBuildOutput("\nBUILD ERROR: ${e.message}\n")
+          activity.flashError("Offline build error: ${e.message}")
+        }
+      } finally {
+        isOfflineBuildRunning = false
+        withContext(Dispatchers.Main) {
+          activity.editorViewModel.isBuildInProgress = false
+          activity.invalidateOptionsMenu()
+        }
+      }
+    }
+
+    return true
+  }
+
   private fun ActionData.isBuildInProgress(): Boolean {
+    if (isOfflineBuildRunning || SharedBuildOrchestrator.isBuildRunning()) {
+      return true
+    }
+    if (BuildPreferences.isOfflineNdkBuild) {
+      return isOfflineBuildRunning
+    }
     val context = getActivity()
     val buildService = Lookup.getDefault().lookup(BuildService.KEY_BUILD_SERVICE)
     return context?.editorViewModel?.let { it.isInitializing || it.isBuildInProgress } == true ||

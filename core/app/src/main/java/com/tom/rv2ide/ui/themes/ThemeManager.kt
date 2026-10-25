@@ -18,12 +18,17 @@
 package com.tom.rv2ide.ui.themes
 
 import android.app.Activity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.view.WindowInsetsControllerCompat
+import com.google.android.material.color.DynamicColors
 import com.google.auto.service.AutoService
 import com.tom.rv2ide.preferences.internal.GeneralPreferences
 import com.tom.rv2ide.utils.isSystemInDarkMode
 
 /**
- * Theme manager for AndroidIDE.
+ * Theme manager for AndroidIDE (ROXUM-ACS).
+ * Dynamically adjusts application themes according to device configurations,
+ * system day/night modes, Material You palettes, and edge-to-edge system bar contrast.
  *
  * @author Akash Yadav
  */
@@ -32,29 +37,55 @@ import com.tom.rv2ide.utils.isSystemInDarkMode
 class ThemeManager : IThemeManager {
 
   /**
-   * Apply the current theme to the given activity. Does nothing if theme is set to
-   * [Material You][IDETheme.MATERIAL_YOU].
+   * Apply the current theme to the given activity, adapting dynamically to the device's
+   * display mode (day/night), Material You dynamic palettes, and system insets/status bars.
    */
   override fun applyTheme(activity: Activity) {
-
     val theme = getCurrentTheme()
+
+    val isDarkMode = when (GeneralPreferences.uiMode) {
+      AppCompatDelegate.MODE_NIGHT_YES -> true
+      AppCompatDelegate.MODE_NIGHT_NO -> false
+      else -> activity.isSystemInDarkMode()
+    }
+
     if (theme == IDETheme.MATERIAL_YOU) {
-      // No need to apply Material You theme
+      if (DynamicColors.isDynamicColorAvailable()) {
+        DynamicColors.applyToActivityIfAvailable(activity)
+      }
+      syncSystemBarsAppearance(activity, isDarkMode)
       return
     }
 
-    val style =
-        if (activity.isSystemInDarkMode()) {
-          theme.styleDark
-        } else {
-          theme.styleLight
-        }
+    val style = when (theme) {
+      IDETheme.CYAN_CREAM -> if (isDarkMode) theme.styleDark else theme.styleLight
+      IDETheme.CRIMSON_BLACK -> if (isDarkMode) theme.styleDark else theme.styleLight
+      IDETheme.SLATE_GREY -> if (isDarkMode) theme.styleDark else theme.styleLight
+      else -> if (isDarkMode) theme.styleDark else theme.styleLight
+    }
 
     activity.setTheme(style)
+    syncSystemBarsAppearance(activity, isDarkMode)
+  }
+
+  private fun syncSystemBarsAppearance(activity: Activity, isDarkMode: Boolean) {
+    try {
+      val window = activity.window ?: return
+      val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+      insetsController.isAppearanceLightStatusBars = !isDarkMode
+      insetsController.isAppearanceLightNavigationBars = !isDarkMode
+    } catch (_: Throwable) {
+    }
   }
 
   /** Get the currently selected theme. */
   override fun getCurrentTheme(): IDETheme {
-    return GeneralPreferences.selectedTheme?.let { IDETheme.valueOf(it) } ?: IDETheme.DEFAULT
+    return GeneralPreferences.selectedTheme?.let {
+      try {
+        IDETheme.valueOf(it)
+      } catch (_: Throwable) {
+        null
+      }
+    } ?: IDETheme.DEFAULT
   }
 }

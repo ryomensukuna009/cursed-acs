@@ -58,21 +58,16 @@ import java.util.zip.ZipInputStream
  */
 class KotlinLspUpdater(private val context: Context) {
 
-    private val manifestUrl = "https://raw.githubusercontent.com/AndroidCSOfficial/acs-language-servers/refs/heads/main/servers-manifest.json"
+    private val manifestUrl = ""
 
     /**
      * Checks for available updates by fetching the remote manifest and comparing versions.
-     *
-     * This function performs a network request to retrieve the latest version information
-     * from the remote manifest. If an update is available, it displays an update dialog
-     * to the user.
-     *
-     * @param currentVersion The currently installed version of the Kotlin LSP server.
-     * @param onResult Optional callback invoked with the update availability status and
-     * the remote version string. The first parameter indicates whether an update is available,
-     * and the second parameter contains the remote version string if available.
      */
     fun checkForUpdates(currentVersion: String, onResult: ((Boolean, String?) -> Unit)? = null) {
+        if (manifestUrl.isBlank()) {
+            onResult?.invoke(false, null)
+            return
+        }
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val jsonString = URL(manifestUrl).readText()

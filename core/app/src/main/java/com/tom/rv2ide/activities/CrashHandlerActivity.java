@@ -22,11 +22,12 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import com.tom.rv2ide.app.IDEActivity;
 import com.tom.rv2ide.databinding.ActivityCrashHandlerBinding;
+import com.tom.rv2ide.BuildConfig;
 import com.tom.rv2ide.fragments.CrashReportFragment;
 
 public class CrashHandlerActivity extends IDEActivity {
 
-  public static final String REPORT_ACTION = "com.tom.rv2ide.REPORT_CRASH";
+  public static final String REPORT_ACTION = BuildConfig.APPLICATION_ID + ".REPORT_CRASH";
   public static final String TRACE_KEY = "crash_trace";
   private ActivityCrashHandlerBinding binding;
 

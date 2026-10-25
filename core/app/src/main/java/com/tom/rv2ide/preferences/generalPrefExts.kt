@@ -31,6 +31,8 @@ import com.tom.rv2ide.ui.themes.IThemeManager
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import com.tom.rv2ide.utils.AppRestartDialog
+import com.tom.rv2ide.utils.AppLogoManager
+import com.tom.rv2ide.utils.AppLogoVariant
 import android.os.Handler
 import android.os.Looper
 
@@ -59,6 +61,8 @@ class InterfaceConfig(
   init {
     addPreference(UiMode())
     addPreference(ThemeSelector())
+    addPreference(AppLogoPreference())
+    addPreference(SukunaLaunchAnimationPreference())
     // addPreference(Snowfall())
     addPreference(LocaleSelector())
   }
@@ -123,9 +127,9 @@ class UiMode(
       entry: PreferenceChoices.Entry?,
       position: Int,
   ) {
+    GeneralPreferences.uiMode = (entry?.data as? Int?) ?: AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
     AppRestartDialog.show(preference.context) { restart ->
         if (restart) { 
-            GeneralPreferences.uiMode = (entry?.data as? Int?) ?: AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             android.widget.Toast.makeText(preference.context, "Restarting...", 0).show()
             Handler(Looper.getMainLooper()).postDelayed({ AppRestartDialog.restartApp(preference.context) }, 1000)
         }
@@ -162,13 +166,29 @@ class ThemeSelector(
       entry: PreferenceChoices.Entry?,
       position: Int,
   ) {
+    GeneralPreferences.selectedTheme = (entry?.data as? IDETheme?)?.name ?: IDETheme.DEFAULT.name
     AppRestartDialog.show(preference.context) { restart ->
         if (restart) { 
-            GeneralPreferences.selectedTheme = (entry?.data as? IDETheme?)?.name ?: IDETheme.DEFAULT.name
             android.widget.Toast.makeText(preference.context, "Restarting...", 0).show()
             Handler(Looper.getMainLooper()).postDelayed({ AppRestartDialog.restartApp(preference.context) }, 1000)
         }
     }
+  }
+}
+
+@Parcelize
+class AppLogoPreference(
+    override val key: String = AppLogoVariant.PREF_KEY,
+    override val title: Int = string.idepref_general_appLogo_title,
+    override val summary: Int? = string.idepref_general_appLogo_summary,
+    override val icon: Int? = drawable.ic_color_scheme,
+) : SimplePreference() {
+
+  override val tintIcon: Boolean = false
+
+  override fun onPreferenceClick(preference: Preference): Boolean {
+    AppLogoManager.showLogoSelectionDialog(preference.context)
+    return true
   }
 }
 
@@ -200,6 +220,30 @@ class Snowfall(
     }
     
     return false
+  }
+}
+
+@Parcelize
+class SukunaLaunchAnimationPreference(
+    override val key: String = GeneralPreferences.SUKUNA_LAUNCH_ANIMATION,
+    override val title: Int = MainR.string.title_sukuna_launch_animation,
+    override val summary: Int? = MainR.string.msg_sukuna_launch_animation,
+    override val icon: Int? = drawable.logo_dual_aura,
+) : SwitchPreference() {
+
+  override val tintIcon: Boolean = false
+
+  override fun onCreatePreference(context: Context): Preference {
+    val pref = super.onCreatePreference(context) as androidx.preference.SwitchPreference
+    pref.isChecked = GeneralPreferences.sukunaLaunchAnimation
+    return pref
+  }
+
+  override fun onPreferenceChanged(preference: Preference, newValue: Any?): Boolean {
+    val enabled = newValue as Boolean? ?: true
+    GeneralPreferences.sukunaLaunchAnimation = enabled
+    (preference as androidx.preference.SwitchPreference).isChecked = enabled
+    return true
   }
 }
 

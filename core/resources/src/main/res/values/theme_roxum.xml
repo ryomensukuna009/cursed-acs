@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~  This file is part of AndroidCodeStudio (ROXUM-ACS).
+  ~  Theme definitions for Phase 9.5: CyanCream, CrimsonBlack, and SlateGrey.
+  -->
+<resources>
+
+  <!-- ======================================================== -->
+  <!-- 1. Theme: Cyan + Creamy White (Theme.AndroidIDE.CyanCream) -->
+  <!-- Pristine Light Palette: warm cream background, deep cyan, crisp dark text -->
+  <!-- ======================================================== -->
+
+  <color name="_cyan_cream_light_colorPrimary">#00838F</color>
+  <color name="_cyan_cream_light_colorPrimaryContainer">#B2EBF2</color>
+  <color name="_cyan_cream_light_colorPrimaryDark">#006064</color>
+  <color name="_cyan_cream_light_colorPrimaryInverse">#80DEEA</color>
+  <color name="_cyan_cream_light_colorOnPrimary">#FFFFFF</color>
+  <color name="_cyan_cream_light_colorOnPrimaryContainer">#004D40</color>
+  <color name="_cyan_cream_light_colorSecondary">#0097A7</color>
+  <color name="_cyan_cream_light_colorSecondaryContainer">#E0F7FA</color>
+  <color name="_cyan_cream_light_colorOnSecondary">#FFFFFF</color>
+  <color name="_cyan_cream_light_colorOnSecondaryContainer">#006064</color>
+  <color name="_cyan_cream_light_colorTertiary">#00796B</color>
+  <color name="_cyan_cream_light_colorTertiaryContainer">#B2DFDB</color>
+  <color name="_cyan_cream_light_colorOnTertiary">#FFFFFF</color>
+  <color name="_cyan_cream_light_colorOnTertiaryContainer">#004D40</color>
+  <color name="_cyan_cream_light_colorError">#BA1A1A</color>
+  <color name="_cyan_cream_light_colorErrorContainer">#FFDAD6</color>
+  <color name="_cyan_cream_light_colorOnError">#FFFFFF</color>
+  <color name="_cyan_cream_light_colorOnErrorContainer">#410002</color>
+  <color name="_cyan_cream_light_colorBackground">#FAF8F5</color>
+  <color name="_cyan_cream_light_colorOnBackground">#1A1C1E</color>
+  <color name="_cyan_cream_light_colorSurface">#FAF8F5</color>
+  <color name="_cyan_cream_light_colorSurfaceDim">#F2EFE9</color>
+  <color name="_cyan_cream_light_colorSurfaceInverse">#2F3033</color>
+  <color name="_cyan_cream_light_colorSurfaceVariant">#F0ECE4</color>
+  <color name="_cyan_cream_light_colorSurfaceContainerLow">#F8F5EE</color>
+  <color name="_cyan_cream_light_colorSurfaceContainer">#EFECE4</color>
+  <color name="_cyan_cream_light_colorSurfaceContainerHigh">#E6E3DA</color>
+  <color name="_cyan_cream_light_colorOnSurface">#1A1C1E</color>
+  <color name="_cyan_cream_light_colorOnSurfaceInverse">#F1F0F4</color>
+  <color name="_cyan_cream_light_colorOnSurfaceVariant">#45494A</color>
+  <color name="_cyan_cream_light_colorOutline">#75797A</color>
+  <color name="_cyan_cream_light_colorOutlineVariant">#CBD0D2</color>
+
+  <style name="Theme.AndroidIDE.CyanCream" parent="Theme.AndroidIDE.Base.Light">
+    <item name="isLightTheme">true</item>
+    <item name="colorPrimary">@color/_cyan_cream_light_colorPrimary</item>
+    <item name="colorPrimaryContainer">@color/_cyan_cream_light_colorPrimaryContainer</item>
+    <item name="colorPrimaryDark">@color/_cyan_cream_light_colorPrimaryDark</item>
+    <item name="colorPrimaryInverse">@color/_cyan_cream_light_colorPrimaryInverse</item>
+    <item name="colorOnPrimary">@color/_cyan_cream_light_colorOnPrimary</item>
+    <item name="colorOnPrimaryContainer">@color/_cyan_cream_light_colorOnPrimaryContainer</item>
+    <item name="colorSecondary">@color/_cyan_cream_light_colorSecondary</item>
+    <item name="colorSecondaryContainer">@color/_cyan_cream_light_colorSecondaryContainer</item>
+    <item name="colorOnSecondary">@color/_cyan_cream_light_colorOnSecondary</item>
+    <item name="colorOnSecondaryContainer">@color/_cyan_cream_light_colorOnSecondaryContainer</item>
+    <item name="colorTertiary">@color/_cyan_cream_light_colorTertiary</item>
+    <item name="colorTertiaryContainer">@color/_cyan_cream_light_colorTertiaryContainer</item>
+    <item name="colorOnTertiary">@color/_cyan_cream_light_colorOnTertiary</item>
+    <item name="colorOnTertiaryContainer">@color/_cyan_cream_light_colorOnTertiaryContainer</item>
+    <item name="colorError">@color/_cyan_cream_light_colorError</item>
+    <item name="colorErrorContainer">@color/_cyan_cream_light_colorErrorContainer</item>
+    <item name="colorOnError">@color/_cyan_cream_light_colorOnError</item>
+    <item name="colorOnErrorContainer">@color/_cyan_cream_light_colorOnErrorContainer</item>
+    <item name="android:colorBackground">@color/_cyan_cream_light_colorBackground</item>
+    <item name="android:windowBackground">@color/_cyan_cream_light_colorBackground</item>
+    <item name="colorOnBackground">@color/_cyan_cream_light_colorOnBackground</item>
+    <item name="colorSurface">@color/_cyan_cream_light_colorSurface</item>
+    <item name="colorSurfaceDim">@color/_cyan_cream_light_colorSurfaceDim</item>
+    <item name="colorSurfaceInverse">@color/_cyan_cream_light_colorSurfaceInverse</item>
+    <item name="colorSurfaceVariant">@color/_cyan_cream_light_colorSurfaceVariant</item>
+    <item name="colorSurfaceContainerLow">@color/_cyan_cream_light_colorSurfaceContainerLow</item>
+    <item name="colorSurfaceContainer">@color/_cyan_cream_light_colorSurfaceContainer</item>
+    <item name="colorSurfaceContainerHigh">@color/_cyan_cream_light_colorSurfaceContainerHigh</item>
+    <item name="colorOnSurface">@color/_cyan_cream_light_colorOnSurface</item>
+    <item name="colorOnSurfaceInverse">@color/_cyan_cream_light_colorOnSurfaceInverse</item>
+    <item name="colorOnSurfaceVariant">@color/_cyan_cream_light_colorOnSurfaceVariant</item>
+    <item name="colorOutline">@color/_cyan_cream_light_colorOutline</item>
+    <item name="colorOutlineVariant">@color/_cyan_cream_light_colorOutlineVariant</item>
+    <item name="android:textColorPrimary">@color/_cyan_cream_light_colorOnSurface</item>
+    <item name="android:textColorSecondary">@color/_cyan_cream_light_colorOnSurfaceVariant</item>
+    <item name="android:textColorTertiary">@color/_cyan_cream_light_colorOutline</item>
+    <item name="android:textColor">@color/_cyan_cream_light_colorOnSurface</item>
+    <item name="android:textColorAlertDialogListItem">@color/_cyan_cream_light_colorOnSurface</item>
+    <item name="android:editTextColor">@color/_cyan_cream_light_colorOnSurface</item>
+    <item name="titleTextColor">@color/_cyan_cream_light_colorOnSurface</item>
+    <item name="subtitleTextColor">@color/_cyan_cream_light_colorOnSurfaceVariant</item>
+    <item name="colorControlNormal">@color/_cyan_cream_light_colorOnSurface</item>
+    <item name="colorControlActivated">@color/_cyan_cream_light_colorPrimary</item>
+    <item name="colorControlHighlight">#2200838F</item>
+    <item name="colorButtonNormal">@color/_cyan_cream_light_colorSurfaceContainer</item>
+
+    <!-- Tab Layout Colors for CyanCream (Crisp Dark Teal & Deep Charcoal on Cream) -->
+    <item name="tabTextColor">@color/_cyan_cream_light_colorOnSurfaceVariant</item>
+    <item name="tabSelectedTextColor">@color/_cyan_cream_light_colorPrimaryDark</item>
+    <item name="tabIndicatorColor">@color/_cyan_cream_light_colorPrimary</item>
+
+    <!-- Terminal Extra Keys Styling for CyanCream -->
+    <item name="extraKeysButtonTextColor">@color/_cyan_cream_light_colorOnSurface</item>
+    <item name="extraKeysButtonActiveTextColor">@color/_cyan_cream_light_colorPrimary</item>
+    <item name="extraKeysButtonBackgroundColor">@color/_cyan_cream_light_colorSurfaceContainer</item>
+    <item name="extraKeysButtonActiveBackgroundColor">@color/_cyan_cream_light_colorPrimaryContainer</item>
+  </style>
+
+  <!-- CyanCream preserves its light creamy identity regardless of system night mode setting -->
+  <style name="Theme.AndroidIDE.CyanCream.Dark" parent="Theme.AndroidIDE.CyanCream" />
+
+
+  <!-- ======================================================== -->
+  <!-- 2. Theme: Crimson Red + Black (Theme.AndroidIDE.CrimsonBlack) -->
+  <!-- Premium Dark Palette: deep obsidian black background, vivid crimson red -->
+  <!-- ======================================================== -->
+
+  <color name="_crimson_black_colorPrimary">#FF2A55</color>
+  <color name="_crimson_black_colorPrimaryContainer">#2A080E</color>
+  <color name="_crimson_black_colorPrimaryDark">#590B16</color>
+  <color name="_crimson_black_colorPrimaryInverse">#BA1A1A</color>
+  <color name="_crimson_black_colorOnPrimary">#FFFFFF</color>
+  <color name="_crimson_black_colorOnPrimaryContainer">#FFDAD6</color>
+  <color name="_crimson_black_colorSecondary">#D83A56</color>
+  <color name="_crimson_black_colorSecondaryContainer">#26070B</color>
+  <color name="_crimson_black_colorOnSecondary">#FFFFFF</color>
+  <color name="_crimson_black_colorOnSecondaryContainer">#FFCDD2</color>
+  <color name="_crimson_black_colorTertiary">#FF6B8B</color>
+  <color name="_crimson_black_colorTertiaryContainer">#3D0B14</color>
+  <color name="_crimson_black_colorOnTertiary">#FFFFFF</color>
+  <color name="_crimson_black_colorOnTertiaryContainer">#FFDCDA</color>
+  <color name="_crimson_black_colorError">#FFB4AB</color>
+  <color name="_crimson_black_colorErrorContainer">#93000A</color>
+  <color name="_crimson_black_colorOnError">#690005</color>
+  <color name="_crimson_black_colorOnErrorContainer">#FFDAD6</color>
+  <color name="_crimson_black_colorBackground">#000000</color>
+  <color name="_crimson_black_colorOnBackground">#F5F2F3</color>
+  <color name="_crimson_black_colorSurface">#000000</color>
+  <color name="_crimson_black_colorSurfaceDim">#000000</color>
+  <color name="_crimson_black_colorSurfaceInverse">#F5F2F3</color>
+  <color name="_crimson_black_colorSurfaceVariant">#0D0D11</color>
+  <color name="_crimson_black_colorSurfaceContainerLow">#000000</color>
+  <color name="_crimson_black_colorSurfaceContainer">#0B0B0E</color>
+  <color name="_crimson_black_colorSurfaceContainerHigh">#141419</color>
+  <color name="_crimson_black_colorOnSurface">#F1ECEE</color>
+  <color name="_crimson_black_colorOnSurfaceInverse">#000000</color>
+  <color name="_crimson_black_colorOnSurfaceVariant">#A8989B</color>
+  <color name="_crimson_black_colorOutline">#4D131B</color>
+  <color name="_crimson_black_colorOutlineVariant">#240B0F</color>
+
+  <style name="Theme.AndroidIDE.CrimsonBlack" parent="Theme.AndroidIDE.Base.Dark">
+    <item name="isLightTheme">false</item>
+    <item name="colorPrimary">@color/_crimson_black_colorPrimary</item>
+    <item name="colorPrimaryContainer">@color/_crimson_black_colorPrimaryContainer</item>
+    <item name="colorPrimaryDark">@color/_crimson_black_colorPrimaryDark</item>
+    <item name="colorPrimaryInverse">@color/_crimson_black_colorPrimaryInverse</item>
+    <item name="colorOnPrimary">@color/_crimson_black_colorOnPrimary</item>
+    <item name="colorOnPrimaryContainer">@color/_crimson_black_colorOnPrimaryContainer</item>
+    <item name="colorSecondary">@color/_crimson_black_colorSecondary</item>
+    <item name="colorSecondaryContainer">@color/_crimson_black_colorSecondaryContainer</item>
+    <item name="colorOnSecondary">@color/_crimson_black_colorOnSecondary</item>
+    <item name="colorOnSecondaryContainer">@color/_crimson_black_colorOnSecondaryContainer</item>
+    <item name="colorTertiary">@color/_crimson_black_colorTertiary</item>
+    <item name="colorTertiaryContainer">@color/_crimson_black_colorTertiaryContainer</item>
+    <item name="colorOnTertiary">@color/_crimson_black_colorOnTertiary</item>
+    <item name="colorOnTertiaryContainer">@color/_crimson_black_colorOnTertiaryContainer</item>
+    <item name="colorError">@color/_crimson_black_colorError</item>
+    <item name="colorErrorContainer">@color/_crimson_black_colorErrorContainer</item>
+    <item name="colorOnError">@color/_crimson_black_colorOnError</item>
+    <item name="colorOnErrorContainer">@color/_crimson_black_colorOnErrorContainer</item>
+    <item name="android:colorBackground">@color/_crimson_black_colorBackground</item>
+    <item name="android:windowBackground">@color/_crimson_black_colorBackground</item>
+    <item name="colorOnBackground">@color/_crimson_black_colorOnBackground</item>
+    <item name="colorSurface">@color/_crimson_black_colorSurface</item>
+    <item name="colorSurfaceDim">@color/_crimson_black_colorSurfaceDim</item>
+    <item name="colorSurfaceInverse">@color/_crimson_black_colorSurfaceInverse</item>
+    <item name="colorSurfaceVariant">@color/_crimson_black_colorSurfaceVariant</item>
+    <item name="colorSurfaceContainerLow">@color/_crimson_black_colorSurfaceContainerLow</item>
+    <item name="colorSurfaceContainer">@color/_crimson_black_colorSurfaceContainer</item>
+    <item name="colorSurfaceContainerHigh">@color/_crimson_black_colorSurfaceContainerHigh</item>
+    <item name="colorOnSurface">@color/_crimson_black_colorOnSurface</item>
+    <item name="colorOnSurfaceInverse">@color/_crimson_black_colorOnSurfaceInverse</item>
+    <item name="colorOnSurfaceVariant">@color/_crimson_black_colorOnSurfaceVariant</item>
+    <item name="colorOutline">@color/_crimson_black_colorOutline</item>
+    <item name="colorOutlineVariant">@color/_crimson_black_colorOutlineVariant</item>
+    <item name="android:textColorPrimary">@color/_crimson_black_colorOnSurface</item>
+    <item name="android:textColorSecondary">@color/_crimson_black_colorOnSurfaceVariant</item>
+    <item name="android:textColor">@color/_crimson_black_colorOnSurface</item>
+    <item name="colorControlNormal">@color/_crimson_black_colorOnSurface</item>
+    <item name="colorControlActivated">@color/_crimson_black_colorPrimary</item>
+    <item name="colorControlHighlight">#33FF5449</item>
+    <item name="colorButtonNormal">@color/_crimson_black_colorSurfaceContainer</item>
+  </style>
+
+  <style name="Theme.AndroidIDE.CrimsonBlack.Dark" parent="Theme.AndroidIDE.CrimsonBlack" />
+
+
+  <!-- ======================================================== -->
+  <!-- 3. Theme: Black + Grey / Slate (Theme.AndroidIDE.SlateGrey) -->
+  <!-- Refined Default Theme: dark slate grey background, cool grey accents -->
+  <!-- ======================================================== -->
+
+  <color name="_slate_grey_colorPrimary">#9ECAFF</color>
+  <color name="_slate_grey_colorPrimaryContainer">#00497D</color>
+  <color name="_slate_grey_colorPrimaryDark">#003258</color>
+  <color name="_slate_grey_colorPrimaryInverse">#0061A4</color>
+  <color name="_slate_grey_colorOnPrimary">#003258</color>
+  <color name="_slate_grey_colorOnPrimaryContainer">#D1E4FF</color>
+  <color name="_slate_grey_colorSecondary">#B6C4FF</color>
+  <color name="_slate_grey_colorSecondaryContainer">#253560</color>
+  <color name="_slate_grey_colorOnSecondary">#152E60</color>
+  <color name="_slate_grey_colorOnSecondaryContainer">#DBE1FF</color>
+  <color name="_slate_grey_colorTertiary">#D0BCFF</color>
+  <color name="_slate_grey_colorTertiaryContainer">#47326B</color>
+  <color name="_slate_grey_colorOnTertiary">#381E72</color>
+  <color name="_slate_grey_colorOnTertiaryContainer">#ECDCFF</color>
+  <color name="_slate_grey_colorError">#FFB4AB</color>
+  <color name="_slate_grey_colorErrorContainer">#93000A</color>
+  <color name="_slate_grey_colorOnError">#690005</color>
+  <color name="_slate_grey_colorOnErrorContainer">#FFDAD6</color>
+  <color name="_slate_grey_colorBackground">#121214</color>
+  <color name="_slate_grey_colorOnBackground">#E2E2E6</color>
+  <color name="_slate_grey_colorSurface">#121214</color>
+  <color name="_slate_grey_colorSurfaceDim">#0D0E10</color>
+  <color name="_slate_grey_colorSurfaceInverse">#E2E2E6</color>
+  <color name="_slate_grey_colorSurfaceVariant">#1E1F24</color>
+  <color name="_slate_grey_colorSurfaceContainerLow">#16171B</color>
+  <color name="_slate_grey_colorSurfaceContainer">#1E1F24</color>
+  <color name="_slate_grey_colorSurfaceContainerHigh">#282930</color>
+  <color name="_slate_grey_colorOnSurface">#E2E2E6</color>
+  <color name="_slate_grey_colorOnSurfaceInverse">#121214</color>
+  <color name="_slate_grey_colorOnSurfaceVariant">#C4C6CF</color>
+  <color name="_slate_grey_colorOutline">#8E9099</color>
+  <color name="_slate_grey_colorOutlineVariant">#44474F</color>
+
+  <style name="Theme.AndroidIDE.SlateGrey" parent="Theme.AndroidIDE.Base.Dark">
+    <item name="isLightTheme">false</item>
+    <item name="colorPrimary">@color/_slate_grey_colorPrimary</item>
+    <item name="colorPrimaryContainer">@color/_slate_grey_colorPrimaryContainer</item>
+    <item name="colorPrimaryDark">@color/_slate_grey_colorPrimaryDark</item>
+    <item name="colorPrimaryInverse">@color/_slate_grey_colorPrimaryInverse</item>
+    <item name="colorOnPrimary">@color/_slate_grey_colorOnPrimary</item>
+    <item name="colorOnPrimaryContainer">@color/_slate_grey_colorOnPrimaryContainer</item>
+    <item name="colorSecondary">@color/_slate_grey_colorSecondary</item>
+    <item name="colorSecondaryContainer">@color/_slate_grey_colorSecondaryContainer</item>
+    <item name="colorOnSecondary">@color/_slate_grey_colorOnSecondary</item>
+    <item name="colorOnSecondaryContainer">@color/_slate_grey_colorOnSecondaryContainer</item>
+    <item name="colorTertiary">@color/_slate_grey_colorTertiary</item>
+    <item name="colorTertiaryContainer">@color/_slate_grey_colorTertiaryContainer</item>
+    <item name="colorOnTertiary">@color/_slate_grey_colorOnTertiary</item>
+    <item name="colorOnTertiaryContainer">@color/_slate_grey_colorOnTertiaryContainer</item>
+    <item name="colorError">@color/_slate_grey_colorError</item>
+    <item name="colorErrorContainer">@color/_slate_grey_colorErrorContainer</item>
+    <item name="colorOnError">@color/_slate_grey_colorOnError</item>
+    <item name="colorOnErrorContainer">@color/_slate_grey_colorOnErrorContainer</item>
+    <item name="android:colorBackground">@color/_slate_grey_colorBackground</item>
+    <item name="android:windowBackground">@color/_slate_grey_colorBackground</item>
+    <item name="colorOnBackground">@color/_slate_grey_colorOnBackground</item>
+    <item name="colorSurface">@color/_slate_grey_colorSurface</item>
+    <item name="colorSurfaceDim">@color/_slate_grey_colorSurfaceDim</item>
+    <item name="colorSurfaceInverse">@color/_slate_grey_colorSurfaceInverse</item>
+    <item name="colorSurfaceVariant">@color/_slate_grey_colorSurfaceVariant</item>
+    <item name="colorSurfaceContainerLow">@color/_slate_grey_colorSurfaceContainerLow</item>
+    <item name="colorSurfaceContainer">@color/_slate_grey_colorSurfaceContainer</item>
+    <item name="colorSurfaceContainerHigh">@color/_slate_grey_colorSurfaceContainerHigh</item>
+    <item name="colorOnSurface">@color/_slate_grey_colorOnSurface</item>
+    <item name="colorOnSurfaceInverse">@color/_slate_grey_colorOnSurfaceInverse</item>
+    <item name="colorOnSurfaceVariant">@color/_slate_grey_colorOnSurfaceVariant</item>
+    <item name="colorOutline">@color/_slate_grey_colorOutline</item>
+    <item name="colorOutlineVariant">@color/_slate_grey_colorOutlineVariant</item>
+    <item name="android:textColorPrimary">@color/_slate_grey_colorOnSurface</item>
+    <item name="android:textColorSecondary">@color/_slate_grey_colorOnSurfaceVariant</item>
+    <item name="android:textColor">@color/_slate_grey_colorOnSurface</item>
+    <item name="colorControlNormal">@color/_slate_grey_colorOnSurface</item>
+    <item name="colorControlActivated">@color/_slate_grey_colorPrimary</item>
+    <item name="colorControlHighlight">#339ECAFF</item>
+    <item name="colorButtonNormal">@color/_slate_grey_colorSurfaceContainer</item>
+  </style>
+
+  <style name="Theme.AndroidIDE.SlateGrey.Dark" parent="Theme.AndroidIDE.SlateGrey" />
+
+</resources>

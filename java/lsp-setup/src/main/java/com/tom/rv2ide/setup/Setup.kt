@@ -13,7 +13,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *   along with AndroidCodeStudio.  If not, see <https://www.gnu.org/licenses/>.
-*/
+ */
 
 package com.tom.rv2ide.setup
 
@@ -29,8 +29,11 @@ import com.google.android.material.button.MaterialButton
 import com.tom.rv2ide.setup.R
 import com.tom.rv2ide.resources.R.string
 import com.tom.rv2ide.setup.servers.ILanguageServerInstaller
+import com.tom.rv2ide.setup.servers.clang.Clang
+import com.tom.rv2ide.setup.servers.kotlin.Kotlin
 import com.tom.rv2ide.models.Range
 import com.tom.rv2ide.models.Position
+import com.tom.rv2ide.utils.Environment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,15 +53,18 @@ class Setup(private val context: Context) {
   fun scanProjectForLanguageServers(projectDir: File, onComplete: ((Boolean) -> Unit)? = null) {
     scope.launch {
       withContext(Dispatchers.IO) {
+        val prefs = context.getSharedPreferences("lsp_setup_preferences", Context.MODE_PRIVATE)
         val serversToInstall = mutableListOf<Pair<String, String>>()
         
         val hasCppFiles = checkForFiles(projectDir, cppExtensions)
-        if (hasCppFiles && !isServerInstalled("clang")) {
+        val clangDismissed = prefs.getBoolean("pref_lsp_dismissed_clang", false)
+        if (hasCppFiles && !clangDismissed && !isServerInstalled("clang")) {
           serversToInstall.add("clang" to context.getString(R.string.project_contians_clang_title))
         }
         
         val hasKotlinFiles = checkForFiles(projectDir, kotlinExtensions)
-        if (hasKotlinFiles && !isServerInstalled("kotlin")) {
+        val kotlinDismissed = prefs.getBoolean("pref_lsp_dismissed_kotlin", false)
+        if (hasKotlinFiles && !kotlinDismissed && !isServerInstalled("kotlin")) {
           serversToInstall.add("kotlin" to context.getString(R.string.project_contians_kotlin_title))
         }
         
@@ -84,10 +90,24 @@ class Setup(private val context: Context) {
   }
   
   private fun isServerInstalled(serverId: String): Boolean {
+    val norm = serverId.lowercase()
+    if (norm == "clang") {
+      val clang = File(Environment.BIN_DIR, "clang")
+      val clangd = File(Environment.BIN_DIR, "clangd")
+      if (clang.exists() && clangd.exists() && clang.length() > 0L) {
+        return true
+      }
+    } else if (norm == "kotlin") {
+      val kotlinBinary = File(Environment.SERVERS_KOTLIN_DIR, "bin/kotlin-language-server")
+      val libDir = File(Environment.SERVERS_KOTLIN_DIR, "lib")
+      if (kotlinBinary.exists() && (libDir.listFiles()?.any { it.name.endsWith(".jar") } == true)) {
+        return true
+      }
+    }
     return try {
       val installer = getLanguageServerInstaller(serverId)
-      installer.isInstalled()
-    } catch (e: Exception) {
+      installer?.isInstalled() == true
+    } catch (_: Throwable) {
       false
     }
   }
@@ -131,6 +151,8 @@ class Setup(private val context: Context) {
     dialogView.findViewById<MaterialButton>(R.id.btn_cancel).setOnClickListener {
       dialog.setOnDismissListener(null)
       dialog.dismiss()
+      val prefs = context.getSharedPreferences("lsp_setup_preferences", Context.MODE_PRIVATE)
+      prefs.edit().putBoolean("pref_lsp_dismissed_$serverId", true).apply()
       onComplete?.invoke(false)
     }
     
@@ -175,13 +197,13 @@ class Setup(private val context: Context) {
     scope.launch {
       try {
         val installer = getLanguageServerInstaller(serverId)
+            ?: throw IllegalStateException("No installer registered for server: $serverId")
         installationResult[0] = withContext(Dispatchers.IO) {
           installer.install { output ->
             scope.launch(Dispatchers.Main) {
               outputBuilder.append(output).append("\n")
               val text = outputBuilder.toString()
               outputText.setText(text)
-              // Move cursor to the end of the text
               val lineCount = outputText.lineCount
               if (lineCount > 0) {
                 val lastLine = lineCount - 1
@@ -198,6 +220,8 @@ class Setup(private val context: Context) {
         progressIndicator.visibility = View.GONE
         if (installationResult[0]) {
           outputBuilder.append("\nInstallation completed successfully!")
+          val prefs = context.getSharedPreferences("lsp_setup_preferences", Context.MODE_PRIVATE)
+          prefs.edit().remove("pref_lsp_dismissed_$serverId").apply()
           showSuccessfullyInstalledDialog(context)
         } else {
           outputBuilder.append("\nInstallation failed. Please check the output above.")
@@ -246,10 +270,20 @@ class Setup(private val context: Context) {
        .show()
   }
   
-  private fun getLanguageServerInstaller(serverId: String): ILanguageServerInstaller {
-    val className = "com.tom.rv2ide.setup.servers.${serverId}.${serverId.capitalize()}"
-    val clazz = Class.forName(className)
-    val constructor = clazz.getDeclaredConstructor(Context::class.java)
-    return constructor.newInstance(context) as ILanguageServerInstaller
+  private fun getLanguageServerInstaller(serverId: String): ILanguageServerInstaller? {
+    return when (serverId.lowercase()) {
+      "clang" -> Clang(context)
+      "kotlin" -> Kotlin(context)
+      else -> {
+        try {
+          val className = "com.tom.rv2ide.setup.servers.${serverId}.${serverId.replaceFirstChar { it.uppercase() }}"
+          val clazz = Class.forName(className)
+          val constructor = clazz.getDeclaredConstructor(Context::class.java)
+          constructor.newInstance(context) as? ILanguageServerInstaller
+        } catch (_: Throwable) {
+          null
+        }
+      }
+    }
   }
 }

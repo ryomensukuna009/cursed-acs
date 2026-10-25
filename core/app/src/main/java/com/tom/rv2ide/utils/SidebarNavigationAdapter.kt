@@ -30,6 +30,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.color.MaterialColors
 import com.tom.rv2ide.R
 import com.tom.rv2ide.actions.SidebarActionItem
 
@@ -67,53 +68,39 @@ class SidebarNavigationAdapter(
 
     fun bind(item: SidebarNavigationItem) {
       button.apply {
-        val paddingLeft = paddingLeft
-        val paddingTop = paddingTop
-        val paddingRight = paddingRight
-        val paddingBottom = paddingBottom
-
-        icon = null
-        iconTint = null
-
         contentDescription = item.title
         isSelected = item.isSelected
         isChecked = item.isSelected
 
-        if (item.isSelected) {
-          val baseColor =
-              resolveColorAttr(context, com.google.android.material.R.attr.colorPrimaryContainer)
+        val density = context.resources.displayMetrics.density
+        iconSize = (28 * density).toInt()
 
-          val alpha = (0.5f * 255).toInt() // 50% opacity
-          val red = (android.graphics.Color.red(baseColor) * 0.7f).toInt()
-          val green = (android.graphics.Color.green(baseColor) * 0.7f).toInt()
-          val blue = (android.graphics.Color.blue(baseColor) * 0.7f).toInt()
-          val finalColor = android.graphics.Color.argb(alpha, red, green, blue)
-
-          val shape =
-              android.graphics.drawable.GradientDrawable().apply {
-                this.shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                cornerRadius = 40f
-                setColor(finalColor)
-              }
-          val insetValue = 30
-          background = android.graphics.drawable.InsetDrawable(shape, insetValue)
+        val baseColorInt = if (item.isSelected) {
+          MaterialColors.getColor(button, com.google.android.material.R.attr.colorPrimaryContainer, 0xFF2A080E.toInt())
         } else {
-          background = null
+          MaterialColors.getColor(button, com.google.android.material.R.attr.colorSurfaceContainerLow, 0xFF000000.toInt())
         }
+        backgroundTintList = ColorStateList.valueOf(baseColorInt)
+        strokeWidth = 0
 
-        setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom)
-
-        item.icon?.let { drawable ->
-          icon = drawable.constantState?.newDrawable()?.mutate() ?: drawable.mutate()
-          if (item.isSelected) {
-            val iconTintColor =
-                resolveColorAttr(
-                    context,
-                    com.google.android.material.R.attr.colorOnPrimaryContainer,
-                )
-            iconTint = ColorStateList.valueOf(iconTintColor)
+        if (item.id == com.tom.rv2ide.actions.sidebar.AIAgentSidebarAction.ID) {
+          // AI Agent Sukuna Icon: Pristine multi-color full-spectrum rendering without color tinting
+          iconTint = null
+          item.icon?.let { drawable ->
+            val d = drawable.constantState?.newDrawable(context.resources)?.mutate() ?: drawable.mutate()
+            d.clearColorFilter()
+            androidx.core.graphics.drawable.DrawableCompat.setTintList(d, null)
+            icon = d
+          }
+        } else {
+          val iconColorInt = if (item.isSelected) {
+            MaterialColors.getColor(button, android.R.attr.colorPrimary, 0xFFFF2A55.toInt())
           } else {
-            iconTint = ColorStateList.valueOf(android.graphics.Color.parseColor("#666666"))
+            MaterialColors.getColor(button, com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFFA8989B.toInt())
+          }
+          iconTint = ColorStateList.valueOf(iconColorInt)
+          item.icon?.let { drawable ->
+            icon = drawable.constantState?.newDrawable(context.resources)?.mutate() ?: drawable.mutate()
           }
         }
 

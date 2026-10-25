@@ -31,6 +31,8 @@ import com.tom.rv2ide.utils.resolveAttr
  */
 abstract class BasePreference : IPreference() {
 
+  open val tintIcon: Boolean = true
+
   abstract fun onCreatePreference(context: Context): Preference
 
   override fun onCreateView(context: Context): Preference {
@@ -41,11 +43,14 @@ abstract class BasePreference : IPreference() {
 
     pref.isIconSpaceReserved = this.icon != null
     this.icon?.let {
-      pref.icon =
-          ContextCompat.getDrawable(context, it)?.apply {
-            colorFilter =
-                PorterDuffColorFilter(context.resolveAttr(R.attr.colorOnPrimaryContainer), SRC_ATOP)
-          }
+      val drawable = ContextCompat.getDrawable(context, it)?.mutate()
+      if (tintIcon) {
+        drawable?.colorFilter =
+            PorterDuffColorFilter(context.resolveAttr(R.attr.colorOnPrimaryContainer), SRC_ATOP)
+      } else {
+        drawable?.clearColorFilter()
+      }
+      pref.icon = drawable
     }
 
     pref.setOnPreferenceClickListener { onPreferenceClick(pref) }

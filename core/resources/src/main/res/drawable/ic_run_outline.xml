@@ -4,8 +4,10 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+
+    <!-- Solid Chunky Play Triangle with Smooth Rounded Vertices -->
     <path
-        android:fillColor="#ffffff"
-        android:pathData="M8.5,8.64L13.77,12L8.5,15.36V8.64M6.5,5V19L17.5,12" />
+        android:fillColor="@android:color/white"
+        android:pathData="M7,4.5 C7,3.6 8,3 8.8,3.5 L20.5,10.8 C21.3,11.3 21.3,12.5 20.5,13 L8.8,20.3 C8,20.8 7,20.2 7,19.3 Z" />
 
 </vector>

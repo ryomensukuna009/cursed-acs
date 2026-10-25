@@ -4,48 +4,822 @@
   xmlns:tools="http://schemas.android.com/tools"
   android:layout_height="match_parent"
   android:layout_width="match_parent"
-  android:gravity="center_horizontal|left"
-  android:padding="16dp"
   android:id="@+id/root_layout"
   android:orientation="vertical"
   android:fitsSystemWindows="true"
-  tools:context="com.tom.rv2ide.ideconfigurations.MainActivityCfg">
+  android:background="?android:attr/colorBackground"
+  tools:context="com.tom.rv2ide.activities.IDEConfigurations">
 
   <com.google.android.material.appbar.AppBarLayout
     android:id="@+id/appbar"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     app:layout_behavior="com.google.android.material.appbar.AppBarLayout$Behavior"
-    app:layout_constraintEnd_toEndOf="parent"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintTop_toTopOf="parent"
     android:background="@android:color/transparent"
     android:fitsSystemWindows="true">
 
     <com.google.android.material.appbar.MaterialToolbar
+      android:id="@+id/toolbar"
       android:layout_width="match_parent"
       android:layout_height="?attr/actionBarSize"
       app:titleTextAppearance="@style/TextAppearance.AndroidIDE.TitleLarge.Bold"
       app:subtitleTextAppearance="@style/TextAppearance.Material3.BodySmall"
-      app:title="IDE Configurations"
-      app:subtitle="IDE build system configurations"
+      app:titleTextColor="?attr/colorOnBackground"
+      app:subtitleTextColor="?attr/colorOnSurfaceVariant"
+      app:title="Packages Configurations"
+      app:subtitle="Package Lifecycle &amp; Toolchain Management"
       app:subtitleCentered="true"
       app:titleCentered="true" />
 
+    <!-- Three Primary Packages Configurations Tabs (Task C) -->
+    <com.google.android.material.tabs.TabLayout
+      android:id="@+id/packagesTabLayout"
+      android:layout_width="match_parent"
+      android:layout_height="48dp"
+      android:background="@android:color/transparent"
+      app:tabMode="fixed"
+      app:tabGravity="fill"
+      app:tabIndicatorAnimationMode="elastic"
+      app:tabSelectedTextColor="?attr/colorPrimary"
+      app:tabTextColor="?attr/colorOnSurfaceVariant"
+      app:tabInlineLabel="true"
+      style="@style/Widget.Material3.TabLayout">
+
+      <com.google.android.material.tabs.TabItem
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Gradle Download"
+        android:icon="@drawable/download" />
+
+      <com.google.android.material.tabs.TabItem
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Offline NDK"
+        android:icon="@drawable/ic_folder" />
+
+      <com.google.android.material.tabs.TabItem
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Miscellaneous"
+        android:icon="@drawable/ic_more_vert" />
+
+    </com.google.android.material.tabs.TabLayout>
+
   </com.google.android.material.appbar.AppBarLayout>
 
-  <LinearLayout
-    android:layout_height="match_parent"
+  <androidx.core.widget.NestedScrollView
     android:layout_width="match_parent"
-    android:gravity="center_horizontal|left"
-    android:padding="16dp"
-    android:orientation="vertical">
+    android:layout_height="match_parent"
+    android:fillViewport="true">
 
-    <include
-        layout="@layout/ndk_layout"/>
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:padding="16dp"
+      android:orientation="vertical">
 
-    <include
-        layout="@layout/cmake_layout"/>
+      <!-- ================================================================= -->
+      <!-- TAB 1 CONTAINER: GRADLE DOWNLOAD                                  -->
+      <!-- ================================================================= -->
+      <LinearLayout
+        android:id="@+id/tabContentGradle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="visible">
 
-  </LinearLayout>
+        <!-- Gradle Environment Overview Card (Task D) -->
+        <com.google.android.material.card.MaterialCardView
+          android:id="@+id/cardGradleEnvironment"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginBottom="16dp"
+          app:cardCornerRadius="16dp"
+          app:cardElevation="0dp"
+          app:strokeWidth="1dp"
+          app:strokeColor="?attr/colorOutlineVariant"
+          app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="Gradle Development Packages"
+              android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+              android:textStyle="bold"
+              android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+              android:id="@+id/tvGradleStatusSummary"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:layout_marginBottom="12dp"
+              android:text="Inspect and download packages required for Gradle Android builds."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <!-- Components Breakdown Table -->
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="vertical"
+              android:layout_marginBottom="12dp">
+
+              <TextView
+                android:id="@+id/tvGradleRuntimeRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:text="• Gradle Distribution: Checking status..."
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="?attr/colorOnSurface" />
+
+              <TextView
+                android:id="@+id/tvJdkRuntimeRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:text="• OpenJDK 17: Checking status..."
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="?attr/colorOnSurface" />
+
+              <TextView
+                android:id="@+id/tvGitRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:text="• Git Version Control: Checking status..."
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="?attr/colorOnSurface" />
+
+              <TextView
+                android:id="@+id/tvOpensshRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:text="• OpenSSH Shell: Checking status..."
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="?attr/colorOnSurface" />
+
+            </LinearLayout>
+
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal">
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDownloadGradleSetup"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/download"
+                android:text="Download" />
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRemoveGradleSetup"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cornerRadius="12dp"
+                app:backgroundTint="?attr/colorErrorContainer"
+                app:iconTint="?attr/colorOnErrorContainer"
+                android:textColor="?attr/colorOnErrorContainer"
+                app:icon="@drawable/ic_delete"
+                android:text="Remove" />
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+              android:id="@+id/btnRunToolchainDoctor"
+              style="@style/Widget.Material3.Button.TonalButton"
+              android:layout_width="match_parent"
+              android:layout_height="48dp"
+              android:layout_marginTop="10dp"
+              app:cornerRadius="12dp"
+              app:icon="@drawable/ic_check_circle"
+              android:text="Run Toolchain Doctor" />
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+              android:id="@+id/gradleDownloadProgress"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="10dp"
+              android:indeterminate="true"
+              android:visibility="gone" />
+
+            <TextView
+              android:id="@+id/tvGradleDownloadStatus"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="6dp"
+              android:visibility="gone"
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorPrimary" />
+
+          </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+      </LinearLayout>
+
+      <!-- ================================================================= -->
+      <!-- TAB 2 CONTAINER: OFFLINE NDK                                      -->
+      <!-- ================================================================= -->
+      <LinearLayout
+        android:id="@+id/tabContentOfflineNdk"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- Offline NDK Archive Selection & Import Card (Task E) -->
+        <com.google.android.material.card.MaterialCardView
+          android:id="@+id/cardOfflineNdkImport"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginBottom="16dp"
+          app:cardCornerRadius="16dp"
+          app:cardElevation="0dp"
+          app:strokeWidth="1dp"
+          app:strokeColor="?attr/colorOutlineVariant"
+          app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="Offline NDK Archive Import"
+              android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+              android:textStyle="bold"
+              android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:layout_marginBottom="12dp"
+              android:text="Select or paste the path to an Offline NDK archive (.zip, .tar.gz, .tgz, .tar.xz) to install native compilers without internet."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <!-- Path input field with paste support -->
+            <com.google.android.material.textfield.TextInputLayout
+              android:id="@+id/tilOfflineNdkPath"
+              style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginBottom="10dp"
+              app:boxCornerRadiusTopStart="12dp"
+              app:boxCornerRadiusTopEnd="12dp"
+              app:boxCornerRadiusBottomStart="12dp"
+              app:boxCornerRadiusBottomEnd="12dp"
+              android:hint="NDK Archive Path (.zip or .tar.gz)">
+
+              <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etOfflineNdkPath"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textUri|textNoSuggestions"
+                android:textSize="13sp" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal">
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/import_btn"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_folder"
+                android:text="Browse ZIP" />
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnImportOfflineNdkAction"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1.2"
+                android:layout_marginStart="6dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_add"
+                android:text="Import Offline NDK" />
+
+            </LinearLayout>
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+              android:id="@+id/ndkExtractProgress"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="10dp"
+              android:indeterminate="true"
+              android:visibility="gone" />
+
+            <TextView
+              android:id="@+id/tvNdkExtractStatus"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="6dp"
+              android:visibility="gone"
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorPrimary" />
+
+          </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Offline NDK Management & Smoke Test Card -->
+        <com.google.android.material.card.MaterialCardView
+          android:id="@+id/cardOfflineNdkManagement"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginBottom="16dp"
+          app:cardCornerRadius="16dp"
+          app:cardElevation="0dp"
+          app:strokeWidth="1dp"
+          app:strokeColor="?attr/colorOutlineVariant"
+          app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="Installed Offline Toolchain"
+              android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+              android:textStyle="bold"
+              android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+              android:id="@+id/tvActiveNdkInfo"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:layout_marginBottom="10dp"
+              android:text="Detected native compiler version and readiness."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <com.google.android.material.textfield.TextInputLayout
+              android:id="@+id/active_ndk_dropdown_layout"
+              style="@style/AppTheme.TextInputLayout.Dropdown.Filled"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginBottom="10dp"
+              android:hint="Active Offline NDK Version">
+
+              <AutoCompleteTextView
+                android:id="@+id/active_ndk_dropdown"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none"
+                android:clickable="true"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal">
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/test_ndk_btn"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_code"
+                android:text="Smoke Test" />
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/remove_btn"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cornerRadius="12dp"
+                app:backgroundTint="?attr/colorErrorContainer"
+                app:iconTint="?attr/colorOnErrorContainer"
+                android:textColor="?attr/colorOnErrorContainer"
+                app:icon="@drawable/ic_delete"
+                android:text="Delete NDK" />
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+              android:id="@+id/btnRunDoctorOfflineNdk"
+              style="@style/Widget.Material3.Button.TonalButton"
+              android:layout_width="match_parent"
+              android:layout_height="48dp"
+              android:layout_marginTop="10dp"
+              app:cornerRadius="12dp"
+              app:icon="@drawable/ic_check_circle"
+              android:text="Run Toolchain Doctor" />
+
+          </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Hidden anchor card to preserve INdk handler binding -->
+        <com.tom.customizablecardview.CustomizableCardView
+          android:id="@+id/ndkCardHolder"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:visibility="gone" />
+
+      </LinearLayout>
+
+      <!-- ================================================================= -->
+      <!-- TAB 3 CONTAINER: MISCELLANEOUS                                    -->
+      <!-- ================================================================= -->
+      <LinearLayout
+        android:id="@+id/tabContentMisc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- Online SDK Manager NDK Downloader Card (Task F) -->
+        <com.google.android.material.card.MaterialCardView
+          android:id="@+id/cardOnlineSdkManagerNdk"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginBottom="16dp"
+          app:cardCornerRadius="16dp"
+          app:cardElevation="0dp"
+          app:strokeWidth="1dp"
+          app:strokeColor="?attr/colorOutlineVariant"
+          app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="SDK Manager NDK (Online Download)"
+              android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+              android:textStyle="bold"
+              android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+              android:id="@+id/tvSdkNdkStatus"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:layout_marginBottom="10dp"
+              android:text="Checking SDK NDK status..."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <com.google.android.material.textfield.TextInputLayout
+              android:id="@+id/ndks_dropdown_layout"
+              style="@style/AppTheme.TextInputLayout.Dropdown.Filled"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginBottom="10dp"
+              android:hint="Available Remote NDK Versions">
+
+              <AutoCompleteTextView
+                android:id="@+id/ndks_dropdown"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none"
+                android:clickable="true"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal">
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/reinstall_btn"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/download"
+                android:text="Download" />
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeleteSdkNdk"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cornerRadius="12dp"
+                app:backgroundTint="?attr/colorErrorContainer"
+                app:iconTint="?attr/colorOnErrorContainer"
+                android:textColor="?attr/colorOnErrorContainer"
+                app:icon="@drawable/ic_delete"
+                android:text="Delete" />
+
+            </LinearLayout>
+
+          </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- CMake Build System Card -->
+        <include
+          layout="@layout/cmake_layout"/>
+
+        <View
+          android:layout_width="match_parent"
+          android:layout_height="12dp" />
+
+        <!-- Kotlin Language Server Card (Optional) -->
+        <com.google.android.material.card.MaterialCardView
+          android:id="@+id/cardKotlinLsp"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginBottom="16dp"
+          app:cardCornerRadius="16dp"
+          app:cardElevation="0dp"
+          app:strokeWidth="1dp"
+          app:strokeColor="?attr/colorOutlineVariant"
+          app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="Kotlin Language Server (Optional)"
+              android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+              android:textStyle="bold"
+              android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+              android:id="@+id/tvKotlinLspStatus"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:layout_marginBottom="6dp"
+              android:text="Checking Kotlin LSP status..."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginBottom="12dp"
+              android:text="Provides Kotlin code completion, syntax error diagnostics, and symbol navigation."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal">
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDownloadKotlinLsp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/download"
+                android:text="Download" />
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeleteKotlinLsp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cornerRadius="12dp"
+                app:backgroundTint="?attr/colorErrorContainer"
+                app:iconTint="?attr/colorOnErrorContainer"
+                android:textColor="?attr/colorOnErrorContainer"
+                app:icon="@drawable/ic_delete"
+                android:text="Delete" />
+
+            </LinearLayout>
+
+          </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Clangd C/C++ Language Server Card (Optional) -->
+        <com.google.android.material.card.MaterialCardView
+          android:id="@+id/cardClangdLsp"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginBottom="16dp"
+          app:cardCornerRadius="16dp"
+          app:cardElevation="0dp"
+          app:strokeWidth="1dp"
+          app:strokeColor="?attr/colorOutlineVariant"
+          app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="Clang Language Server (C/C++) (Optional)"
+              android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+              android:textStyle="bold"
+              android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+              android:id="@+id/tvClangdLspStatus"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:layout_marginBottom="6dp"
+              android:text="Checking Clang Language Server status..."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginBottom="12dp"
+              android:text="Language Server Setup for projects containing C/C++ files. Provides Clang &amp; Clangd code completion, semantic diagnostics, and header navigation."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal">
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDownloadClangdLsp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/download"
+                android:text="Download" />
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeleteClangdLsp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cornerRadius="12dp"
+                app:backgroundTint="?attr/colorErrorContainer"
+                app:iconTint="?attr/colorOnErrorContainer"
+                android:textColor="?attr/colorOnErrorContainer"
+                app:icon="@drawable/ic_delete"
+                android:text="Delete" />
+
+            </LinearLayout>
+
+          </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Eclipse JDT Java Language Server Card (Optional) -->
+        <com.google.android.material.card.MaterialCardView
+          android:id="@+id/cardJavaLsp"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginBottom="16dp"
+          app:cardCornerRadius="16dp"
+          app:cardElevation="0dp"
+          app:strokeWidth="1dp"
+          app:strokeColor="?attr/colorOutlineVariant"
+          app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="Eclipse JDT Java Language Server (Optional)"
+              android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+              android:textStyle="bold"
+              android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+              android:id="@+id/tvJavaLspStatus"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:layout_marginBottom="6dp"
+              android:text="Checking Java LSP status..."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginBottom="12dp"
+              android:text="In-process compiler service providing Java auto-completion, quick fixes, and AST analysis."
+              android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+              android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal">
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDownloadJavaLsp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/download"
+                android:text="Download" />
+
+              <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeleteJavaLsp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cornerRadius="12dp"
+                app:backgroundTint="?attr/colorErrorContainer"
+                app:iconTint="?attr/colorOnErrorContainer"
+                android:textColor="?attr/colorOnErrorContainer"
+                app:icon="@drawable/ic_delete"
+                android:text="Delete" />
+
+            </LinearLayout>
+
+          </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+      </LinearLayout>
+
+      <View
+        android:layout_width="match_parent"
+        android:layout_height="32dp" />
+
+    </LinearLayout>
+
+  </androidx.core.widget.NestedScrollView>
+
 </LinearLayout>

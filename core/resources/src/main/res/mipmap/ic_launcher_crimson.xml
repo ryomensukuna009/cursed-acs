@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="72dp"
+        android:height="72dp"
+        android:gravity="center">
+        <shape android:shape="rectangle">
+            <corners android:radius="18dp" />
+            <solid android:color="#1A0A0E" />
+            <stroke android:width="2dp" android:color="#FF2A55" />
+        </shape>
+    </item>
+    <item
+        android:width="54dp"
+        android:height="54dp"
+        android:gravity="center"
+        android:drawable="@drawable/logo_crimson_domain" />
+</layer-list>

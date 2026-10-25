@@ -21,4 +21,5 @@
   android:layout_height="48dp"
   android:padding="8dp"
   app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
-  app:srcCompat="@mipmap/ic_launcher" />
+  android:id="@+id/sidebar_header_logo"
+  app:srcCompat="@drawable/logo_cyan_cyber" />

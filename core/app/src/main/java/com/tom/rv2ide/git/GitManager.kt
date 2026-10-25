@@ -457,9 +457,12 @@ class GitManager(private val projectPath: String) {
             
             PushResult(success, if (success) "Push successful" else "Push failed")
         } catch (e: Exception) {
-            e.printStackTrace()
-            PushResult(false, e.message ?: "Push failed")
+            PushResult(false, sanitizeErrorMessage(e.message, password) ?: "Push failed")
         }
+    }
+
+    private fun sanitizeErrorMessage(message: String?, secret: String?): String? {
+        return SecureGitCredentialStore.sanitizeErrorMessage(message, secret)
     }
     
     fun pull(remoteName: String = "origin", branchName: String? = null, username: String? = null, password: String? = null): PullResult {
@@ -483,8 +486,7 @@ class GitManager(private val projectPath: String) {
             
             PullResult(success, if (success) "Pull successful" else "Pull failed")
         } catch (e: Exception) {
-            e.printStackTrace()
-            PullResult(false, e.message ?: "Pull failed")
+            PullResult(false, sanitizeErrorMessage(e.message, password) ?: "Pull failed")
         }
     }
     
@@ -503,31 +505,43 @@ class GitManager(private val projectPath: String) {
             fetchCommand?.call()
             FetchResult(true, "Fetch successful")
         } catch (e: Exception) {
-            e.printStackTrace()
-            FetchResult(false, e.message ?: "Fetch failed")
+            FetchResult(false, sanitizeErrorMessage(e.message, password) ?: "Fetch failed")
         }
     }
     
-    fun clone(remoteUrl: String, localPath: String, username: String? = null, password: String? = null): Boolean {
+    fun clone(
+        remoteUrl: String,
+        localPath: String,
+        username: String? = null,
+        password: String? = null,
+        progressMonitor: org.eclipse.jgit.lib.ProgressMonitor? = null
+    ): Boolean {
         return try {
             val cloneCommand = Git.cloneRepository()
             cloneCommand.setURI(remoteUrl)
             cloneCommand.setDirectory(File(localPath))
-            
-            cloneCommand.setCredentialsProvider(
-                org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
-                    username ?: "", 
-                    password ?: ""
+
+            if (!username.isNullOrBlank() || !password.isNullOrBlank()) {
+                cloneCommand.setCredentialsProvider(
+                    org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
+                        username ?: "", 
+                        password ?: ""
+                    )
                 )
-            )
-            
+            }
+
+            if (progressMonitor != null) {
+                cloneCommand.setProgressMonitor(progressMonitor)
+            }
+
             git = cloneCommand.call()
             repository = git?.repository
             loadGitIgnore()
             loadGitAttributes()
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            val safeMsg = sanitizeErrorMessage(e.message, password)
+            android.util.Log.e("GitManager", "Clone failed: $safeMsg")
             false
         }
     }

@@ -162,6 +162,12 @@ class InitFragment : Fragment() {
         val editTextUsername = dialogView.findViewById<TextInputEditText>(R.id.editTextCloneUsername)
         val editTextPassword = dialogView.findViewById<TextInputEditText>(R.id.editTextClonePassword)
         
+        val prefsManager = PreferencesManager(requireContext())
+        if (prefsManager.shouldRememberCredentials()) {
+            prefsManager.getUsername()?.let { editTextUsername.setText(it) }
+            prefsManager.getPassword()?.let { editTextPassword.setText(it) }
+        }
+
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Clone Repository")
             .setMessage("Clone to: ${GCProperties.userProject}")
@@ -171,6 +177,10 @@ class InitFragment : Fragment() {
                 val username = editTextUsername.text.toString().takeIf { it.isNotBlank() }
                 val password = editTextPassword.text.toString().takeIf { it.isNotBlank() }
                 
+                if (username != null && password != null && prefsManager.shouldRememberCredentials()) {
+                    prefsManager.saveCredentials(username, password)
+                }
+
                 if (url.isNotBlank()) {
                     viewModel.cloneRepository(url, GCProperties.userProject, username, password)
                 } else {

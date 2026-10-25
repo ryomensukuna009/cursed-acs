@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/*_activity, @drawable/cpp_activity, @drawable/no_activity, @raw/sukuna_domain_expansion" />

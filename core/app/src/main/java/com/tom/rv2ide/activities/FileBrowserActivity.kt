@@ -96,8 +96,9 @@ class FileBrowserActivity : EdgeToEdgeIDEActivity() {
 
     private fun loadFileBrowserFragment() {
         if (supportFragmentManager.findFragmentById(R.id.fragment_container) == null) {
+            val rootPath = intent.getStringExtra("root_path")
             supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, FileBrowserFragment.newInstance())
+                .replace(R.id.fragment_container, FileBrowserFragment.newInstance(rootPath))
                 .commit()
         }
     }

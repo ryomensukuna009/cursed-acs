@@ -17,11 +17,19 @@
 
 package com.tom.rv2ide.fragments.onboarding
 
+import android.os.Bundle
+import android.view.View
 import com.tom.rv2ide.databinding.FragmentOnboardingGreetingBinding
 import com.tom.rv2ide.fragments.FragmentWithBinding
+import com.tom.rv2ide.utils.AppLogoManager
 
 /** @author Akash Yadav */
 class GreetingFragment :
     FragmentWithBinding<FragmentOnboardingGreetingBinding>(
         FragmentOnboardingGreetingBinding::inflate
-    )
+    ) {
+  override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    super.onViewCreated(view, savedInstanceState)
+    AppLogoManager.bindLogo(binding.icon)
+  }
+}

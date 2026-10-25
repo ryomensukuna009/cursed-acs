@@ -381,7 +381,14 @@ class FileBrowserFragment : Fragment() {
                 if (fileItem.isDirectory) {
                     listFiles(fileItem.path)
                 } else {
-                    Toast.makeText(requireContext(), "Clicked on file: ${fileItem.name}", Toast.LENGTH_SHORT).show()
+                    val file = File(fileItem.path)
+                    org.greenrobot.eventbus.EventBus.getDefault().post(com.tom.rv2ide.events.OpenFileRequestEvent(file))
+                    val intent = android.content.Intent(requireContext(), com.tom.rv2ide.activities.editor.EditorActivityKt::class.java).apply {
+                        flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        putExtra("extra_open_file_path", file.absolutePath)
+                    }
+                    startActivity(intent)
+                    activity?.finish()
                 }
             },
             onItemLongClick = { fileItem -> 

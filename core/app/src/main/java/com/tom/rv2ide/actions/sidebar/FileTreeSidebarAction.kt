@@ -39,7 +39,7 @@ class FileTreeSidebarAction(context: Context, override val order: Int) : Abstrac
   override val fragmentClass: KClass<out Fragment> = FileTreeFragment::class
 
   init {
-    icon = ContextCompat.getDrawable(context, R.drawable.ic_folder)
-    iconRes = R.drawable.ic_folder
+    icon = ContextCompat.getDrawable(context, com.tom.rv2ide.resources.R.drawable.ic_nav_files_badass)
+    iconRes = com.tom.rv2ide.resources.R.drawable.ic_nav_files_badass
   }
 }

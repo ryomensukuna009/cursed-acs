@@ -50,6 +50,7 @@ import com.tom.rv2ide.adapters.DiagnosticsAdapter
 import com.tom.rv2ide.adapters.EditorBottomSheetTabAdapter
 import com.tom.rv2ide.adapters.SearchListAdapter
 import com.tom.rv2ide.databinding.LayoutEditorBottomSheetBinding
+import com.tom.rv2ide.fragments.output.BuildOutputFragment
 import com.tom.rv2ide.fragments.output.ShareableOutputFragment
 import com.tom.rv2ide.models.LogLine
 import com.tom.rv2ide.resources.R.string
@@ -127,6 +128,7 @@ constructor(
         }
 
     mediator.attach()
+    setStatus("", android.view.Gravity.CENTER)
     binding.pager.isUserInputEnabled = false
     binding.pager.offscreenPageLimit = pagerAdapter.itemCount - 1 // Do not remove any views
 
@@ -309,6 +311,15 @@ constructor(
     pagerAdapter.buildOutputFragment?.clearOutput()
   }
 
+  fun showBuildOutput() {
+    runOnUiThread {
+      val index = pagerAdapter.findIndexOfFragmentByClass(BuildOutputFragment::class.java)
+      if (index >= 0 && index < binding.tabs.tabCount) {
+        binding.tabs.getTabAt(index)?.select()
+      }
+    }
+  }
+
   fun handleDiagnosticsResultVisibility(errorVisible: Boolean) {
     runOnUiThread { pagerAdapter.diagnosticsFragment?.isEmpty = errorVisible }
   }
@@ -368,7 +379,16 @@ constructor(
     runOnUiThread {
       binding.buildStatus.let {
         it.statusText.gravity = gravity
-        it.statusText.text = text
+        val resolved = if (text.isNullOrBlank()) {
+          if (com.tom.rv2ide.preferences.internal.BuildPreferences.isOfflineNdkBuild) {
+            "Default NDK Offline build is ready"
+          } else {
+            "Default Gradle build is ready"
+          }
+        } else {
+          text
+        }
+        it.statusText.text = resolved
       }
     }
   }

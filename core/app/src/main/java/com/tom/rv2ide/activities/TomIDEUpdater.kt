@@ -42,8 +42,7 @@ class TomIDEUpdater(private val context: Context) {
 
   companion object {
     private const val TAG = "TomIDEUpdater"
-    private const val UPDATE_JSON_URL =
-        "https://raw.githubusercontent.com/AndroidCSOfficial/android-code-studio/refs/heads/dev/updater.json"
+    private const val UPDATE_JSON_URL = ""
     private const val DOWNLOAD_NOTIFICATION_ID = 1001
   }
 
@@ -62,6 +61,9 @@ class TomIDEUpdater(private val context: Context) {
   private var progressText: TextView? = null
 
   fun checkForUpdates() {
+    if (UPDATE_JSON_URL.isBlank()) {
+      return
+    }
     CoroutineScope(Dispatchers.IO).launch {
       try {
         val updateInfo = fetchUpdateInfo()
@@ -76,6 +78,7 @@ class TomIDEUpdater(private val context: Context) {
   }
 
   private suspend fun fetchUpdateInfo(): UpdateInfo? {
+    if (UPDATE_JSON_URL.isBlank()) return null
     return withContext(Dispatchers.IO) {
       try {
         val url = URL(UPDATE_JSON_URL)

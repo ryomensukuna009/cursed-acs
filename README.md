@@ -1,133 +1,187 @@
-<p align="left">
-  <img src="https://avatars.githubusercontent.com/u/234419170?s=400&u=43571ebf481969baafb8399813ad57f46c19eb95&v=4" alt="AndroidIDE" width="80" height="80"/>
+<p align="center">
+  <img src="core/resources/src/main/res/drawable/logo_dual_aura.jpg" alt="CURSED ACS Logo" width="120" height="120" style="border-radius: 20px;"/>
 </p>
 
-<h2 align="left"><b>Android Code Studio</b></h2>
-<p align="left">
-  An IDE to develop real, Gradle-based Android applications on Android devices.
-<p><br>
+<h1 align="center">CURSED ACS</h1>
 
-<p align="left">
-<!-- Latest release -->
-<img src="https://img.shields.io/github/v/release/AndroidCSOfficial/android-code-studio?include_prereleases&amp;label=latest%20release" alt="Latest release">
-<!-- Build and test -->
-<!-- <img src="https://github.com/Mohammed-baqer-null/android-code-studio/actions/workflows/asm_build.yml/badge.svg" alt="Builds and tests"> -->
-<!-- Crowdin -->
-<a href="https://crowdin.com/project/androidide"><img src="https://badges.crowdin.net/androidide/localized.svg" alt="Crowdin"></a>
-<!-- License -->
-<img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License"></p>
-
-
-<p align="left">
-  <a href="https://github.com/Mohammed-baqer-null/android-code-studio/issues/new?labels=bug&template=BUG.yml&title=%5BBug%5D%3A+">
-    <img src="https://img.shields.io/badge/Report%20Bug-red?style=for-the-badge&logo=github" alt="Report a bug">
-  </a>
-  <a href="https://github.com/Mohammed-baqer-null/android-code-studio/issues/new?labels=feature&template=FEATURE.yml&title=%5BFeature%5D%3A+">
-    <img src="https://img.shields.io/badge/Request%20Feature-brightgreen?style=for-the-badge&logo=github" alt="Request a feature">
-  </a>
-  <a href="https://t.me/rv2ide">
-    <img src="https://img.shields.io/badge/Telegram-Join%20Us-1DA1F2?style=for-the-badge&logo=telegram" alt="Join on Telegram">
-  </a>
-    <a href="https://docs.androidide.com/">
-    <img src="https://img.shields.io/badge/Docs-Explore-blue?style=for-the-badge&logo=read-the-docs" alt="Explore the docs">
-  </a>
+<p align="center">
+  <b>Advanced On-Device Android IDE with Offline Native NDK Toolchains, Jujutsu AI Agent & Full Gradle Build System</b>
 </p>
 
-## Features
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%2B)-brightgreen?style=flat-square&logo=android" alt="Platform">
+  <img src="https://img.shields.io/badge/Architecture-arm64--v8a%20%7C%20armeabi--v7a-blue?style=flat-square" alt="Architecture">
+  <img src="https://img.shields.io/badge/Build%20System-Gradle%208.x%20%2B%20AGP-orange?style=flat-square&logo=gradle" alt="Gradle">
+  <img src="https://img.shields.io/badge/Native%20Compilers-Clang%20%7C%20CMake%20%7C%20NDK-red?style=flat-square" alt="Native">
+  <img src="https://img.shields.io/badge/License-GPL%20v3.0-blue.svg?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/Release-v1.0.0--Hardened-crimson?style=flat-square" alt="Release">
+</p>
 
-- [x] Gradle support
-- [x] JDK 11 & JDK 17 available
-- [x] Terminal with essential packages
-- [x] Custom environment variables (for builds & terminal)
-- [x] SDK & NDK Manager (manage Android SDKs and NDKs via terminal)
-- [x] API information for classes and their members (since, removed, deprecated)
-- [x] Log reader (real-time logs for your app)
-- [ ] Language servers
-    - [x] Java
-    - [x] XML
-    - [x] Kotlin
-- [ ] UI Designer
-    - [x] Layout inflater
-    - [x] Resolve resource references
-    - [x] Auto-complete resource values when editing attributes
-    - [x] Drag & Drop interface
-    - [x] Visual attribute editor
-    - [x] Android Widgets
-- [ ] String Translator
-- [x] Asset Studio (Drawable & Icon Maker)
-- [x] Plugin Creator (Create sub-modules or plugins inside your project)
-- [x] Git integration
-- [x] **AI Agent** – fully **project-aware AI assistant** that understands your code, modules, and project structure to help with coding.
-<!-- - debugging, and suggestions-->
+---
 
-## Installation
+## Overview
 
-[<img src="https://github.com/Kunzisoft/Github-badge/raw/main/get-it-on-github.svg"
-    alt="Get it on F-Droid"
-    height="80">](https://github.com/Mohammed-baqer-null/android-code-studio/releases)
+**CURSED ACS** is a self-contained, enterprise-grade Integrated Development Environment (IDE) engineered to build, compile, debug, and run real Android applications directly on physical Android devices — without needing a PC or remote cloud server. 
 
-> _Please install Android Code Studio from trusted sources only i.e._
-> - [_GitHub Releases_](https://github.com/Mohammed-baqer-null/android-code-studio/releases)
+Building upon the open-source **AndroidIDE** foundation, CURSED ACS introduces a **completely offline C/C++ native NDK build toolchain**, an integrated **Jujutsu AI Coding Agent** with multi-provider reasoning, a **modular 3-tab package configuration architecture**, an automated **Toolchain Doctor**, and **R8 release hardening**.
 
-- Download the Android Code Studio APK from the mentioned trusted sources.
-- Follow the
-  instructions [here](https://docs.androidide.com/tutorials/get-started.html) to
-  install the build tools.
+---
 
-## Limitations
+## What It Can Do & Key Features
 
-- For working with projects in AndroidCodeStudio, your project must use Android Gradle Plugin v7.2.0 or
-  newer. Projects with older AGP must be migrated to newer versions.
-- SDK Manager is already included in Android SDK and is accessible in Android Code Studio via its Terminal.
-  But, you cannot use it to install some tools (like NDK) because those tools are not built for
-  Android.
+### 1. On-Device Full Gradle Android Builds
+- **Real Android Builds**: Compiles production Java and Kotlin projects with official Android Gradle Plugin (AGP 7.2.0 – 8.13.0+) and Gradle 8.x.
+- **Embedded OpenJDK 17**: On-device Java Virtual Machine running javac, D8/R8 dexing, and AAPT2 resource compilation.
+- **Live Terminal Build Streaming**: Standard output and error streams pipe in real-time to the bottom sheet terminal with colorized task progression.
+- **One-Tap APK Signing & Installation**: Automatically signs assembled debug/release APKs and launches the Android package installer directly on device.
+- **Background Execution**: Keep compilation running seamlessly in the background with native notification progress tracking.
 
-The app is still being developed actively. It's in beta stage and may not be stable. if you have any
-issues using the app, please let us know.
+### 2. Standalone Offline Native NDK Build Environment
+- **Zero-Internet Native Compilation**: Build C and C++ native libraries (`.so`) using embedded Clang, LLVM, and CMake without requiring active internet access.
+- **Offline NDK Archive Import**: Direct manual import of `.zip`, `.tar.gz`, `.tgz`, or `.tar.xz` NDK archives from device storage.
+- **Zip Slip Path-Traversal Protection**: Safe archive extraction engine protecting system and app sandbox directories against malicious archive paths.
+- **Active NDK Version Switching**: Seamlessly toggle between multiple installed NDK toolchains (`aide_ndk_arm64`, standalone NDKs).
+- **NDK Smoke Testing**: Built-in verification compiling a native C++ test binary to validate compiler, sysroot, and header integrity.
 
-## Contributing
+### 3. Jujutsu Cursed AI Coding Agent
+- **Multi-Provider Intelligence**: Direct, high-speed API integration with leading AI providers:
+  - **Google Gemini**: Gemini 2.5 Pro, Gemini 2.5 Flash, Gemma 4
+  - **Anthropic Claude**: Claude 3.7 Sonnet (Thinking & Standard), Claude 3.5 Haiku
+  - **OpenAI**: GPT-4o, GPT-4o-mini, o1, o3-mini
+  - **DeepSeek**: DeepSeek-R1 (Full Reasoning), DeepSeek-V3
+  - **xAI Grok**: Grok 2, Grok 2 Vision
+- **Collapsible `> ⌄` Thought Reasoning**: Parses model `<thought>` and `<think>` reasoning tags into a dedicated collapsible UI block (`#121722` background, crimson left accent bar) keeping chat responses clean.
+- **Project-Aware Context Engine**: Indexes project layout, dependencies, manifests, and source trees for accurate multi-file edits.
+- **One-Tap Diagnostics & Repair**: Automatically ingests compiler errors and build failures, suggesting and applying contextual source code repairs.
+- **Token Telemetry**: Live context usage badges and token estimation per conversation.
 
-See the [contributing guide](./CONTRIBUTING.md).
+### 4. Modular Package Configuration & Lifecycle
+- **3 Dedicated Configuration Tabs**:
+  - **Gradle Download**: Overview of Gradle distributions, OpenJDK 17, Git, and OpenSSH with individual download and safe removal options.
+  - **Offline NDK**: Archive file picker, archive path input, ZIP import button, live active NDK status badge, version dropdown, and Smoke Test.
+  - **Miscellaneous**: Modular, decoupled cards for **SDK Manager NDK (Online)**, **CMake Build System**, **Kotlin Language Server**, **Clang Language Server (C/C++)**, and **Eclipse JDT Java Language Server**.
+- **Truthful Binary Detection**: Verifies binary presence on disk (`usr/bin`). Automatically greys out and disables the Delete button when a package is not installed.
+- **Universal Red Warning Deletion Protocol (`#E53935`)**: Every deletion triggers a high-visibility red confirmation dialog explaining exact files removed and all developer consequences.
 
-For translations, visit the [Crowdin project page](https://crowdin.com/project/androidide).
+### 5. Build Toolchain Doctor
+- **Multi-Component Health Diagnostics**: Audits 10 distinct IDE subsystems (SDK Platform, Build Tools, Java Runtime, Gradle, Active NDK, CMake, Compilers, File Permissions, Storage Space, Environment Paths).
+- **Mode-Aware Evaluation**: Automatically switches verification rules depending on the active build mode (Gradle vs. Offline NDK vs. Both).
+- **Actionable Diagnostic Reporting**: Distinguishes between critical errors, warnings, and passed checks with one-click repair suggestions.
 
-## Thanks to
+### 6. Intelligent Code Editor & Language Servers
+- **High-Performance Editor**: Powered by the Sora Editor engine with smooth scrolling, code mini-map, line numbers, and bracket matching.
+- **Multi-Language LSP Support**:
+  - **Java**: Eclipse JDT Language Server providing code completion, real-time syntax checking, quick fixes, and AST resolution.
+  - **Kotlin**: Kotlin Language Server with symbol navigation, completion, and error diagnostics.
+  - **C/C++**: Clangd Language Server offering header navigation, completion, and semantic diagnostics.
+  - **XML**: Attribute auto-completion, resource ID resolution, and syntax validation.
+- **Tree-Sitter Highlighting**: Native Tree-Sitter grammars for lightning-fast syntax parsing across multiple programming languages.
 
-- [Rosemoe](https://github.com/Rosemoe) for the
-  awesome [CodeEditor](https://github.com/Rosemoe/sora-editor)
-- [Termux](https://github.com/termux) for [Terminal Emulator](https://github.com/termux/termux-app)
-- [Bogdan Melnychuk](https://github.com/bmelnychuk)
-  for [AndroidTreeView](https://github.com/bmelnychuk/AndroidTreeView)
-- [George Fraser](https://github.com/georgewfraser) for
-  the [Java Language Server](https://github.com/georgewfraser/java-language-server)
-- [FWCD](https://github.com/fwcd) for
-  the [Kotlin Language Server](https://github.com/fwcd/kotlin-language-server)
-- [Itsaky](https://github.com/itsaky) The original developer
-  of [AndroidIDE](https://github.com/AndroidIDEOfficial/AndroidIDE.git) whose project I forked and now maintain.
-  
-Thanks to all the developers who have contributed to this project.
+### 7. Integrated Linux Terminal (Termux Engine)
+- **Full Linux Command-Line**: Powered by the Termux terminal subsystem built directly into the IDE.
+- **Developer Package Ecosystem**: Pre-configured environment with access to `git`, `openssh`, `clang`, `make`, `tar`, and standard shell utilities.
+- **Custom Environment Variables**: Define custom build flags, PATH overrides, and execution variables.
 
-## Contact Us
+### 8. Visual UI Designer
+- **Real-Time Layout Preview**: Instant on-device rendering of Android XML layouts.
+- **Visual Drag & Drop**: Place buttons, text fields, cards, and layouts visually with coordinate guides.
+- **Attribute Inspector**: Interactively edit view dimensions, margins, paddings, colors, and resource references.
 
-- [Website](https://m.androidide.com)
-- [Telegram](https://t.me/rv2ide)
+### 9. Version Control & Project Management
+- **Full Git Integration**: Clone repositories via HTTPS/SSH, manage branches, inspect diffs, stage files, and commit directly.
+- **Non-Destructive Project Removal**: Dedicated option to remove projects from the IDE workspace while keeping all source files intact on disk.
+- **Project Templates**: Built-in scaffolding for Empty Views Activity, Compose, C++ Native (CMake), and Modular Libraries.
+
+### 10. Security Hardening & Release Optimization
+- **Hardware-Backed Credential Storage**: AI provider keys are encrypted at rest using **Android Keystore AES-256-GCM**. Master keys never leave device hardware security modules (TEE / StrongBox).
+- **Protected Components**: Sensitive internal services (like `LogReceiverService`) secured via custom signature permissions; internal activities explicitly unexported (`exported="false"`).
+- **R8 Minification & Obfuscation**: Release builds fully shrunk and obfuscated with package flattening (`com.tom.rv2ide.obf.*`), reducing DEX bytecode footprint by **79.0%** (from 142.5 MB to 29.98 MB).
+- **100% Local-First Privacy**: Zero tracking pixels, zero analytics telemetry, and zero intermediary proxy servers.
+
+### 11. Zero-Delay Sukuna Domain Expansion Startup Engine
+- **Instant Launch Bloom**: HTML5/WebGL vector animation starts at the very first millisecond of launch with true MAPPA anime proportions and 0 vertical distortion.
+- **Concurrent Loading**: Background IDE initialization tasks run parallel to the startup visuals.
+- **Skip Control**: A sleek `"Tap anywhere to skip ➔"` pill appears as soon as background initialization completes.
+
+---
+
+## Architecture & System Requirements
+
+| Specification | Requirement |
+| :--- | :--- |
+| **Operating System** | Android 8.0 (Oreo / API 26) or higher |
+| **Supported ABIs** | `arm64-v8a` (64-bit recommended), `armeabi-v7a` (32-bit legacy) |
+| **RAM** | 3 GB minimum (4 GB+ recommended for large Gradle builds) |
+| **Storage** | 3 GB free internal storage for SDK, compilers, and toolchains |
+| **Permissions** | Storage Management (`MANAGE_EXTERNAL_STORAGE` / Media Permissions), Post Notifications |
+
+---
+
+## Getting Started
+
+1. **Download**: Obtain the latest release APK (`arm64-v8a` or `armeabi-v7a`) from [GitHub Releases](../../releases).
+2. **First-Run Setup**: Choose your preferred development setup mode:
+   - **Both (Offline NDK & Gradle)**: Full IDE environment with internet-downloaded Gradle tooling and offline native compilers.
+   - **Offline NDK Only**: Immediate zero-internet native C/C++ environment without downloading full terminal packages.
+   - **Gradle Only**: Standard Android Java/Kotlin build environment.
+3. **Packages Configurations**: Navigate to **Packages Configurations** from the home screen at any time to import offline NDK archives, manage CMake, or install optional language servers.
+
+---
+
+## Building from Source
+
+Ensure you have JDK 17 installed and Android SDK configured with Build Tools 35.0.0+:
+
+```bash
+# Clone the repository
+git clone https://github.com/AndroidCSOfficial/android-code-studio.git
+cd android-code-studio
+
+# Assemble Debug APKs
+./gradlew :core:app:assembleDebug
+
+# Assemble Hardened & Obfuscated Release APKs (Dual ABI)
+./gradlew :core:app:assembleRelease
+```
+
+Release APKs and deobfuscation mappings are generated under:
+- `core/app/build/outputs/apk/release/`
+- `core/app/build/outputs/mapping/release/mapping.txt`
+
+---
+
+## Upstream Attribution & Open-Source Licenses
+
+CURSED ACS is an advanced fork derived from and built upon the open-source **AndroidIDE** project. We express our deep appreciation and credit to the upstream authors and open-source community:
+
+- **Original Project**: [AndroidIDE](https://github.com/AndroidIDE-Official/AndroidIDE) by **[itsaky](https://github.com/itsaky)** & contributors (Licensed under **GPL-3.0-or-later**).
+- **Code Editor**: [Sora Editor](https://github.com/Rosemoe/sora-editor) by **Rosemoe** (Apache 2.0).
+- **Terminal Emulator**: [Termux](https://github.com/termux) by **Fredrik Fornwall** & Termux Contributors (GPL-3.0).
+- **Syntax Parsing**: [Tree-Sitter](https://github.com/tree-sitter/tree-sitter) by **Max Brunsfeld** (MIT).
+- **Eclipse JDT**: [Eclipse JDT Core](https://github.com/eclipse-jdt/eclipse.jdt.core) (EPL-2.0).
+- **Networking**: [OkHttp](https://github.com/square/okhttp) by Square, Inc. (Apache 2.0).
+
+In compliance with the **GNU General Public License v3.0**, all source code modifications, scripts, and build tools remain open and licensed under GPL-3.0.
+
+---
 
 ## License
 
-```
-AndroidCodeStudio is free software: you can redistribute it and/or modify
+```text
+CURSED ACS — On-Device Android Integrated Development Environment
+Copyright (C) 2021-2024 itsaky & AndroidIDE Contributors
+Copyright (C) 2024-2026 CURSED ACS Contributors
+
+This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-AndroidCodeStudio is distributed in the hope that it will be useful,
+This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with AndroidCodeStudio.  If not, see <https://www.gnu.org/licenses/>.
+along with this program. If not, see <https://www.gnu.org/licenses/>.
 ```
-
-Any violations to the license can be reported either by opening an issue or writing a mail to us
-directly.

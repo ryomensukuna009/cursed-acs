@@ -18,6 +18,7 @@
 package com.tom.rv2ide.actions
 
 import com.tom.rv2ide.lookup.Lookup
+import com.tom.rv2ide.preferences.internal.BuildPreferences
 import com.tom.rv2ide.projects.builder.BuildService
 
 /**
@@ -40,6 +41,10 @@ abstract class BaseBuildAction : EditorActivityAction() {
       visible = true
     }
 
-    enabled = buildService?.let { !it.isBuildInProgress } == true
+    enabled = if (BuildPreferences.isOfflineNdkBuild) {
+      true
+    } else {
+      buildService?.let { !it.isBuildInProgress } == true
+    }
   }
 }

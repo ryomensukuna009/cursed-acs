@@ -44,13 +44,21 @@ abstract class BaseIDEActivity : AppCompatActivity() {
   val activityScope = CoroutineScope(Dispatchers.Default)
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    IThemeManager.getInstance().applyTheme(this)
+    val typedValue = android.util.TypedValue()
+    if (theme.resolveAttribute(android.R.attr.windowBackground, typedValue, true)) {
+      if (typedValue.resourceId != 0) {
+        window?.setBackgroundDrawableResource(typedValue.resourceId)
+      } else {
+        window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(typedValue.data))
+      }
+    }
     if (enableSystemBarTheming) {
       window?.apply {
         navigationBarColor = this@BaseIDEActivity.navigationBarColor
         statusBarColor = this@BaseIDEActivity.statusBarColor
       }
     }
-    IThemeManager.getInstance().applyTheme(this)
     super.onCreate(savedInstanceState)
     preSetContentLayout()
     setContentView(bindLayout())

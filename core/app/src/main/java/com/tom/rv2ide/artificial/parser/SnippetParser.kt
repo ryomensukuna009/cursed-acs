@@ -208,6 +208,8 @@ class SnippetParser {
             "<?xml", "<!DOCTYPE",  // XML declarations
             "implementation(", "dependencies {",  // Gradle
             "    android:", "    app:",  // Indented XML
+            "#include", "#pragma", "#define", "#ifdef", "#ifndef", "#endif", "#if",  // C/C++
+            "extern \"C\"", "using namespace", "typedef ", "struct ", "enum "
         )
         
         return codePatterns.any { line.contains(it) }
@@ -246,6 +248,19 @@ class SnippetParser {
                 line.startsWith("/*") ||
                 line.startsWith("dependencies {") ||
                 line.startsWith("android {") ||
+                line.startsWith("#include") ||
+                line.startsWith("#pragma") ||
+                line.startsWith("#define") ||
+                line.startsWith("#ifndef") ||
+                line.startsWith("#ifdef") ||
+                line.startsWith("#if") ||
+                line.startsWith("extern ") ||
+                line.startsWith("typedef ") ||
+                line.startsWith("struct ") ||
+                line.startsWith("enum ") ||
+                line.startsWith("namespace ") ||
+                line.startsWith("using namespace") ||
+                line.startsWith("template") ||
                 line.matches(Regex("^(public|private|protected|internal|open|abstract|class|interface|object|fun|val|var).*"))) {
                 codeStartIndex = i
                 Log.d(TAG, "Code starts at line $i: $line")

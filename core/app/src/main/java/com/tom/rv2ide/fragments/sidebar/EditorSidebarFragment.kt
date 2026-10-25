@@ -40,22 +40,29 @@ import com.tom.rv2ide.utils.EditorSidebarActions
 class EditorSidebarFragment :
     FragmentWithBinding<FragmentEditorSidebarBinding>(FragmentEditorSidebarBinding::inflate) {
 
+  private var initialTitleTopMargin = 0
+  private var initialSidebarPaddingTop = 0
+  private var initialSidebarPaddingLeft = 0
+  private var initialCaptured = false
+
   internal fun onApplyWindowInsets(insets: Insets) {
     _binding?.apply {
+      if (!initialCaptured) {
+        initialTitleTopMargin = title.marginTop
+        initialSidebarPaddingTop = sidebarContainer.paddingTop
+        initialSidebarPaddingLeft = sidebarContainer.paddingLeft
+        initialCaptured = true
+      }
       title.updateLayoutParams<MarginLayoutParams> {
         updateMarginsRelative(
-            top = title.marginTop + insets.top,
+            top = initialTitleTopMargin + insets.top,
         )
       }
-      fragmentContainer.updateLayoutParams<MarginLayoutParams> {
-        updateMarginsRelative(
-            bottom = fragmentContainer.marginBottom + insets.bottom,
-        )
-      }
-      sidebarContainer.updatePadding(
-          top = sidebarContainer.paddingTop + insets.top,
-          bottom = sidebarContainer.paddingBottom + insets.bottom,
-          left = sidebarContainer.paddingLeft + insets.left,
+      sidebarContainer.setPadding(
+          initialSidebarPaddingLeft + insets.left,
+          initialSidebarPaddingTop + insets.top,
+          sidebarContainer.paddingRight,
+          0,
       )
       navigation.updatePadding(bottom = insets.bottom)
     }
@@ -64,6 +71,15 @@ class EditorSidebarFragment :
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
 
+    ViewCompat.setOnApplyWindowInsetsListener(view) { _, insets ->
+      val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+      val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+      val sysBottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+      val isKeyboardOpen = imeVisible || (imeBottom > sysBottom + 80)
+      binding.navigation.visibility = if (isKeyboardOpen) View.GONE else View.VISIBLE
+      insets
+    }
+
     ViewCompat.setOnApplyWindowInsetsListener(binding.navigation) { v, insets ->
       val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
       v.updatePadding(bottom = systemBars.bottom)
@@ -71,6 +87,10 @@ class EditorSidebarFragment :
     }
 
     EditorSidebarActions.setup(this)
+  }
+
+  fun setKeyboardActive(active: Boolean) {
+    _binding?.navigation?.visibility = if (active) View.GONE else View.VISIBLE
   }
 
   /** Get the (nullable) binding object for this fragment. */

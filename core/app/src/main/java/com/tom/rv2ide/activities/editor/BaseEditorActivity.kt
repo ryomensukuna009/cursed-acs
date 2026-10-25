@@ -193,9 +193,22 @@ abstract class BaseEditorActivity :
   private val onBackPressedCallback: OnBackPressedCallback =
       object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
-          if (binding.root.isDrawerOpen(GravityCompat.START)) {
+          val isDrawerOpen = _binding != null && (binding.root.isDrawerOpen(GravityCompat.START) || binding.root.isDrawerVisible(GravityCompat.START))
+          if (isDrawerOpen) {
+            if (binding.root.isSidePanelKeyboardActive()) {
+              android.util.Log.e("ACS_KEYBOARD_DEBUG", "onBackPressedCallback: Dismissed keyboard! Keeping drawer open.")
+              binding.root.dismissKeyboardIfOpen()
+              hideSoftKeyboardOnly()
+              return
+            }
             binding.root.closeDrawer(GravityCompat.START)
-          } else if (editorBottomSheet?.state != BottomSheetBehavior.STATE_COLLAPSED) {
+            return
+          }
+          if (isImeVisible()) {
+            hideSoftKeyboardOnly()
+            return
+          }
+          if (editorBottomSheet?.state != BottomSheetBehavior.STATE_COLLAPSED) {
             editorBottomSheet?.setState(BottomSheetBehavior.STATE_COLLAPSED)
           } else if (binding.swipeReveal.isOpen) {
             binding.swipeReveal.close()
@@ -204,6 +217,85 @@ abstract class BaseEditorActivity :
           }
         }
       }
+
+  override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+    if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+      val isDrawerOpen = _binding != null && (binding.root.isDrawerOpen(GravityCompat.START) || binding.root.isDrawerVisible(GravityCompat.START))
+      if (isDrawerOpen) {
+        if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+          if (binding.root.isSidePanelKeyboardActive()) {
+            return true
+          }
+        } else if (event.action == android.view.KeyEvent.ACTION_UP) {
+          if (binding.root.isSidePanelKeyboardActive()) {
+            android.util.Log.e("ACS_KEYBOARD_DEBUG", "dispatchKeyEvent: Dismissed keyboard keeping drawer open!")
+            binding.root.dismissKeyboardIfOpen()
+            hideSoftKeyboardOnly()
+            return true
+          }
+        }
+      } else if (_binding != null && isImeVisible()) {
+        if (event.action == android.view.KeyEvent.ACTION_UP) {
+          hideSoftKeyboardOnly()
+        }
+        return true
+      }
+    }
+    return super.dispatchKeyEvent(event)
+  }
+
+  internal fun isImeVisible(): Boolean {
+    if (_binding?.root?.isSidePanelKeyboardActive() == true) {
+      return true
+    }
+    val rootView = window?.decorView ?: return false
+    val insets = ViewCompat.getRootWindowInsets(rootView)
+    if (insets != null && insets.isVisible(WindowInsetsCompat.Type.ime())) {
+      return true
+    }
+    val imeBottom = insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
+    val sysBottom = insets?.getInsets(WindowInsetsCompat.Type.systemBars())?.bottom ?: 0
+    if (imeBottom > sysBottom + 80) {
+      return true
+    }
+    val r = android.graphics.Rect()
+    rootView.getWindowVisibleDisplayFrame(r)
+    val screenHeight = rootView.rootView.height
+    if (screenHeight > 0) {
+      val keypadHeight = screenHeight - r.bottom
+      if (keypadHeight > screenHeight * 0.12) {
+        return true
+      }
+    }
+    return false
+  }
+
+  internal fun hideSoftKeyboardOnly() {
+    val rootView = window?.decorView ?: return
+    val focused = _binding?.drawerSidebar?.findFocus() ?: currentFocus ?: rootView.findFocus()
+    val imm =
+        getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+            as? android.view.inputmethod.InputMethodManager
+    val token = focused?.windowToken ?: rootView.windowToken
+    imm?.hideSoftInputFromWindow(token, 0)
+    WindowCompat.getInsetsController(window, rootView).hide(WindowInsetsCompat.Type.ime())
+    focused?.clearFocus()
+    this.isImeVisible = false
+  }
+
+  open fun doCloseAll(runAfter: () -> Unit = {}) {}
+
+  fun showBuildOutput() {
+    editorBottomSheet?.state = BottomSheetBehavior.STATE_EXPANDED
+  }
+
+  fun openProject(root: java.io.File) {
+    com.tom.rv2ide.templates.preferences.WizardPreferences.addRecentProject(this, root.absolutePath)
+    com.tom.rv2ide.projects.IProjectManager.getInstance().openProject(root)
+    val intent = Intent(this, javaClass)
+    finish()
+    startActivity(intent)
+  }
 
   private var isReinitializingChart = false
 
@@ -642,6 +734,18 @@ abstract class BaseEditorActivity :
     if (this.isImeVisible != isImeVisible) {
       this.isImeVisible = isImeVisible
       onSoftInputChanged()
+    }
+
+    _binding?.startNav?.apply {
+      updateLayoutParams<ViewGroup.MarginLayoutParams> {
+        bottomMargin = imeInsets.bottom
+      }
+    }
+
+    try {
+      _binding?.drawerSidebar?.getFragment<EditorSidebarFragment>()?.setKeyboardActive(imeInsets.bottom > 0)
+    } catch (e: Exception) {
+      // Ignored if fragment not attached yet
     }
   }
 
@@ -1290,7 +1394,7 @@ override fun onApplySystemBarInsets(insets: Insets) {
         childId = contentCard.id
         translationBehaviorStart = ContentTranslatingDrawerLayout.TranslationBehavior.FULL
         translationBehaviorEnd = ContentTranslatingDrawerLayout.TranslationBehavior.FULL
-        setScrimColor(Color.TRANSPARENT)
+        setScrimColor(0x66000000)
       }
     }
   }

@@ -3,8 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:layout_height="match_parent">
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
@@ -12,7 +11,7 @@
         android:layout_height="wrap_content"
         android:background="@drawable/yet_filled_chip_background"
         android:layout_margin="6dp"
-        android:elevation="4dp">
+        android:elevation="8dp">
 
         <LinearLayout
             android:id="@+id/topBar"
@@ -20,27 +19,33 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingVertical="8dp">
-
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fabToggleRail"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_marginEnd="8dp"
-                android:src="@drawable/ic_menu"
-                app:fabCustomSize="32dp"
-                app:tint="?attr/colorOnSurface" />
+            android:paddingVertical="4dp"
+            android:paddingHorizontal="6dp">
 
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tabLayout"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="44dp"
                 android:layout_weight="1"
                 android:background="@android:color/transparent"
                 app:tabMode="fixed"
                 app:tabGravity="fill"
+                app:tabIndicatorAnimationMode="elastic"
+                app:tabSelectedTextColor="?attr/colorPrimary"
+                app:tabTextColor="?attr/colorOnSurfaceVariant"
+                app:tabInlineLabel="true"
                 style="@style/Widget.Material3.TabLayout" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAgentSettings"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="AI Settings"
+                app:icon="@drawable/ic_nav_settings_badass"
+                app:iconSize="24dp"
+                app:iconTint="?attr/colorOnSurface" />
 
         </LinearLayout>
 
@@ -69,26 +74,5 @@
         android:visibility="gone"
         app:icon="@drawable/ic_undo"
         style="@style/Widget.Material3.ExtendedFloatingActionButton.Primary" />
-
-    <View
-        android:id="@+id/overlayView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#80000000"
-        android:visibility="gone"
-        android:clickable="true"
-        android:alpha="0"
-        android:elevation="20dp" />
-
-    <com.google.android.material.navigationrail.NavigationRailView
-        android:id="@+id/navigationRail"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:visibility="gone"
-        app:menu="@menu/chat_navigation_menu"
-        app:labelVisibilityMode="labeled"
-        android:elevation="24dp"
-        android:layout_gravity="start"
-        />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

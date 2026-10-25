@@ -7,10 +7,17 @@ import com.tom.rv2ide.artificial.agents.AIAgentManager
 import com.tom.rv2ide.fragments.ChatFragment
 import com.tom.rv2ide.fragments.AIHistoryFragment
 
-class ViewPagerAdapter(
-    fragmentActivity: FragmentActivity,
+class ViewPagerAdapter : FragmentStateAdapter {
+
     private val aiAgent: AIAgentManager
-) : FragmentStateAdapter(fragmentActivity) {
+
+    constructor(fragment: Fragment, aiAgent: AIAgentManager) : super(fragment) {
+        this.aiAgent = aiAgent
+    }
+
+    constructor(fragmentActivity: FragmentActivity, aiAgent: AIAgentManager) : super(fragmentActivity) {
+        this.aiAgent = aiAgent
+    }
 
     override fun getItemCount(): Int = 2
 

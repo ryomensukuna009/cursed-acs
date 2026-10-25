@@ -271,6 +271,33 @@ class IDEApplication : TermuxApplication() {
       }
 
       log.info("Successfully extracted logger-runtime.aar to: ${targetFile.absolutePath}")
+
+      // Also ensure local Maven repository is populated
+      val repoArtifactDir = File(pluginsDir, "repo/com/tom/rv2ide/logger-runtime/1.0.0")
+      if (!repoArtifactDir.exists()) {
+        repoArtifactDir.mkdirs()
+      }
+      val mavenAar = File(repoArtifactDir, "logger-runtime-1.0.0.aar")
+      if (!mavenAar.exists() || mavenAar.length() != targetFile.length()) {
+        targetFile.copyTo(mavenAar, overwrite = true)
+      }
+      val pomFile = File(repoArtifactDir, "logger-runtime-1.0.0.pom")
+      if (!pomFile.exists()) {
+        pomFile.writeText(
+            """<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.tom.rv2ide</groupId>
+  <artifactId>logger-runtime</artifactId>
+  <version>1.0.0</version>
+  <packaging>aar</packaging>
+  <description>Android Code Studio Logger Runtime</description>
+</project>
+""".trimIndent()
+        )
+      }
     } catch (e: Exception) {
       log.error("Failed to extract logger-runtime.aar", e)
     }

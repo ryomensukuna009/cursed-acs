@@ -13,7 +13,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *   along with AndroidCodeStudio.  If not, see <https://www.gnu.org/licenses/>.
-*/
+ */
 
 package com.tom.rv2ide.artificial.project.awareness
 
@@ -22,23 +22,31 @@ import java.io.File
 
 /*
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
-*/
+ */
 
 class ProjectData(ctx: Context) {
     
-    // This helps the ai to see full paths of files 
+    // This helps the ai to see full paths of files without bloating context with build artifacts
     fun showProjectTree(proj: File): ProjectTreeResult {
         val sb = StringBuilder()
+        val ignoredDirs = setOf("build", ".gradle", ".git", "intermediates", ".cxx", ".idea", "bin", "obj", "build-cache")
     
-        fun walk(dir: File) {
+        fun walk(dir: File, depth: Int) {
+            if (depth > 8) return
             sb.appendLine(dir.canonicalPath)
-            dir.listFiles()?.forEach { file ->
-                if (file.isDirectory) walk(file)
-                else sb.appendLine(file.canonicalPath)
+            val children = dir.listFiles() ?: return
+            for (file in children.sortedBy { it.name }) {
+                if (file.isDirectory) {
+                    if (file.name !in ignoredDirs && !file.name.startsWith(".")) {
+                        walk(file, depth + 1)
+                    }
+                } else {
+                    sb.appendLine(file.canonicalPath)
+                }
             }
         }
     
-        walk(proj)
+        walk(proj, 0)
     
         return ProjectTreeResult(sb.toString(), proj)
     }

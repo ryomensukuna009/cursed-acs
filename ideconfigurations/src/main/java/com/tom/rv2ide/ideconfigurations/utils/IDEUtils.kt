@@ -88,7 +88,15 @@ class IDEUtils {
   }
 
   fun deleteNdk(context: Context, ndkVersion: String): Boolean {
-    val ndkDir = File(Environment.HOME, "android-sdk/ndk/$ndkVersion")
+    val trimmed = ndkVersion.trim()
+    if (trimmed.isEmpty() || trimmed.contains("..") || trimmed.contains("/") || trimmed.contains("\\")) {
+      return false
+    }
+    val baseNdk = File(Environment.HOME, "android-sdk/ndk").canonicalFile
+    val ndkDir = File(baseNdk, trimmed).canonicalFile
+    if (!ndkDir.path.startsWith(baseNdk.path + File.separator)) {
+      return false
+    }
 
     return if (ndkDir.exists() && ndkDir.isDirectory()) {
       try {

@@ -20,9 +20,12 @@ package com.tom.rv2ide.events
 import com.tom.rv2ide.eventbus.events.Event
 import com.tom.rv2ide.models.SheetOption
 import com.unnamed.b.atv.model.TreeNode
+import java.io.File
 
 internal data class FileContextMenuItemClickEvent(val option: SheetOption) : Event()
 
 data class ExpandTreeNodeRequestEvent(val node: TreeNode) : Event()
 
 class ListProjectFilesRequestEvent : Event()
+
+data class OpenFileRequestEvent(val file: File) : Event()

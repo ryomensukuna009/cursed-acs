@@ -4,8 +4,10 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+
+    <!-- Solid Chunky Plus Glyph with Rounded Caps -->
     <path
-        android:fillColor="#ffffff"
-        android:pathData="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+        android:fillColor="@android:color/white"
+        android:pathData="M19,10.5 H13.5 V5 C13.5,4.2 12.8,3.5 12,3.5 C11.2,3.5 10.5,4.2 10.5,5 V10.5 H5 C4.2,10.5 3.5,11.2 3.5,12 C3.5,12.8 4.2,13.5 5,13.5 H10.5 V19 C10.5,19.8 11.2,20.5 12,20.5 C12.8,20.5 13.5,19.8 13.5,19 V13.5 H19 C19.8,13.5 20.5,12.8 20.5,12 C20.5,11.2 19.8,10.5 19,10.5 Z" />
 
 </vector>

@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     app:setCardStroke="0sp"
-    app:setCardTitle="Android development kit"
+    app:setCardTitle="Android NDK Toolchains"
     app:isCheckableCard="false"
     app:isClickableCard="true"
     app:setCardSummary="@string/cfg_installed_ndk_version"
@@ -19,13 +19,123 @@
     app:setCardElevation="0dp"
     app:setCardIcon="@drawable/ic_cfg">
 
+    <!-- SECTION 1: Offline NDK (Local Import & Installed) -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginHorizontal="4dp"
+        android:text="Offline NDK (Local Import &amp; Installed)"
+        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary" />
+
+    <TextView
+        android:id="@+id/tvActiveNdkInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="4dp"
+        android:layout_marginHorizontal="4dp"
+        android:text="Detected native compiler version and readiness."
+        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/active_ndk_dropdown_layout"
+        style="@style/AppTheme.TextInputLayout.Dropdown.Filled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="4dp"
+        android:hint="Active Offline NDK (Build System)">
+
+        <AutoCompleteTextView
+            android:id="@+id/active_ndk_dropdown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="none"
+            android:clickable="true"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:textAppearance="@style/TextAppearance.Material3.LabelLarge" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/import_btn"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            app:cornerRadius="12dp"
+            app:iconSize="20dp"
+            app:backgroundTint="?attr/colorSurfaceContainerHigh"
+            app:icon="@drawable/ic_add"
+            android:text="Import Archive" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/test_ndk_btn"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            app:cornerRadius="12dp"
+            app:iconSize="20dp"
+            app:backgroundTint="?attr/colorSurfaceContainerHigh"
+            app:icon="@drawable/ic_code"
+            android:text="Smoke Test" />
+
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/remove_btn"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="4dp"
+        app:cornerRadius="12dp"
+        app:iconSize="20dp"
+        app:backgroundTint="?attr/colorErrorContainer"
+        app:iconTint="?attr/colorOnErrorContainer"
+        android:textColor="?attr/colorOnErrorContainer"
+        app:icon="@drawable/ic_delete"
+        android:text="Delete Installed NDK" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="12dp"
+        android:background="?attr/colorOutlineVariant" />
+
+    <!-- SECTION 2: Online SDK Manager NDK (Repository Download) -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:text="SDK Manager NDK (Online Download)"
+        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+        android:textStyle="bold"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/ndks_dropdown_layout"
         style="@style/AppTheme.TextInputLayout.Dropdown.Filled"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="4dp"
-        >
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="4dp"
+        android:hint="Available Remote NDK Versions">
 
         <AutoCompleteTextView
             android:id="@+id/ndks_dropdown"
@@ -39,40 +149,55 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <LinearLayout
-        android:layout_height="wrap_content"
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/reinstall_btn"
+        style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="match_parent"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_height="48dp"
+        android:layout_marginTop="6dp"
+        app:cornerRadius="12dp"
+        app:iconSize="20dp"
+        app:backgroundTint="?attr/colorSurfaceContainerHigh"
+        app:icon="@drawable/download"
+        android:text="Download &amp; Install" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/reinstall_btn"
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:layout_margin="4dp"
-            app:icon="@drawable/download"
-            style="@style/Widget.Material3.Button.TonalButton"
-            app:backgroundTint="?attr/colorSurfaceContainerHigh"
-            android:text="Download" />
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="12dp"
+        android:background="?attr/colorOutlineVariant" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/remove_btn"
-            android:layout_height="40dp"
-            android:layout_width="wrap_content"
-            android:layout_margin="4dp"
-            android:minWidth="40dp"
-            android:minHeight="40dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:insetLeft="0dp"
-            android:insetRight="0dp"
-            android:padding="4dp"
-            android:gravity="center"
-            app:iconPadding="0dp"
-            app:iconGravity="textTop"
-            app:icon="@drawable/ic_delete"
-            />
+    <!-- SECTION 3: OpenJDK 17 Java Runtime (Optional) -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:text="OpenJDK 17 Compiler (Optional)"
+        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+        android:textStyle="bold"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
-    </LinearLayout>
+    <TextView
+        android:id="@+id/tvJdkOfflineStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="6dp"
+        android:layout_marginHorizontal="4dp"
+        android:text="Embedded in-process Java compiler is ready. Download external OpenJDK 17 if CLI javac is desired."
+        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnDownloadJdkOffline"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="2dp"
+        app:cornerRadius="12dp"
+        app:iconSize="20dp"
+        app:backgroundTint="?attr/colorSurfaceContainerHigh"
+        app:icon="@drawable/download"
+        android:text="Download OpenJDK 17 (Optional)" />
 
 </com.tom.customizablecardview.CustomizableCardView>

@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory
 object InstallationResultHandler {
 
   private const val INSTALL_PACKAGE_REQ_CODE = 2304
-  private const val INSTALL_PACKAGE_ACTION = "com.tom.rv2ide.installer.INSTALL_PACKAGE"
+  private val INSTALL_PACKAGE_ACTION = "${com.tom.rv2ide.BuildConfig.APPLICATION_ID}.installer.INSTALL_PACKAGE"
 
   private val log = LoggerFactory.getLogger(InstallationResultHandler::class.java)
 

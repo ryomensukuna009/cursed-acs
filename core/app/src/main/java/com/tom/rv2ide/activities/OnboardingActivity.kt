@@ -39,6 +39,7 @@ import com.tom.rv2ide.fragments.onboarding.PermissionsFragment
 import com.tom.rv2ide.fragments.onboarding.StatisticsFragment
 import com.tom.rv2ide.models.JdkDistribution
 import com.tom.rv2ide.preferences.internal.StatPreferences
+import com.tom.rv2ide.preferences.internal.BuildPreferences
 import com.tom.rv2ide.preferences.internal.prefManager
 import com.tom.rv2ide.tasks.launchAsyncWithProgress
 import com.tom.rv2ide.ui.themes.IThemeManager
@@ -56,6 +57,7 @@ class OnboardingActivity : AppIntro2() {
       registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         Log.d(TAG, "TerminalActivity: resultCode=${it.resultCode}")
         if (!isFinishing) {
+          prefManager.putBoolean("first_run_setup_completed", true)
           reloadJdkDistInfo { tryNavigateToMainIfSetupIsCompleted() }
         }
       }
@@ -163,6 +165,21 @@ class OnboardingActivity : AppIntro2() {
     }
 
     if (!checkToolsIsInstalled() && currentFragment is IdeSetupConfigurationFragment) {
+      if (currentFragment.isOfflineNdkOnly()) {
+        BuildPreferences.buildMode = BuildPreferences.BUILD_MODE_OFFLINE_NDK
+        prefManager.putString("ide_setup_workflow_choice", "offline_only")
+        prefManager.putBoolean("first_run_setup_completed", true)
+        startActivity(Intent(this, MainActivity::class.java))
+        finish()
+        return
+      }
+      if (currentFragment.isBothModes()) {
+        BuildPreferences.buildMode = BuildPreferences.BUILD_MODE_GRADLE
+        prefManager.putString("ide_setup_workflow_choice", "both")
+      } else if (currentFragment.isGradleOnly()) {
+        BuildPreferences.buildMode = BuildPreferences.BUILD_MODE_GRADLE
+        prefManager.putString("ide_setup_workflow_choice", "gradle_only")
+      }
       val intent = Intent(this, TerminalActivity::class.java)
       if (currentFragment.isAutoInstall()) {
         intent.putExtra(TerminalActivity.EXTRA_ONBOARDING_RUN_IDESETUP, true)
@@ -179,11 +196,18 @@ class OnboardingActivity : AppIntro2() {
   }
 
   private fun checkToolsIsInstalled(): Boolean {
+    if (BuildPreferences.isOfflineNdkBuild) {
+      return true
+    }
     return IJdkDistributionProvider.getInstance().installedDistributions.isNotEmpty() &&
         Environment.ANDROID_HOME.exists()
   }
 
   private fun isSetupCompleted(): Boolean {
+    if (prefManager.getBoolean("first_run_setup_completed", false)) {
+      return StatPreferences.statConsentDialogShown &&
+          PermissionsFragment.areAllPermissionsGranted(this)
+    }
     return checkToolsIsInstalled() &&
         StatPreferences.statConsentDialogShown &&
         PermissionsFragment.areAllPermissionsGranted(this)

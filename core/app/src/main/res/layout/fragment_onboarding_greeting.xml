@@ -22,16 +22,18 @@
 
   <com.google.android.material.imageview.ShapeableImageView
     android:id="@+id/icon"
-    android:layout_width="0dp"
-    android:layout_height="150dp"
-    android:src="@drawable/ic_launcher_fg_vector"
+    android:layout_width="140dp"
+    android:layout_height="140dp"
+    android:src="@drawable/logo_dual_aura"
+    android:scaleType="centerCrop"
+    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Large"
+    app:strokeWidth="2dp"
+    app:strokeColor="#FF2A55"
     app:layout_constraintBottom_toBottomOf="parent"
     app:layout_constraintEnd_toEndOf="parent"
     app:layout_constraintStart_toStartOf="parent"
     app:layout_constraintTop_toTopOf="parent"
-    app:layout_constraintVertical_bias="0.4"
-    app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Full"
-    app:tint="?attr/colorOnSurface" />
+    app:layout_constraintVertical_bias="0.38" />
 
   <com.google.android.material.textview.MaterialTextView
     android:id="@+id/title"

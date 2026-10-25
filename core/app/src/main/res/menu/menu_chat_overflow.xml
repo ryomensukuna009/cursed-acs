@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_compact_context"
+        android:icon="@drawable/ic_clear"
+        android:title="Compact Context Window (/compact)" />
+    <item
+        android:id="@+id/action_clear_chat"
+        android:icon="@drawable/ic_delete"
+        android:title="Clean chat" />
+    <item
+        android:id="@+id/action_dismiss_keyboard"
+        android:icon="@drawable/ic_keyboard_hide"
+        android:title="Dismiss Keyboard" />
+</menu>

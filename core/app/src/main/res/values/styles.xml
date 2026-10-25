@@ -19,4 +19,23 @@
   <declare-styleable name="SwipeRevealLayout">
     <attr name="dragHandle" format="reference"/>
   </declare-styleable>
+
+  <style name="Widget.AndroidIDE.ToolSheetRow" parent="">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">56dp</item>
+    <item name="android:gravity">center_vertical</item>
+    <item name="android:paddingHorizontal">12dp</item>
+    <item name="android:background">?attr/selectableItemBackground</item>
+    <item name="android:clickable">true</item>
+    <item name="android:focusable">true</item>
+    <item name="android:orientation">horizontal</item>
+  </style>
+
+  <style name="Widget.AndroidIDE.ToolSheetText" parent="TextAppearance.Material3.BodyMedium">
+    <item name="android:layout_width">0dp</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_weight">1</item>
+    <item name="android:layout_marginStart">16dp</item>
+    <item name="android:textColor">?attr/colorOnSurface</item>
+  </style>
 </resources>

@@ -110,11 +110,13 @@ abstract class EdgeToEdgeIDEActivity : IDEActivity() {
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    com.tom.rv2ide.ui.themes.IThemeManager.getInstance().applyTheme(this)
     applyEdgeToEdge()
     super.onCreate(savedInstanceState)
   }
 
   override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
+    com.tom.rv2ide.ui.themes.IThemeManager.getInstance().applyTheme(this)
     applyEdgeToEdge()
     super.onCreate(savedInstanceState, persistentState)
   }

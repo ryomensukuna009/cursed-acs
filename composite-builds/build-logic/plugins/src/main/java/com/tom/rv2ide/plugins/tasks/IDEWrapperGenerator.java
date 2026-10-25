@@ -463,7 +463,7 @@ public class IDEWrapperGenerator {
 
   @Option(option = "validate-url", description = "Sets task to validate the configured distribution url.")
   public Boolean getValidateDistributionUrl() {
-    return true;
+    return false;
   }
 
   @Inject

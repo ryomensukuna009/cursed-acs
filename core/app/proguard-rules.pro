@@ -2,7 +2,50 @@
 
 -dontwarn **
 -dontnote **
--dontobfuscate
+
+# Standard R8 Release Obfuscation & Hardening
+-repackageclasses 'com.tom.rv2ide.obf'
+-allowaccessmodification
+
+# Preserve native method signatures and JNI symbol bindings
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
+# Preserve WebView JavascriptInterface methods for bridges
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# Preserve ViewBinding implementations
+-keep class * implements androidx.viewbinding.ViewBinding { *; }
+
+# Preserve custom views and XML-inflated constructors
+-keep public class * extends android.view.View {
+    public <init>(android.content.Context);
+    public <init>(android.content.Context, android.util.AttributeSet);
+    public <init>(android.content.Context, android.util.AttributeSet, int);
+}
+
+# Preserve custom preferences for XML inflation
+-keep public class * extends androidx.preference.Preference {
+    public <init>(android.content.Context, android.util.AttributeSet);
+    public <init>(android.content.Context, android.util.AttributeSet, int);
+}
+
+# Preserve AI Agent models, transport, and JSON serialization
+-keep class com.tom.rv2ide.artificial.** { *; }
+
+# Preserve Shell and process execution
+-keep class com.tom.rv2ide.shell.** { *; }
+-keep class com.termux.** { *; }
+
+# Preserve diagnostics, problems, and doctor models
+-keep class com.tom.rv2ide.problems.** { *; }
+-keep class com.tom.rv2ide.doctor.** { *; }
+
+# Preserve AIDL interfaces
+-keep interface * extends android.os.IInterface { *; }
 
 -keep class javax.** { *; }
 -keep class jdkx.** { *; }
@@ -151,5 +194,15 @@
 
 -keep class * extends java.lang.Record { *; }
 -keepclassmembers class * extends java.lang.Record {
+    <init>(...);
+}
+# Preserve LSP setup servers and installer interfaces
+-keep class com.tom.rv2ide.setup.servers.** { *; }
+-keep interface com.tom.rv2ide.setup.servers.ILanguageServerInstaller { *; }
+-keep class openjdk.tools.javac.** { *; }
+
+# Preserve custom UI widgets inflated in XML
+-keep class com.tom.rv2ide.ui.MaxHeightNestedScrollView { *; }
+-keepclassmembers class com.tom.rv2ide.ui.MaxHeightNestedScrollView {
     <init>(...);
 }

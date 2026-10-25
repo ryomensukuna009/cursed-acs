@@ -53,6 +53,20 @@ class AIFileWriter(private val context: Context) {
             return FileWriteResult.PermissionDenied("Path not in allowed directories")
         }
 
+        val actionType = if (File(filePath).exists()) {
+            com.tom.rv2ide.artificial.policy.ActionType.MODIFY_FILE
+        } else {
+            com.tom.rv2ide.artificial.policy.ActionType.CREATE_FILE
+        }
+        val isAllowed = com.tom.rv2ide.artificial.policy.ActionPolicyGate.isActionPermittedSync(
+            context = context,
+            actionType = actionType,
+            targetDetail = filePath
+        )
+        if (!isAllowed) {
+            return FileWriteResult.PermissionDenied("Action denied by AI Action Policy Gate")
+        }
+
         val file = File(filePath)
 
         // Create parent directories if they don't exist

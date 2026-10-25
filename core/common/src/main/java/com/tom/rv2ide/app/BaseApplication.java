@@ -46,6 +46,8 @@ public class BaseApplication extends Application {
   public static final String EMAIL = "rv2.code.studio@gmail.com";
   
   private static BaseApplication instance;
+  private static java.lang.ref.WeakReference<android.app.Activity> currentActivityRef =
+      new java.lang.ref.WeakReference<>(null);
   private PreferenceManager mPrefsManager;
   
   private Object kotlinProcessManager;
@@ -56,11 +58,42 @@ public class BaseApplication extends Application {
     return instance;
   }
 
+  public static android.app.Activity getCurrentActivity() {
+    return currentActivityRef != null ? currentActivityRef.get() : null;
+  }
+
   @Override
   public void onCreate() {
     instance = this;
     Environment.init(this);
     super.onCreate();
+
+    registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+      @Override
+      public void onActivityCreated(android.app.Activity activity, android.os.Bundle savedInstanceState) {
+        currentActivityRef = new java.lang.ref.WeakReference<>(activity);
+      }
+      @Override
+      public void onActivityStarted(android.app.Activity activity) {
+        currentActivityRef = new java.lang.ref.WeakReference<>(activity);
+      }
+      @Override
+      public void onActivityResumed(android.app.Activity activity) {
+        currentActivityRef = new java.lang.ref.WeakReference<>(activity);
+      }
+      @Override
+      public void onActivityPaused(android.app.Activity activity) {}
+      @Override
+      public void onActivityStopped(android.app.Activity activity) {}
+      @Override
+      public void onActivitySaveInstanceState(android.app.Activity activity, android.os.Bundle outState) {}
+      @Override
+      public void onActivityDestroyed(android.app.Activity activity) {
+        if (currentActivityRef != null && currentActivityRef.get() == activity) {
+          currentActivityRef = new java.lang.ref.WeakReference<>(null);
+        }
+      }
+    });
 
     mPrefsManager = new PreferenceManager(this);
     JavaCharacter.initMap();

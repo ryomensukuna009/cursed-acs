@@ -95,6 +95,41 @@ class IdeSetupConfigurationFragment : OnboardingFragment(), SlidePolicy {
       meteredConnection.root.setText(R.string.msg_connected_to_metered_connection)
       backgroundDataRestricted.root.setText(R.string.msg_disable_background_data_restriction)
 
+      setupModeGroup.setOnCheckedChangeListener { _, checkedId ->
+        when (checkedId) {
+          R.id.mode_offline_only -> {
+            setupOfflineInfoCard.isVisible = true
+            connectionInfoContainer.isVisible = false
+            autoInstallSwitch.isVisible = false
+            sdkVersionLayout.isVisible = false
+            jdkVersionLayout.isVisible = false
+            ndkVersionLayout.isVisible = false
+            installGit.isVisible = false
+            installOpenssh.isVisible = false
+          }
+          R.id.mode_gradle_only -> {
+            setupOfflineInfoCard.isVisible = false
+            connectionInfoContainer.isVisible = true
+            autoInstallSwitch.isVisible = true
+            sdkVersionLayout.isVisible = true
+            jdkVersionLayout.isVisible = true
+            ndkVersionLayout.isVisible = false
+            installGit.isVisible = true
+            installOpenssh.isVisible = true
+          }
+          else -> {
+            setupOfflineInfoCard.isVisible = false
+            connectionInfoContainer.isVisible = true
+            autoInstallSwitch.isVisible = true
+            sdkVersionLayout.isVisible = true
+            jdkVersionLayout.isVisible = true
+            ndkVersionLayout.isVisible = true
+            installGit.isVisible = true
+            installOpenssh.isVisible = true
+          }
+        }
+      }
+
       autoInstallSwitch.setOnCheckedChangeListener { button, isChecked ->
         button.setText(
             if (isChecked) R.string.action_auto_install else R.string.action_manual_install
@@ -141,6 +176,10 @@ class IdeSetupConfigurationFragment : OnboardingFragment(), SlidePolicy {
     updateConnectionStatus()
   }
 
+  fun isOfflineNdkOnly(): Boolean = _content?.modeOfflineOnly?.isChecked == true
+  fun isGradleOnly(): Boolean = _content?.modeGradleOnly?.isChecked == true
+  fun isBothModes(): Boolean = _content?.modeBoth?.isChecked == true
+
   fun isAutoInstall(): Boolean = content.autoInstallSwitch.isChecked
 
   fun buildIdeSetupArguments(): Array<String> {
@@ -154,9 +193,10 @@ class IdeSetupConfigurationFragment : OnboardingFragment(), SlidePolicy {
         IdeSetupArgument.JDK_VERSION,
         JdkVersion.fromDisplayName(content.jdkVersion.text).version,
     )
+    val ndkArg = if (isGradleOnly()) "0" else NdkVersion.fromDisplayName(content.ndkVersion.text).version
     args.setArgument(
         IdeSetupArgument.NDK_VERSION,
-        NdkVersion.fromDisplayName(content.ndkVersion.text).version,
+        ndkArg,
     )
     args.setArgument(IdeSetupArgument.ASSUME_YES)
     if (content.installGit.isChecked) {
@@ -259,10 +299,15 @@ class IdeSetupConfigurationFragment : OnboardingFragment(), SlidePolicy {
   }
 
   override val isPolicyRespected: Boolean
-    get() = getConnectionInfo(requireContext()).isConnected
+    get() {
+      if (isOfflineNdkOnly()) return true
+      return getConnectionInfo(requireContext()).isConnected
+    }
 
   override fun onUserIllegallyRequestedNextPage() {
-    flashError(string.msg_no_internet)
+    if (!isOfflineNdkOnly()) {
+      flashError(string.msg_no_internet)
+    }
   }
 
   private fun monitorNetworkState() {

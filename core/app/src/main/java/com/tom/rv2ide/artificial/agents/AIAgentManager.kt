@@ -18,20 +18,26 @@
 package com.tom.rv2ide.artificial.agents
 
 import android.content.Context
-import com.tom.rv2ide.artificial.agents.google.Gemini
-import com.tom.rv2ide.artificial.agents.openai.OpenAI
 import com.tom.rv2ide.artificial.agents.anthropic.Anthropic
-import com.tom.rv2ide.artificial.agents.grok.Grok
 import com.tom.rv2ide.artificial.agents.deepseek.DeepSeek
+import com.tom.rv2ide.artificial.agents.google.Gemini
+import com.tom.rv2ide.artificial.agents.grok.Grok
 import com.tom.rv2ide.artificial.agents.local.LocalLLM
+import com.tom.rv2ide.artificial.agents.openai.OpenAI
+import com.tom.rv2ide.artificial.dialogs.ProviderSwitchDialog
 import com.tom.rv2ide.artificial.file.FileWriteResult
 import com.tom.rv2ide.artificial.parser.SnippetParser
 import com.tom.rv2ide.artificial.permissions.AIPermissionManager
 import com.tom.rv2ide.artificial.project.awareness.ProjectData
-import com.tom.rv2ide.artificial.secrets.ApiKey
+import com.tom.rv2ide.artificial.providers.ProviderRegistryManager
+import com.tom.rv2ide.artificial.secrets.SecretRedactor
+import com.tom.rv2ide.artificial.transport.CitationItem
+import com.tom.rv2ide.artificial.transport.StreamEvent
+import com.tom.rv2ide.artificial.tools.HistoricalToolOutputStore
+import com.tom.rv2ide.artificial.coding.TaskCheckpointManager
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import com.tom.rv2ide.artificial.dialogs.ProviderSwitchDialog
 
 /**
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
@@ -41,79 +47,110 @@ class AIAgentManager(private val context: Context) {
 
     private val snippetParser = SnippetParser()
     private val permissionManager = AIPermissionManager(context)
+    private val registryManager = ProviderRegistryManager.getInstance(context)
     private var currentProjectRoot: File? = null
-    private var currentProviderId: String = "gemini"
+    private var currentProviderId: String = Agents(context).getProvider()
     private var currentAgent: AIAgent? = null
     private val providerSwitchDialog = ProviderSwitchDialog(context)
 
     init {
+        try {
+            val aiStorageDir = File(context.filesDir, "ai")
+            HistoricalToolOutputStore.setStorageDirectory(File(aiStorageDir, "historical_outputs"))
+            TaskCheckpointManager.setStorageDirectory(File(aiStorageDir, "checkpoints"))
+        } catch (_: Throwable) {}
+
         Gemini.registerAgent()
         OpenAI.registerAgent()
         Anthropic.registerAgent()
         Grok.registerAgent()
         DeepSeek.registerAgent()
         LocalLLM.registerAgent()
-        
+
+        // Upgrade all preset and custom profiles to UniversalProviderAgent
+        UniversalProviderAgent.registerAllProfiles(context)
+
         permissionManager.setFileWriteEnabled(true)
         permissionManager.setRequireConfirmation(false)
-        
-        setProvider(currentProviderId)
+
+        if (!setProvider(currentProviderId)) {
+            // Keep uninitialized UniversalProviderAgent reference so provider name/model are still visible
+            currentAgent = UniversalProviderAgent(currentProviderId, context)
+        }
     }
-    
+
+    fun refreshRegisteredProfiles() {
+        UniversalProviderAgent.registerAllProfiles(context)
+    }
+
     fun getCurrentAgent(): AIAgent? = currentAgent
 
+    fun cancelActiveRequest() {
+        (currentAgent as? StreamingToolCapableAgent)?.cancelActiveRequest()
+    }
+
+    @Volatile
+    private var lastCompletionReport: com.tom.rv2ide.artificial.chat.AgentCompletionReport? = null
+
+    fun getLastCompletionReport(): com.tom.rv2ide.artificial.chat.AgentCompletionReport? = lastCompletionReport
+
+    fun getLastCitations(): List<CitationItem> {
+        return (currentAgent as? StreamingToolCapableAgent)?.getLastCitations() ?: emptyList()
+    }
+
+    fun getLastTokenUsage(): com.tom.rv2ide.artificial.transport.TokenUsage? {
+        return (currentAgent as? StreamingToolCapableAgent)?.getLastTokenUsage()
+    }
+
+    fun getCumulativeTokenUsage(): com.tom.rv2ide.artificial.transport.TokenUsage {
+        return (currentAgent as? StreamingToolCapableAgent)?.getCumulativeTokenUsage() ?: com.tom.rv2ide.artificial.transport.TokenUsage()
+    }
+
     fun setProvider(providerId: String): Boolean {
-        android.util.Log.d("AIAgentManager", "setProvider called with: $providerId")
-        
-        val factory = AIAgentRegistry.getFactory(providerId)
-        if (factory == null) {
-            android.util.Log.e("AIAgentManager", "No factory found for provider: $providerId")
-            return false
+        if (!AIAgentRegistry.hasProvider(providerId) && registryManager.getProfile(providerId) != null) {
+            UniversalProviderAgent.registerForProfile(context, providerId)
         }
-        
-        if (!factory.hasValidApiKey()) {
-            android.util.Log.e("AIAgentManager", "No valid API key for provider: $providerId")
-            return false
-        }
-        
+
+        val factory = AIAgentRegistry.getFactory(providerId) ?: return false
+
         currentProviderId = providerId
         currentAgent = factory.create(context)
-        android.util.Log.d("AIAgentManager", "Agent created: ${currentAgent != null}")
-        
-        factory.getApiKey()?.let { apiKey ->
-            android.util.Log.d("AIAgentManager", "Initializing agent with API key")
-            currentAgent?.initialize(apiKey, context)
+
+        if (!factory.hasValidApiKey()) {
             currentAgent?.setContext(context)
-            
-            currentProjectRoot?.let { root ->
-                val projectData = ProjectData(context)
-                val projectTree = projectData.showProjectTree(root)
-                currentAgent?.setProjectData(projectTree)
-            }
-            
-            android.util.Log.d("AIAgentManager", "Agent initialized: ${currentAgent?.isInitialized()}")
+            return false
         }
-        
+
+        val apiKey = factory.getApiKey() ?: ""
+        currentAgent?.initialize(apiKey, context)
+        currentAgent?.setContext(context)
+
+        currentProjectRoot?.let { root ->
+            val projectData = ProjectData(context)
+            val projectTree = projectData.showProjectTree(root)
+            currentAgent?.setProjectData(projectTree)
+        }
+
         return currentAgent?.isInitialized() ?: false
     }
 
     fun getCurrentProviderId(): String = currentProviderId
-    
+
     fun getCurrentProviderName(): String {
-        return currentAgent?.providerName ?: "Unknown"
+        return registryManager.getProfile(currentProviderId)?.displayName
+            ?: currentAgent?.providerName
+            ?: currentProviderId
     }
-    
+
     fun getAvailableProviders(): List<ProviderInfo> {
-        return AIAgentRegistry.getAvailableProviders().mapNotNull { providerId ->
-            val factory = AIAgentRegistry.getFactory(providerId)
-            val agent = factory?.create(context)
-            agent?.let {
-                ProviderInfo(
-                    id = it.providerId,
-                    name = it.providerName,
-                    isAvailable = factory.hasValidApiKey()
-                )
-            }
+        refreshRegisteredProfiles()
+        return registryManager.getEnabledProfiles().map { profile ->
+            val factory = AIAgentRegistry.getFactory(profile.id)
+            ProviderInfo(
+                id = profile.id,
+                name = profile.displayName,
+                isAvailable = factory?.hasValidApiKey() ?: false
+            )
         }
     }
 
@@ -122,6 +159,7 @@ class AIAgentManager(private val context: Context) {
         if (!projectRoot.exists()) return false
 
         currentProjectRoot = projectRoot
+        com.tom.rv2ide.builder.SharedBuildOrchestrator.setActiveProjectDir(projectRoot)
         val projectData = ProjectData(context)
         val projectTree = projectData.showProjectTree(projectRoot)
 
@@ -135,9 +173,25 @@ class AIAgentManager(private val context: Context) {
         currentAgent?.clearConversation()
     }
 
-    suspend fun executeRequest(userRequest: String, callback: AIAgentCallback) {
+    suspend fun executeRequest(
+        userRequest: String,
+        callback: AIAgentCallback,
+        explicitWebSearch: Boolean = false
+    ) {
         var success = false
         var providerSwitched = false
+
+        // Sync execution mode and /edit command state
+        val executionMode = com.tom.rv2ide.artificial.policy.AgentExecutionMode.getSavedMode(context)
+        val isEditCommand = userRequest.trim().startsWith("/edit", ignoreCase = true) || userRequest.contains("/edit", ignoreCase = true)
+        com.tom.rv2ide.artificial.rules.WritingRules.currentExecutionMode = executionMode
+        com.tom.rv2ide.artificial.rules.WritingRules.isEditCommandActive = isEditCommand
+
+        // Ensure current provider is synced with Agents preference
+        val selectedProviderId = Agents(context).getProvider()
+        if (selectedProviderId != currentProviderId || currentAgent == null || currentAgent?.isInitialized() != true) {
+            setProvider(selectedProviderId)
+        }
 
         currentAgent?.resetAttemptCount()
         callback.onProcessing("Analyzing your request...")
@@ -152,116 +206,295 @@ class AIAgentManager(private val context: Context) {
                 }
 
                 val previousFileStates = captureCurrentFileStates()
+                val agent = currentAgent ?: UniversalProviderAgent(currentProviderId, context).also {
+                    currentAgent = it
+                }
 
-                val result = currentAgent?.generateCode(
-                    prompt = userRequest,
-                    context = null,
-                    language = "kotlin",
-                    projectStructure = null
-                ) ?: Result.failure(Exception("No agent initialized"))
+                val streamingTextBuffer = StringBuilder()
+                val citationsList = mutableListOf<CitationItem>()
+
+                val result: Result<String> = if (agent is StreamingToolCapableAgent) {
+                    val chatRes = agent.generateStreamingChat(
+                        prompt = userRequest,
+                        context = null,
+                        language = "kotlin",
+                        projectStructure = null,
+                        explicitWebSearch = explicitWebSearch
+                    ) { event ->
+                        when (event) {
+                            is StreamEvent.StatusUpdate -> {
+                                callback.onToolStatus(event.status)
+                                callback.onProcessing(event.status)
+                            }
+                            is StreamEvent.TextDelta -> {
+                                streamingTextBuffer.append(event.text)
+                                callback.onStreamTextDelta(event.text, streamingTextBuffer.toString())
+                            }
+                            is StreamEvent.CitationAdded -> {
+                                if (citationsList.none { it.url == event.citation.url }) {
+                                    citationsList.add(event.citation)
+                                    callback.onCitationsUpdated(citationsList.toList())
+                                }
+                            }
+                            is StreamEvent.Completed -> {
+                                if (event.response.citations.isNotEmpty()) {
+                                    callback.onCitationsUpdated(event.response.citations)
+                                }
+                            }
+                            else -> {}
+                        }
+                    }
+                    chatRes.map { it.text }
+                } else {
+                    agent.generateCode(
+                        prompt = userRequest,
+                        context = null,
+                        language = "kotlin",
+                        projectStructure = null
+                    )
+                }
 
                 result.fold(
-                    onSuccess = { response ->
-                        
-                        if (response.contains("FILE_TO_MODIFY:")) {
-                            callback.onProcessing("Modifying files...")
-                            val modifications = processModifications(response, previousFileStates, callback)
+                    onSuccess = { initialResponse ->
+                        val hasFileBlocks = initialResponse.contains("FILE_TO_MODIFY:") ||
+                            initialResponse.contains("FILE_TO_CREATE:") ||
+                            initialResponse.contains("FILE_TO_PATCH:")
 
-                            if (modifications.isNotEmpty()) {
-                                val allSuccessful = modifications.all { it.writeResult is FileWriteResult.Success }
+                        val inspectedFiles = (agent as? StreamingToolCapableAgent)?.getLastInspectedFiles() ?: emptyList()
 
-                                if (allSuccessful) {
-                                    val results = modifications.map { mod ->
-                                        val isNewFile = !previousFileStates.containsKey(mod.filePath)
-                                        ModificationResult(
-                                            filePath = mod.filePath,
-                                            content = mod.content,
-                                            success = true,
-                                            message = "Modified successfully",
-                                            isNewFile = isNewFile
-                                        )
+                        val toolModifiedFiles = (agent as? StreamingToolCapableAgent)?.getLastModifiedFiles() ?: emptyList()
+                        val toolRollbackSessionId = (agent as? StreamingToolCapableAgent)?.getLastRollbackSessionId()
+
+                        val isExplicitBuildRepairRequest = userRequest.contains("build", ignoreCase = true) &&
+                            (userRequest.contains("fix", ignoreCase = true) || userRequest.contains("repair", ignoreCase = true) || userRequest.contains("keep fixing", ignoreCase = true))
+
+                        val isAutonomousAllowed = (executionMode == com.tom.rv2ide.artificial.policy.AgentExecutionMode.AUTONOMOUS) || isEditCommand
+                        val hasWorkToVerify = isAutonomousAllowed && (hasFileBlocks || isExplicitBuildRepairRequest || toolModifiedFiles.isNotEmpty())
+
+                        if (hasWorkToVerify) {
+                            val projectRoot = currentProjectRoot ?: com.tom.rv2ide.builder.SharedBuildOrchestrator.getActiveProjectDir()
+                            if (projectRoot != null && projectRoot.exists()) {
+                                if (currentProjectRoot == null) {
+                                    setProjectRoot(projectRoot.absolutePath)
+                                }
+                                callback.onProcessing("Starting Autonomous Engineering Loop...")
+
+                                val stateListener = object : com.tom.rv2ide.artificial.coding.AutonomousStateListener {
+                                    override fun onStateChanged(state: com.tom.rv2ide.artificial.coding.AutonomousExecutionState, description: String) {
+                                        val label = if (description.isNotBlank()) description else state.displayName
+                                        callback.onToolStatus("⚙️ $label")
+                                        callback.onProcessing(label)
                                     }
+                                }
 
-                                    val summary = createSummary(results)
-                                    callback.onSuccess(response, results, summary)
-                                    success = true
-                                } else {
-                                    callback.onProcessing("Some files failed. Retrying...")
-                                    currentAgent?.incrementAttemptCount()
-                                    delay(1500)
+                                com.tom.rv2ide.artificial.coding.AutonomousExecutionCoordinator.addListener(stateListener)
+                                try {
+                                    val initialCandidate = if (hasFileBlocks && toolModifiedFiles.isEmpty()) initialResponse else null
+                                    val loopSummary = com.tom.rv2ide.artificial.coding.AutonomousExecutionCoordinator.runAutonomousEngineeringLoop(
+                                        projectRoot = projectRoot,
+                                        userGoal = userRequest,
+                                        initialCodeCandidate = initialCandidate,
+                                        codeGenerator = { prompt ->
+                                            if (agent is StreamingToolCapableAgent) {
+                                                agent.generateStreamingChat(
+                                                    prompt = prompt,
+                                                    explicitWebSearch = false
+                                                ) { event ->
+                                                    when (event) {
+                                                        is StreamEvent.TextDelta -> {
+                                                            callback.onStreamTextDelta(event.text, "")
+                                                        }
+                                                        else -> {}
+                                                    }
+                                                }.map { it.text }.getOrNull()
+                                            } else {
+                                                agent.generateCode(prompt = prompt, context = null, language = "kotlin", projectStructure = null).getOrNull()
+                                            }
+                                        },
+                                        onFileModifying = { path, name ->
+                                            callback.onFileModifying(path, name)
+                                        },
+                                        onFileModified = { path, name, ok ->
+                                            currentAgent?.recordModification(path, null, "", ok)
+                                            callback.onFileModified(path, name, ok)
+                                        },
+                                        preModifiedFiles = toolModifiedFiles,
+                                        existingSessionId = toolRollbackSessionId
+                                    )
+
+                                    lastCompletionReport = loopSummary.report
+
+                                    if (loopSummary.isSuccess) {
+                                        val results = loopSummary.totalFilesModified.map { relPath ->
+                                            val f = File(projectRoot, relPath)
+                                            ModificationResult(
+                                                filePath = f.absolutePath,
+                                                content = if (f.exists()) f.readText() else "",
+                                                success = true,
+                                                message = "Verified via actual ${loopSummary.lastBuildResult?.buildMode ?: "build"}",
+                                                isNewFile = false
+                                            )
+                                        }
+                                        val summary = createSummary(results)
+                                        val responseText = if (initialResponse.isNotBlank()) {
+                                            "$initialResponse\n\n✅ ${loopSummary.report.mainChangesSummary}"
+                                        } else {
+                                            "✅ ${loopSummary.report.mainChangesSummary}"
+                                        }
+                                        callback.onSuccess(responseText, results, summary)
+                                        success = true
+                                    } else {
+                                        val errMsg = loopSummary.failureBlockerMessage
+                                            ?: "Build failed: ${loopSummary.lastBuildResult?.errorMessage ?: "compiler errors remaining"}"
+                                        callback.onError(errMsg)
+                                        success = true
+                                    }
+                                } finally {
+                                    com.tom.rv2ide.artificial.coding.AutonomousExecutionCoordinator.removeListener(stateListener)
                                 }
                             } else {
-                                callback.onProcessing("No files were modified. Retrying...")
-                                currentAgent?.incrementAttemptCount()
-                                delay(1500)
+                                val agentReport = (agent as? StreamingToolCapableAgent)?.getLastCompletionReport()
+                                if (agentReport != null) {
+                                    lastCompletionReport = agentReport
+                                    val results = agentReport.filesModified.map { relPath ->
+                                        val f = File(relPath)
+                                        ModificationResult(
+                                            filePath = f.absolutePath,
+                                            content = if (f.exists()) f.readText() else "",
+                                            success = true,
+                                            message = "Modified successfully",
+                                            isNewFile = false
+                                        )
+                                    }
+                                    val summary = createSummary(results)
+                                    callback.onSuccess(initialResponse, results, summary)
+                                    success = true
+                                } else if (toolModifiedFiles.isNotEmpty() && toolRollbackSessionId != null) {
+                                    val report = com.tom.rv2ide.artificial.chat.AgentCompletionReport(
+                                        goalOrRootCause = userRequest.take(140),
+                                        filesModified = toolModifiedFiles,
+                                        mainChangesSummary = "Modified ${toolModifiedFiles.size} file(s) via agent tools: " + toolModifiedFiles.joinToString(", "),
+                                        validationChecksRun = listOf("File change-set transaction applied"),
+                                        validationPassed = true,
+                                        verificationLevel = com.tom.rv2ide.artificial.chat.VerificationLevel.IMPLEMENTED_UNVERIFIED,
+                                        repairAttemptsUsed = 1,
+                                        remainingErrors = emptyList<String>(),
+                                        nextActionableStep = null,
+                                        rollbackSessionId = toolRollbackSessionId
+                                    )
+                                    lastCompletionReport = report
+                                    val results = toolModifiedFiles.map { relPath ->
+                                        val f = File(relPath)
+                                        ModificationResult(
+                                            filePath = f.absolutePath,
+                                            content = if (f.exists()) f.readText() else "",
+                                            success = true,
+                                            message = "Modified successfully",
+                                            isNewFile = false
+                                        )
+                                    }
+                                    val summary = createSummary(results)
+                                    callback.onSuccess(initialResponse, results, summary)
+                                    success = true
+                                } else {
+                                    val modifications = processModifications(initialResponse, previousFileStates, callback)
+                                    if (modifications.isNotEmpty() && modifications.all { it.writeResult is FileWriteResult.Success }) {
+                                        val results = modifications.map { mod ->
+                                            val isNewFile = !previousFileStates.containsKey(mod.filePath)
+                                            ModificationResult(
+                                                filePath = mod.filePath,
+                                                content = mod.content,
+                                                success = true,
+                                                message = "Modified successfully",
+                                                isNewFile = isNewFile
+                                            )
+                                        }
+                                        val summary = createSummary(results)
+                                        callback.onSuccess(initialResponse, results, summary)
+                                        success = true
+                                    } else {
+                                        callback.onProcessing("No files were modified. Retrying...")
+                                        currentAgent?.incrementAttemptCount()
+                                        delay(1000)
+                                    }
+                                }
                             }
                         } else {
+                            lastCompletionReport = null
                             val summary = ModificationSummary(0, 0, 0, 0, 0, emptyList())
-                            callback.onTextResponse(response, summary)
+                            callback.onTextResponse(initialResponse, summary)
                             success = true
                         }
                     },
-                  onFailure = { error ->
-                      android.util.Log.e("AIAgentManager", "Error occurred: ${error.message}", error)
-                      
-                      val shouldSwitchProvider = error is com.tom.rv2ide.artificial.exceptions.RateLimitException ||
-                                                error is com.tom.rv2ide.artificial.exceptions.QuotaExceededException ||
-                                                error is com.tom.rv2ide.artificial.exceptions.InsufficientBalanceException ||
-                                                error is com.tom.rv2ide.artificial.exceptions.InvalidApiKeyException
-                      
-                      if (shouldSwitchProvider && !providerSwitched) {
-                          val currentProviderName = currentAgent?.providerName ?: "Unknown"
-                          val errorMsg = error.message ?: "Unknown error"
-                          
-                          if (providerSwitchDialog.isAutoSwitchEnabled()) {
-                              val alternativeProvider = getAlternativeProvider()
-                              if (alternativeProvider != null) {
-                                  callback.onProcessing("⚠️ $currentProviderName: $errorMsg")
-                                  callback.onProcessing("🔄 Auto-switching to another provider...")
-                                  delay(1500)
-                                  
-                                  if (setProvider(alternativeProvider)) {
-                                      providerSwitched = true
-                                      currentAgent?.resetAttemptCount()
-                                      
-                                      val newProviderName = currentAgent?.providerName ?: "Unknown"
-                                      callback.onProcessing("✅ Switched to $newProviderName")
-                                  } else {
-                                      val errorDisplay = formatErrorMessage(error)
-                                      callback.onError("$errorDisplay\n\n❌ Failed to switch providers.")
-                                      success = true
-                                  }
-                              } else {
-                                  val errorDisplay = formatErrorMessage(error)
-                                  callback.onError("$errorDisplay\n\n❌ No alternative providers available.")
-                                  success = true
-                              }
-                          } else {
-                              val errorDisplay = formatErrorMessage(error)
-                              callback.onError("PROVIDER_SWITCH_REQUIRED::$errorDisplay")
-                              success = true
-                          }
-                      } else if ((currentAgent?.canRetry() == true) && !providerSwitched) {
-                          callback.onRetry(
-                              currentAgent?.getCurrentAttemptCount() ?: 0,
-                              "Error: ${error.message?.take(50) ?: "Unknown error"}. Retrying..."
-                          )
-                          currentAgent?.incrementAttemptCount()
-                          delay(1500)
-                      } else {
-                          val errorDisplay = formatErrorMessage(error)
-                          callback.onError(errorDisplay)
-                          success = true
-                      }
-                  }
+                    onFailure = { error ->
+                        if (error is CancellationException) {
+                            callback.onProcessing("⏹️ Generation stopped by user.")
+                            success = true
+                            return@fold
+                        }
+
+                        val shouldSwitchProvider =
+                            error is com.tom.rv2ide.artificial.exceptions.RateLimitException ||
+                                error is com.tom.rv2ide.artificial.exceptions.QuotaExceededException ||
+                                error is com.tom.rv2ide.artificial.exceptions.InsufficientBalanceException ||
+                                error is com.tom.rv2ide.artificial.exceptions.InvalidApiKeyException
+
+                        if (shouldSwitchProvider && !providerSwitched) {
+                            val currentProviderName = getCurrentProviderName()
+                            val errorMsg = SecretRedactor.redact(error.message ?: "Unknown error")
+
+                            if (providerSwitchDialog.isAutoSwitchEnabled()) {
+                                val alternativeProvider = getAlternativeProvider()
+                                if (alternativeProvider != null) {
+                                    callback.onProcessing("⚠️ $currentProviderName: $errorMsg")
+                                    callback.onProcessing("🔄 Auto-switching to another provider...")
+                                    delay(1500)
+
+                                    if (setProvider(alternativeProvider)) {
+                                        providerSwitched = true
+                                        currentAgent?.resetAttemptCount()
+
+                                        val newProviderName = getCurrentProviderName()
+                                        callback.onProcessing("✅ Switched to $newProviderName")
+                                    } else {
+                                        val errorDisplay = formatErrorMessage(error)
+                                        callback.onError("$errorDisplay\n\n❌ Failed to switch providers.")
+                                        success = true
+                                    }
+                                } else {
+                                    val errorDisplay = formatErrorMessage(error)
+                                    callback.onError("$errorDisplay\n\n❌ No alternative providers available.")
+                                    success = true
+                                }
+                            } else {
+                                val errorDisplay = formatErrorMessage(error)
+                                callback.onError("PROVIDER_SWITCH_REQUIRED::$errorDisplay")
+                                success = true
+                            }
+                        } else if ((currentAgent?.canRetry() == true) && !providerSwitched) {
+                            val safeMsg = SecretRedactor.redact(error.message?.take(80) ?: "Unknown error")
+                            callback.onRetry(
+                                currentAgent?.getCurrentAttemptCount() ?: 0,
+                                "Error: $safeMsg. Retrying..."
+                            )
+                            currentAgent?.incrementAttemptCount()
+                            delay(1500)
+                        } else {
+                            val errorDisplay = formatErrorMessage(error)
+                            callback.onError(errorDisplay)
+                            success = true
+                        }
+                    }
                 )
+            } catch (e: CancellationException) {
+                callback.onProcessing("⏹️ Generation stopped by user.")
+                success = true
             } catch (e: Exception) {
-                android.util.Log.e("AIAgentManager", "Exception occurred: ${e.message}", e)
-                
                 if (currentAgent?.canRetry() == true) {
+                    val safeMsg = SecretRedactor.redact(e.message?.take(80) ?: "Unknown")
                     callback.onRetry(
                         currentAgent?.getCurrentAttemptCount() ?: 0,
-                        "Exception: ${e.message?.take(50) ?: "Unknown"}. Trying again..."
+                        "Exception: $safeMsg. Trying again..."
                     )
                     currentAgent?.incrementAttemptCount()
                     delay(1500)
@@ -274,10 +507,10 @@ class AIAgentManager(private val context: Context) {
         }
 
         if (!success) {
-          val attemptCount = currentAgent?.getCurrentAttemptCount() ?: 0
-          val agentName = currentAgent?.providerName ?: "No agent initialized"
-          callback.onError("Failed after $attemptCount attempts with $agentName.\n\nPlease check your API key and try again.")
-          undoLastModification()
+            val attemptCount = currentAgent?.getCurrentAttemptCount() ?: 0
+            val agentName = getCurrentProviderName()
+            callback.onError("Failed after $attemptCount attempts with $agentName.\n\nPlease check your API key and endpoint settings.")
+            undoLastModification()
         }
     }
 
@@ -294,6 +527,12 @@ class AIAgentManager(private val context: Context) {
         val modifications = mutableListOf<BaseFileModification>()
         val parser = SnippetParser()
 
+        val execMode = com.tom.rv2ide.artificial.policy.AgentExecutionMode.getSavedMode(context)
+        val isEditCmd = com.tom.rv2ide.artificial.rules.WritingRules.isEditCommandActive
+        if (execMode == com.tom.rv2ide.artificial.policy.AgentExecutionMode.SIDE_AGENT && !isEditCmd) {
+            return emptyList()
+        }
+
         if (response.contains("FILE_TO_MODIFY:")) {
             val lines = response.lines()
             var currentFile: String? = null
@@ -308,9 +547,26 @@ class AIAgentManager(private val context: Context) {
 
                         val rawContent = contentBuilder.toString().trim()
                         val cleanedContent = parser.cleanFileContent(rawContent)
+
+                        val approval = com.tom.rv2ide.artificial.policy.ApprovalManager.requestApproval(
+                            context = context,
+                            actionName = "Modify Project File",
+                            targetDetail = currentFile,
+                            actionKey = "file:$currentFile",
+                            proposedDiff = cleanedContent
+                        )
+                        if (approval == com.tom.rv2ide.artificial.policy.ApprovalDecision.REFUSE) {
+                            callback.onFileModified(currentFile, fileName, false)
+                            callback.onProcessing("Modification of $fileName refused by user.")
+                            currentFile = null
+                            contentBuilder.clear()
+                            continue
+                        }
+
                         val previousContent = previousFileStates[currentFile]
 
                         val writeResult = currentAgent?.writeFile(currentFile, cleanedContent)
+                        ?: FileWriteResult.Error("Agent unavailable")
                             ?: FileWriteResult.Error("No agent initialized")
 
                         val success = writeResult is FileWriteResult.Success
@@ -336,18 +592,30 @@ class AIAgentManager(private val context: Context) {
 
                 val rawContent = contentBuilder.toString().trim()
                 val cleanedContent = parser.cleanFileContent(rawContent)
-                val previousContent = previousFileStates[currentFile]
 
-                val writeResult = currentAgent?.writeFile(currentFile, cleanedContent)
-                    ?: FileWriteResult.Error("No agent initialized")
+                val approval = com.tom.rv2ide.artificial.policy.ApprovalManager.requestApproval(
+                    context = context,
+                    actionName = "Modify Project File",
+                    targetDetail = currentFile,
+                    actionKey = "file:$currentFile",
+                    proposedDiff = cleanedContent
+                )
+                if (approval != com.tom.rv2ide.artificial.policy.ApprovalDecision.REFUSE) {
+                    val previousContent = previousFileStates[currentFile]
 
-                val success = writeResult is FileWriteResult.Success
-                currentAgent?.recordModification(currentFile, previousContent, cleanedContent, success)
+                    val writeResult = currentAgent?.writeFile(currentFile, cleanedContent)
+                        ?: FileWriteResult.Error("Agent unavailable")
+                    val success = writeResult is FileWriteResult.Success
+                    currentAgent?.recordModification(currentFile, previousContent, cleanedContent, success)
 
-                callback.onFileModified(currentFile, fileName, success)
-                delay(300)
+                    callback.onFileModified(currentFile, fileName, success)
+                    delay(300)
 
-                modifications.add(BaseFileModification(currentFile, cleanedContent, writeResult))
+                    modifications.add(BaseFileModification(currentFile, cleanedContent, writeResult))
+                } else {
+                    callback.onFileModified(currentFile, fileName, false)
+                    callback.onProcessing("Modification of $fileName refused by user.")
+                }
             }
         }
 
@@ -355,27 +623,28 @@ class AIAgentManager(private val context: Context) {
     }
 
     private fun formatErrorMessage(error: Throwable): String {
-        val errorMessage = error.message ?: "Unknown error occurred"
-        val stackTrace = error.stackTraceToString().take(500)
-        val providerName = currentAgent?.providerName ?: "Unknown"
-        
+        val errorMessage = SecretRedactor.redact(error.message ?: "Unknown error occurred")
+        val providerName = getCurrentProviderName()
+
         return when (error) {
-            is com.tom.rv2ide.artificial.exceptions.RateLimitException -> 
-                "⚠️ RATE LIMIT EXCEEDED\n\nThe API rate limit has been exceeded.\nPlease wait a few minutes before trying again.\n\nDetails: $errorMessage"
-            is com.tom.rv2ide.artificial.exceptions.QuotaExceededException -> 
+            is com.tom.rv2ide.artificial.exceptions.RateLimitException ->
+                "⚠️ RATE LIMIT EXCEEDED\n\nThe API rate limit has been exceeded.\nPlease wait before trying again.\n\nDetails: $errorMessage"
+            is com.tom.rv2ide.artificial.exceptions.QuotaExceededException ->
                 "⚠️ QUOTA EXCEEDED\n\nYour API quota has been exhausted.\nPlease check your billing or upgrade your plan.\n\nDetails: $errorMessage"
-            is com.tom.rv2ide.artificial.exceptions.InsufficientBalanceException -> 
-                "💳 INSUFFICIENT BALANCE\n\nYour account balance is too low to process this request.\nPlease add credits or upgrade your plan.\n\nProvider: $providerName\n\nDetails: $errorMessage"
-            is com.tom.rv2ide.artificial.exceptions.InvalidApiKeyException -> 
-                "❌ INVALID API KEY\n\nThe API key is invalid or expired.\nPlease update your API key in the configuration.\n\nDetails: $errorMessage"
-            is java.net.UnknownHostException ->
-                "🌐 NETWORK ERROR\n\nCould not connect to the API server.\nPlease check your internet connection.\n\nDetails: $errorMessage"
+            is com.tom.rv2ide.artificial.exceptions.InsufficientBalanceException ->
+                "💳 INSUFFICIENT BALANCE\n\nYour account balance is too low to process this request.\n\nProvider: $providerName\n\nDetails: $errorMessage"
+            is com.tom.rv2ide.artificial.exceptions.InvalidApiKeyException ->
+                "❌ INVALID OR MISSING API KEY\n\nThe API key for $providerName is missing, invalid, or expired.\nPlease configure your API key in AI Settings.\n\nDetails: $errorMessage"
+            is com.tom.rv2ide.artificial.exceptions.UnsupportedEndpointException ->
+                "🔗 ENDPOINT / MODEL NOT FOUND\n\nVerify Base URL, API protocol, and Model ID for $providerName.\n\nDetails: $errorMessage"
+            is com.tom.rv2ide.artificial.exceptions.InsecureEndpointException ->
+                "🔒 INSECURE HTTP BLOCKED\n\n$errorMessage"
+            is java.net.UnknownHostException, is com.tom.rv2ide.artificial.exceptions.NetworkErrorException ->
+                "🌐 NETWORK ERROR\n\nCould not connect to $providerName.\nPlease check your internet connection and Base URL.\n\nDetails: $errorMessage"
             is java.net.SocketTimeoutException ->
-                "⏱️ TIMEOUT ERROR\n\nThe request took too long to complete.\nPlease try again.\n\nDetails: $errorMessage"
-            is org.json.JSONException ->
-                "📄 JSON PARSING ERROR\n\nFailed to parse API response.\nThe API may be experiencing issues.\n\nDetails: $errorMessage"
-            else -> 
-                "❌ ERROR OCCURRED\n\nProvider: $providerName\nError Type: ${error.javaClass.simpleName}\n\nMessage: $errorMessage\n\nStack Trace (first 500 chars):\n$stackTrace"
+                "⏱️ TIMEOUT ERROR\n\nThe request took too long to complete.\n\nDetails: $errorMessage"
+            else ->
+                "❌ ERROR OCCURRED\n\nProvider: $providerName\nError Type: ${error.javaClass.simpleName}\n\nMessage: $errorMessage"
         }
     }
 
@@ -384,11 +653,11 @@ class AIAgentManager(private val context: Context) {
         errorMessage: String,
         onProviderSelected: (String) -> Unit
     ) {
-        val currentProviderName = currentAgent?.providerName ?: "Unknown"
+        val currentProviderName = getCurrentProviderName()
         val availableProviders = getAvailableProviders()
             .filter { it.id != currentProviderId && it.isAvailable }
             .map { Pair(it.id, it.name) }
-        
+
         providerSwitchDialog.showProviderErrorDialog(
             currentProviderName,
             errorMessage,
@@ -396,6 +665,7 @@ class AIAgentManager(private val context: Context) {
             onProviderSelected = { providerId ->
                 setProvider(providerId)
                 val agents = Agents(context)
+                agents.setProvider(providerId)
                 val availableModels = agents.getModelsForProvider(providerId)
                 if (availableModels.isNotEmpty()) {
                     agents.setAgent(availableModels[0])
@@ -408,6 +678,7 @@ class AIAgentManager(private val context: Context) {
                 if (alternativeProvider != null) {
                     setProvider(alternativeProvider)
                     val agents = Agents(context)
+                    agents.setProvider(alternativeProvider)
                     val availableModels = agents.getModelsForProvider(alternativeProvider)
                     if (availableModels.isNotEmpty()) {
                         agents.setAgent(availableModels[0])
@@ -417,11 +688,11 @@ class AIAgentManager(private val context: Context) {
             }
         )
     }
-    
+
     fun isAutoSwitchEnabled(): Boolean {
         return providerSwitchDialog.isAutoSwitchEnabled()
     }
-    
+
     fun setAutoSwitch(enabled: Boolean) {
         providerSwitchDialog.setAutoSwitch(enabled)
     }
@@ -460,14 +731,16 @@ class AIAgentManager(private val context: Context) {
         projectRoot.walkTopDown()
             .filter { it.isFile }
             .filter {
-                it.extension in listOf("kt", "java", "xml", "gradle", "kts") &&
-                !it.path.contains("/build/") &&
-                !it.path.contains("/.gradle/")
+                it.extension in listOf("kt", "java", "xml", "gradle", "kts", "c", "cpp", "h", "mk") &&
+                    !it.path.contains("/build/") &&
+                    !it.path.contains("/.gradle/")
             }
             .forEach { file ->
                 try {
-                    states[file.absolutePath] = file.readText()
-                } catch (e: Exception) {
+                    if (file.length() <= 128 * 1024) {
+                        states[file.absolutePath] = file.readText()
+                    }
+                } catch (_: Exception) {
                 }
             }
 
@@ -480,16 +753,15 @@ class AIAgentManager(private val context: Context) {
 
     fun reinitializeWithSelectedModel() {
         val factory = AIAgentRegistry.getFactory(currentProviderId)
-        factory?.getApiKey()?.let { apiKey ->
-            currentAgent?.reinitializeWithNewModel(apiKey, context)
-        }
+        val key = factory?.getApiKey() ?: ""
+        currentAgent?.reinitializeWithNewModel(key, context)
     }
 
     fun getCurrentModelName(): String {
         val agents = Agents(context)
         return agents.getAgent()
     }
-    
+
     fun getConversationHistory(): List<UnifiedModificationAttempt> {
         return currentAgent?.getModificationHistory()?.map {
             UnifiedModificationAttempt(
@@ -511,6 +783,9 @@ class AIAgentManager(private val context: Context) {
         fun onTextResponse(response: String, summary: ModificationSummary)
         fun onError(message: String)
         fun onRetry(attemptNumber: Int, message: String)
+        fun onStreamTextDelta(delta: String, fullTextSoFar: String) {}
+        fun onToolStatus(statusMessage: String) {}
+        fun onCitationsUpdated(citations: List<CitationItem>) {}
     }
 
     data class ModificationResult(
@@ -539,7 +814,7 @@ class AIAgentManager(private val context: Context) {
 
     enum class FileStatus { SUCCESS, FAILED }
     enum class ChangeType { CREATED, MODIFIED }
-    
+
     data class ProviderInfo(
         val id: String,
         val name: String,

@@ -13,6 +13,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:src="@drawable/ic_menu"
-        app:fabSize="mini" />
+        app:fabCustomSize="38dp"
+        app:maxImageSize="22dp"
+        app:elevation="0dp"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
 
 </LinearLayout>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!-- Test-only diagnostic receiver for Android Keystore verification.
+             Packaged EXCLUSIVELY into debug builds. Excluded completely from release APKs. -->
+        <receiver
+            android:name=".git.KeystoreVerificationReceiver"
+            android:enabled="true"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.tom.rv2ide.git.ACTION_VERIFY_KEYSTORE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Test-only diagnostic receiver for Task 23 AI Trust Engine verification.
+             Packaged EXCLUSIVELY into debug builds. Excluded completely from release APKs. -->
+        <receiver
+            android:name=".artificial.TrustEngineVerificationReceiver"
+            android:enabled="true"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.tom.rv2ide.artificial.ACTION_VERIFY_TRUST_ENGINE" />
+                <action android:name="com.tom.rv2ide.artificial.ACTION_SHOW_SAMPLE_DIFF" />
+                <action android:name="com.tom.rv2ide.artificial.ACTION_SHOW_SAMPLE_REVIEW" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

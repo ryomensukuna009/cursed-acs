@@ -42,11 +42,6 @@ buildscript {
   }
 }
 
-tasks.configureEach {
-    if (name.contains("desugar", ignoreCase = true)) {
-        enabled = false
-    }
-}
 
 configurations.all {
   resolutionStrategy {
@@ -97,17 +92,23 @@ android {
 
   buildTypes {
     debug {
-      signingConfig = signingConfigs.getByName("custom")
     }
 
     release {
-      isShrinkResources = false
-      signingConfig = signingConfigs.getByName("custom")
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(
+          getDefaultProguardFile("proguard-android-optimize.txt"),
+          "proguard-rules.pro"
+      )
+      val hasCustomSigning = (System.getenv("SIGNING_STORE_PASSWORD") ?: "").isNotEmpty()
+      signingConfig = if (hasCustomSigning) signingConfigs.getByName("custom") else signingConfigs.getByName("debug")
     }
   }
   
   lint {
     abortOnError = false
+    checkReleaseBuilds = false
     disable.addAll(arrayOf("VectorPath", "NestedWeights", "ContentDescription", "SmallSp"))
   }
 
@@ -228,6 +229,10 @@ dependencies {
   // Git
   implementation(libs.git.jgit)
 
+  // Standalone offline build dependencies: apksig and D8/R8
+  implementation("com.android.tools.build:apksig:8.3.0")
+  implementation("com.android.tools:r8:8.2.42")
+
   // AndroidX
   implementation(libs.androidx.splashscreen)
   implementation(libs.androidx.annotation)
@@ -300,5 +305,7 @@ dependencies {
   // This is to build the tooling-api-impl project before the app is built
   // So we always copy the latest JAR file to assets
   compileOnly(projects.tooling.impl)
-  
+
+  testImplementation(libs.tests.junit)
+  testImplementation("org.json:json:20231013")
 }

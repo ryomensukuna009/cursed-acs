@@ -513,13 +513,35 @@ class TemplateAdapter(
     val template = templates[position]
     holder.title.text = template.displayName
 
-    val resId =
-        ctx.resources.getIdentifier(
-            template.javaClass.simpleName.replace(Regex("([a-z])([A-Z])"), "$1_$2").lowercase(),
-            "drawable",
-            ctx.packageName,
-        )
-    holder.image.setImageResource(if (resId != 0) resId else android.R.drawable.ic_menu_gallery)
+    val resId = when {
+        template is com.tom.rv2ide.templates.android.NoActivity || template.displayName.equals("No Activity", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.no_activity
+        template is com.tom.rv2ide.templates.android.BasicActivity || template.displayName.equals("Basic Activity", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.basic_activity
+        template is com.tom.rv2ide.templates.android.EmptyActivity || template.displayName.equals("Empty Activity", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.empty_activity
+        template is com.tom.rv2ide.templates.android.ComposeEmptyActivity || template.displayName.contains("Compose", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.compose_empty_activity
+        template is com.tom.rv2ide.templates.android.BottomNavigationActivity || template.displayName.contains("Bottom Navigation", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.bottom_navigation_activity
+        template is com.tom.rv2ide.templates.android.NavigationDrawerActivity || template.displayName.contains("Navigation drawer", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.navigation_drawer_activity
+        template is com.tom.rv2ide.templates.android.ResponsiveActivity || template.displayName.contains("Responsive", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.responsive_activity
+        template is com.tom.rv2ide.templates.android.GameActivity || template.displayName.contains("Game", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.game_activity
+        template is com.tom.rv2ide.templates.android.NativeCpp || template.displayName.contains("Native C++", ignoreCase = true) || template.displayName.contains("C++", ignoreCase = true) ->
+            com.tom.rv2ide.resources.R.drawable.cpp_activity
+        else -> {
+            val dynamicId = ctx.resources.getIdentifier(
+                template.javaClass.simpleName.replace(Regex("([a-z])([A-Z])"), "$1_$2").lowercase(),
+                "drawable",
+                ctx.packageName,
+            )
+            if (dynamicId != 0) dynamicId else com.tom.rv2ide.resources.R.drawable.basic_activity
+        }
+    }
+    holder.image.setImageResource(if (resId != 0) resId else com.tom.rv2ide.resources.R.drawable.basic_activity)
     holder.card.setOnClickListener { onTemplateClick(template) }
   }
 
@@ -543,7 +565,7 @@ private val Int.dp: Int
 
 internal object SafResolver {
   private const val ANDROID_DOCS_AUTHORITY = "com.android.externalstorage.documents"
-  private const val ANDROIDIDE_DOCS_AUTHORITY = "com.tom.rv2ide.documents"
+  private val ANDROIDIDE_DOCS_AUTHORITY = "${com.tom.rv2ide.BuildConfig.APPLICATION_ID}.documents"
 
   fun resolveToPath(context: Context, uriStr: String): String {
     return try {

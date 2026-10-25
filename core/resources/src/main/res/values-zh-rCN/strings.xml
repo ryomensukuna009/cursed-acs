@@ -86,6 +86,21 @@
   <!-- AI Agent grok -->
   <string name="ai_agent_grok_api_key">Grok API 密钥</string>
 
+  <!-- Agent Approvals & Permissions -->
+  <string name="agent_tab_title">Agent</string>
+  <string name="agent_tab_summary">文件修改、终端命令及构建任务的权限设置</string>
+  <string name="agent_approvals_title">AI 代理权限与审批</string>
+  <string name="pref_agent_file_perm_title">文件修改</string>
+  <string name="pref_agent_file_perm_always">始终自动批准</string>
+  <string name="pref_agent_file_perm_ask">每次修改文件前询问</string>
+  <string name="pref_agent_term_perm_title">终端命令</string>
+  <string name="pref_agent_term_perm_always">始终自动批准</string>
+  <string name="pref_agent_term_perm_ask">每次执行终端命令前询问</string>
+  <string name="pref_agent_build_perm_title">项目构建</string>
+  <string name="pref_agent_build_perm_always">始终自动批准</string>
+  <string name="pref_agent_build_perm_ask">每次启动 Gradle 构建前询问</string>
+
+
   <string name="no_acs_title">ACS 组件缺失</string>
   <string name="no_acs_summary">该应用程序似乎不完整或非官方，因为它缺少所需的 ACS 构建系统。要获得完整功能，请从可信来源安装官方 Android Code Studio。</string>
 
@@ -1004,4 +1019,8 @@
   <string name="lsp_ok_button">好的</string>
   <string name="lsp_installation_failed_description">无法安装更新：%s</string>
   <string name="lsp_retry_button">重试</string>
+
+    <string name="pref_agent_reset_all_title">重置所有批准</string>
+    <string name="pref_agent_reset_all_summary">将所有权限恢复为“每次询问”并清除保存的规则</string>
+    <string name="pref_agent_reset_all_done">已将所有代理权限重置为每次询问</string>
 </resources>

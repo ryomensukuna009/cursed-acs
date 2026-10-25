@@ -28,40 +28,44 @@ object WizardPreferences {
   private const val PREFS_NAME = "atc_wizard_prefs"
   private const val KEY_LAST_SAVE_LOCATION = "last_save_location"
   private const val KEY_RECENT_PROJECTS = "recent_projects"
+  private const val KEY_HIDDEN_PROJECTS = "hidden_projects"
   private const val MAX_RECENT_PROJECTS = 10
 
-  private fun getPrefs(context: Context): SharedPreferences {
-    return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+  @androidx.annotation.VisibleForTesting
+  var prefsOverrideForTesting: SharedPreferences? = null
+
+  private fun getPrefs(context: Context? = null): SharedPreferences {
+    return prefsOverrideForTesting ?: context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) ?: throw IllegalStateException("Context required")
   }
 
-  fun getLastSaveLocation(context: Context): String? {
+  fun getLastSaveLocation(context: Context? = null): String? {
     return getPrefs(context).getString(KEY_LAST_SAVE_LOCATION, null)
   }
 
-  fun setLastSaveLocation(context: Context, path: String) {
+  fun setLastSaveLocation(context: Context? = null, path: String) {
     getPrefs(context).edit().putString(KEY_LAST_SAVE_LOCATION, path).apply()
   }
 
   // Add a project to recent projects list
-  fun addRecentProject(context: Context, projectPath: String) {
+  fun addRecentProject(context: Context? = null, projectPath: String) {
+    unhideProject(context, projectPath)
     val prefs = getPrefs(context)
+    val normPath = try {
+      java.io.File(projectPath).canonicalPath
+    } catch (_: Exception) {
+      projectPath
+    }
     val recentProjects = getRecentProjects(context).toMutableList()
 
-    // Remove if already exists (we'll add it to the front)
-    recentProjects.remove(projectPath)
+    recentProjects.removeAll { it == normPath || it == projectPath }
+    recentProjects.add(0, normPath)
 
-    // Add to front
-    recentProjects.add(0, projectPath)
-
-    // Keep only MAX_RECENT_PROJECTS
     val trimmedList = recentProjects.take(MAX_RECENT_PROJECTS)
-
-    // Save as comma-separated string
     prefs.edit().putString(KEY_RECENT_PROJECTS, trimmedList.joinToString(",")).apply()
   }
 
   // Get list of recent project paths
-  fun getRecentProjects(context: Context): List<String> {
+  fun getRecentProjects(context: Context? = null): List<String> {
     val prefs = getPrefs(context)
     val projectsString = prefs.getString(KEY_RECENT_PROJECTS, "") ?: ""
 
@@ -80,12 +84,88 @@ object WizardPreferences {
   }
 
   // Check if a project is in recent list
-  fun isRecentProject(context: Context, projectPath: String): Boolean {
+  fun isRecentProject(context: Context? = null, projectPath: String): Boolean {
     return getRecentProjects(context).contains(projectPath)
   }
 
   // Get the position/rank of a project in recent list (0 = most recent)
-  fun getRecentProjectRank(context: Context, projectPath: String): Int {
-    return getRecentProjects(context).indexOf(projectPath)
+  fun getRecentProjectRank(context: Context? = null, projectPath: String): Int {
+    val normPath = try {
+      java.io.File(projectPath).canonicalPath
+    } catch (_: Exception) {
+      projectPath
+    }
+    val recents = getRecentProjects(context)
+    val idx = recents.indexOf(normPath)
+    if (idx >= 0) return idx
+    return recents.indexOf(projectPath)
   }
+
+  // Remove a project from recent projects list without touching files on disk (Task 2)
+  fun removeRecentProject(context: Context? = null, projectPath: String): Boolean {
+    val prefs = getPrefs(context)
+    val normPath = try {
+      java.io.File(projectPath).canonicalPath
+    } catch (_: Exception) {
+      projectPath
+    }
+    val recentProjects = getRecentProjects(context).toMutableList()
+    val removed = recentProjects.removeAll { it == normPath || it == projectPath }
+    if (removed) {
+      prefs.edit().putString(KEY_RECENT_PROJECTS, recentProjects.joinToString(",")).apply()
+    }
+    try {
+      if (com.tom.rv2ide.preferences.internal.GeneralPreferences.lastOpenedProject == projectPath ||
+          com.tom.rv2ide.preferences.internal.GeneralPreferences.lastOpenedProject == normPath) {
+        com.tom.rv2ide.preferences.internal.GeneralPreferences.lastOpenedProject = com.tom.rv2ide.preferences.internal.GeneralPreferences.NO_OPENED_PROJECT
+      }
+    } catch (_: Throwable) {}
+    return removed
+  }
+
+  // Hide project from IDE list (Remove from IDE)
+  fun hideProject(context: Context? = null, projectPath: String) {
+    val prefs = getPrefs(context)
+    val normPath = try {
+      java.io.File(projectPath).canonicalPath
+    } catch (_: Exception) {
+      projectPath
+    }
+    val hidden = getHiddenProjects(context).toMutableSet()
+    hidden.add(normPath)
+    hidden.add(projectPath)
+    prefs.edit().putString(KEY_HIDDEN_PROJECTS, hidden.joinToString(",")).apply()
+  }
+
+  // Unhide project (e.g. when reopened or reimported)
+  fun unhideProject(context: Context? = null, projectPath: String) {
+    val prefs = getPrefs(context)
+    val normPath = try {
+      java.io.File(projectPath).canonicalPath
+    } catch (_: Exception) {
+      projectPath
+    }
+    val hidden = getHiddenProjects(context).toMutableSet()
+    hidden.remove(normPath)
+    hidden.remove(projectPath)
+    prefs.edit().putString(KEY_HIDDEN_PROJECTS, hidden.joinToString(",")).apply()
+  }
+
+  fun isProjectHidden(context: Context? = null, projectPath: String): Boolean {
+    val normPath = try {
+      java.io.File(projectPath).canonicalPath
+    } catch (_: Exception) {
+      projectPath
+    }
+    val hidden = getHiddenProjects(context)
+    return hidden.contains(normPath) || hidden.contains(projectPath)
+  }
+
+  fun getHiddenProjects(context: Context? = null): Set<String> {
+    val prefs = getPrefs(context)
+    val str = prefs.getString(KEY_HIDDEN_PROJECTS, "") ?: ""
+    if (str.isBlank()) return emptySet()
+    return str.split(",").filter { it.isNotBlank() }.toSet()
+  }
+
 }
