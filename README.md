@@ -5,7 +5,7 @@
 <h1 align="center">CURSED ACS</h1>
 
 <p align="center">
-  <b>Advanced On-Device Android IDE with Offline Native NDK Toolchains, Jujutsu AI Agent & Full Gradle Build System</b>
+  <b>Advanced On-Device Android IDE with Offline Native NDK Toolchains and Full Gradle Build System and Jujutsu AI Agent</b>
 </p>
 
 <p align="center">
