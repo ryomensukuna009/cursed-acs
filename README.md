@@ -34,8 +34,12 @@
 - **🎨 Modern Editor & Material 3 UI:** Sora Editor with Tree-Sitter highlighting, Eclipse JDT (Java) / Kotlin / Clangd LSP, visual XML layout designer, dynamic Day/Night theming, and edge-to-edge support.
 - **🔒 Hardened Security & R8 Optimization:** Hardware-backed Keystore AES-256-GCM encryption for credentials, unexported sensitive services, and full R8 bytecode shrinkage.
 
+
+
 **BEST FOR MODDERS, CHEAT MAKERS**
-** SEPARATE - SEPARATE GRADLE BUILD SYSTEM AND NDK BUILD SYSTEM[YOU CAN USE aide_ndk_arm64.tar.gz or aide_ndk_arm32.tar.gz ]
+
+
+**SEPARATE - SEPARATE GRADLE BUILD SYSTEM AND NDK BUILD SYSTEM[YOU CAN USE aide_ndk_arm64.tar.gz or aide_ndk_arm32.tar.gz ]**
 ---
 
 ## 📱 System Requirements
