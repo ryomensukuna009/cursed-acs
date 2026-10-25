@@ -5,7 +5,7 @@
 <h1 align="center">CURSED ACS</h1>
 
 <p align="center">
-  <b>Advanced On-Device Android IDE with Offline Native NDK Toolchains, Full Gradle Build System & Jujutsu AI Agent</b>
+  <b>Advanced On-Device Android IDE with Offline Native NDK Toolchains, Full Gradle Build System & Powerful AI Agent</b>
 </p>
 
 <p align="center">
@@ -23,8 +23,8 @@
 
 - **🛠️ Standalone Offline Native NDK & CMake:** Zero-internet C/C++ compilation via embedded Clang, LLVM, and CMake. Direct `.zip` / `.tar.gz` NDK archive import with zip-slip protection.
 - **🧠 Jujutsu Cursed AI Coding Agent:**
-  - Multi-Provider Support: Google Gemini, Anthropic Claude, OpenAI, DeepSeek-R1, and xAI Grok.
-  - Collapsible `<thought>` Block: Clean separation between reasoning CoT and response text.
+  - Multiple API Support: Gemini, Claude, OpenAI, DeepSeek, xAI Grok, xkiro, CUSTOM PROVIDER.
+  - Advance errors detection: Advance Error Detection system and fix them with AI in one click.
   - Autonomous Multi-File Editing: Context-aware codebase indexing and atomic code diff application.
   - One-Tap Compiler Diagnostics: Ingests Gradle/NDK build failures and auto-generates contextual fixes.
   - Token Telemetry: Live context usage metering and auto-compaction.
@@ -34,16 +34,18 @@
 - **🎨 Modern Editor & Material 3 UI:** Sora Editor with Tree-Sitter highlighting, Eclipse JDT (Java) / Kotlin / Clangd LSP, visual XML layout designer, dynamic Day/Night theming, and edge-to-edge support.
 - **🔒 Hardened Security & R8 Optimization:** Hardware-backed Keystore AES-256-GCM encryption for credentials, unexported sensitive services, and full R8 bytecode shrinkage.
 
+**BEST FOR MODDERS, CHEAT MAKERS**
+** SEPARATE - SEPARATE GRADLE BUILD SYSTEM AND NDK BUILD SYSTEM[YOU CAN USE aide_ndk_arm64.tar.gz or aide_ndk_arm32.tar.gz ]
 ---
 
 ## 📱 System Requirements
 
 | Parameter | Specification |
 | :--- | :--- |
-| **Android Version** | Android 8.0 (API 26) through Android 15+ |
+| **Android Version** | Android 8.0 (API 26) through Android 17 |[NOTE:- ONLY ANDROID 10 TO 17 TESTED..]
 | **Supported ABIs** | `arm64-v8a` (Primary), `armeabi-v7a` (32-bit legacy) |
-| **RAM** | 3 GB minimum (4 GB+ recommended for large Gradle/NDK builds) |
-| **Storage** | 3 GB free storage for SDK, compilers, and dependencies |
+| **RAM** | 2 GB minimum (4 GB+ recommended for large Gradle/NDK builds) |
+| **Storage** | 3 GB free storage for SDK, compilers, and dependencies |[NOTE:- 3GB IF YOU LOAD BOTH GRADLE AND NDK]
 
 ---
 
