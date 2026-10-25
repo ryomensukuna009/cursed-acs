@@ -46,10 +46,10 @@
 
 | Parameter | Specification |
 | :--- | :--- |
-| **Android Version** | Android 8.0 (API 26) through Android 17 |[NOTE:- ONLY ANDROID 10 TO 17 TESTED..]
+| **Android Version** | Android 8.0 (API 26) through Android 17[ONLY AN10 TO AN17 TESTED..] |
 | **Supported ABIs** | `arm64-v8a` (Primary), `armeabi-v7a` (32-bit legacy) |
 | **RAM** | 2 GB minimum (4 GB+ recommended for large Gradle/NDK builds) |
-| **Storage** | 3 GB free storage for SDK, compilers, and dependencies |[NOTE:- 3GB IF YOU LOAD BOTH GRADLE AND NDK]
+| **Storage** | 3 GB free storage for SDK, compilers, and dependencies[GRADLE(1.5 GB) AND NDK(1.5 GB)] |
 
 ---
 
