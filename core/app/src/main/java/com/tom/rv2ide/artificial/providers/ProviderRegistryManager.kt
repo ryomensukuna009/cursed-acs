@@ -346,29 +346,54 @@ class ProviderRegistryManager(
      */
     fun getEffectiveModelCapabilities(providerId: String, modelId: String): ModelCapabilities {
         val profile = getProfile(providerId)
-        val discovered = getCachedModels(providerId).firstOrNull { it.id == modelId }?.capabilities
-            ?: ModelCapabilities()
+        val catalogCaps = try {
+            com.tom.rv2ide.artificial.models.ModelCatalogManager.getInstance().getCapabilities(modelId, providerId)
+        } catch (_: Exception) {
+            ModelCapabilities()
+        }
+        val cached = getCachedModels(providerId).firstOrNull { it.id == modelId }?.capabilities
+        val baseCaps = cached ?: catalogCaps
 
-        if (profile == null) return discovered
-
-        val toolSupport = if (profile.userOverrideToolCalling != TriStateCapability.UNKNOWN) {
-            profile.userOverrideToolCalling
+        val effectiveVision = if (baseCaps.supportsVision != TriStateCapability.UNKNOWN) {
+            baseCaps.supportsVision
         } else {
-            discovered.supportsToolCalling
+            catalogCaps.supportsVision
         }
 
-        val ctxLength = profile.userOverrideContextLength ?: discovered.contextLength
+        val effectiveTools = if (profile?.userOverrideToolCalling != null && profile.userOverrideToolCalling != TriStateCapability.UNKNOWN) {
+            profile.userOverrideToolCalling
+        } else if (baseCaps.supportsToolCalling != TriStateCapability.UNKNOWN) {
+            baseCaps.supportsToolCalling
+        } else {
+            catalogCaps.supportsToolCalling
+        }
 
-        val groundingSupport = if (profile.protocol == ApiProtocol.GEMINI_NATIVE && profile.enableNativeGeminiGrounding) {
+        val effectiveThinking = if (baseCaps.supportsThinking != TriStateCapability.UNKNOWN) {
+            baseCaps.supportsThinking
+        } else {
+            catalogCaps.supportsThinking
+        }
+
+        val effectiveCtx = profile?.userOverrideContextLength ?: baseCaps.contextLength ?: catalogCaps.contextLength
+
+        val groundingSupport = if (profile?.protocol == ApiProtocol.GEMINI_NATIVE && profile.enableNativeGeminiGrounding) {
             TriStateCapability.SUPPORTED
         } else {
-            discovered.supportsSearchGrounding
+            baseCaps.supportsSearchGrounding
         }
 
-        return discovered.copy(
-            contextLength = ctxLength,
-            supportsToolCalling = toolSupport,
-            supportsSearchGrounding = groundingSupport
+        val effectiveInMods = when (effectiveVision) {
+            TriStateCapability.SUPPORTED -> listOf("text", "image")
+            TriStateCapability.UNSUPPORTED -> listOf("text")
+            TriStateCapability.UNKNOWN -> baseCaps.inputModalities ?: catalogCaps.inputModalities
+        }
+
+        return baseCaps.copy(
+            contextLength = effectiveCtx,
+            supportsToolCalling = effectiveTools,
+            supportsThinking = effectiveThinking,
+            supportsSearchGrounding = groundingSupport,
+            inputModalities = effectiveInMods
         )
     }
 

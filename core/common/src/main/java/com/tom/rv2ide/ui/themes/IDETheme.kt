@@ -53,6 +53,13 @@ enum class IDETheme(
       R.string.theme_crimson_black,
   ),
 
+  /** Kelivo Sleek (Dark Charcoal + Violet) theme. */
+  KELIVO_SLEEK(
+      R.style.Theme_AndroidIDE_KelivoSleek,
+      R.style.Theme_AndroidIDE_KelivoSleek_Dark,
+      R.string.theme_kelivo_sleek,
+  ),
+
   /** Blue Wave theme. */
   BLUE_WAVE(
       R.style.Theme_AndroidIDE_BlueWave,

@@ -981,6 +981,7 @@ This AI agent is designed to assist you in developing Android applications direc
   <string name="idepref_editor_pinLineNumbers_summary">Whether the editor should pin line number panel when scrolled horizontally.</string>
   <string name="theme_cyan_cream">Cyan + Creamy White</string>
   <string name="theme_crimson_black">Crimson Red + Black</string>
+  <string name="theme_kelivo_sleek">Kelivo Sleek (Dark Charcoal + Violet)</string>
   <string name="theme_slate_grey">Black + Grey (Default)</string>
   <string name="idepref_general_appLogo_title">App Logo</string>
   <string name="idepref_general_appLogo_summary">Choose your preferred ROXUM launcher and brand icon.</string>

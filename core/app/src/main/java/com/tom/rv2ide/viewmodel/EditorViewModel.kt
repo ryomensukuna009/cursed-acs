@@ -16,6 +16,7 @@
  */
 package com.tom.rv2ide.viewmodel
 
+import android.os.Looper
 import android.view.Gravity.CENTER
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
@@ -73,40 +74,48 @@ class EditorViewModel : ViewModel() {
       _filesSaving.value = value
     }
 
+  private fun <T> MutableLiveData<T>.safeSet(value: T?) {
+    if (Looper.myLooper() == Looper.getMainLooper()) {
+      this.value = value
+    } else {
+      this.postValue(value)
+    }
+  }
+
   var openedFilesCache: OpenedFilesCache?
     get() = _openedFiles.value
     set(value) {
-      this._openedFiles.value = value
+      this._openedFiles.safeSet(value)
     }
 
   var isBoundToBuildSerice: Boolean
     get() = _isBoundToBuildService.value ?: false
     set(value) {
-      _isBoundToBuildService.value = value
+      _isBoundToBuildService.safeSet(value)
     }
 
   var isBuildInProgress: Boolean
     get() = _isBuildInProgress.value ?: false
     set(value) {
-      _isBuildInProgress.value = value
+      _isBuildInProgress.safeSet(value)
     }
 
   var isInitializing: Boolean
     get() = _isInitializing.value ?: false
     set(value) {
-      _isInitializing.value = value
+      _isInitializing.safeSet(value)
     }
 
   var statusText: CharSequence
     get() = this._statusText.value?.first ?: ""
     set(value) {
-      _statusText.value = value to (_statusText.value?.second ?: 0)
+      _statusText.safeSet(value to (_statusText.value?.second ?: 0))
     }
 
   var statusGravity: Int
     get() = this._statusText.value?.second ?: CENTER
     set(value) {
-      _statusText.value = (_statusText.value?.first ?: "") to value
+      _statusText.safeSet((_statusText.value?.first ?: "") to value)
     }
 
   var displayedFileIndex: Int

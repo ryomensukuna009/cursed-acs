@@ -1399,13 +1399,26 @@ override fun onApplySystemBarInsets(insets: Insets) {
     }
   }
 
+  fun hideProgressIndicator() {
+    runOnUiThread {
+      content.progressIndicator.hide()
+      content.progressIndicator.visibility = View.GONE
+    }
+  }
+
   private fun onBuildStatusChanged() {
     log.debug(
         "onBuildStatusChanged: isInitializing: ${editorViewModel.isInitializing}, isBuildInProgress: ${editorViewModel.isBuildInProgress}"
     )
     Initialization.setInitializing(editorViewModel.isInitializing)
     val visible = editorViewModel.isBuildInProgress || editorViewModel.isInitializing
-    content.progressIndicator.visibility = if (visible) View.VISIBLE else View.GONE
+    if (visible) {
+      content.progressIndicator.show()
+      content.progressIndicator.visibility = View.VISIBLE
+    } else {
+      content.progressIndicator.hide()
+      content.progressIndicator.visibility = View.GONE
+    }
     invalidateOptionsMenu()
   }
 

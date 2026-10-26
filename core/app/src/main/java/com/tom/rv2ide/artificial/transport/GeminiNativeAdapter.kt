@@ -222,6 +222,17 @@ class GeminiNativeAdapter : ProtocolAdapter {
             val genConfig = JSONObject()
             request.temperature?.let { genConfig.put("temperature", it) }
             request.maxTokens?.let { genConfig.put("maxOutputTokens", it) }
+            request.reasoningEffort?.let { effort ->
+                val thinkingConfig = JSONObject()
+                if (effort != com.tom.rv2ide.artificial.models.ReasoningEffort.OFF && effort.budgetTokens > 0) {
+                    thinkingConfig.put("thinkingBudget", effort.budgetTokens)
+                    thinkingConfig.put("includeThoughts", true)
+                } else {
+                    thinkingConfig.put("thinkingBudget", 0)
+                    thinkingConfig.put("includeThoughts", false)
+                }
+                genConfig.put("thinkingConfig", thinkingConfig)
+            }
             if (genConfig.length() > 0) {
                 put("generationConfig", genConfig)
             }

@@ -131,14 +131,16 @@ data class ModelCapabilities(
     val supportsStreaming: TriStateCapability = TriStateCapability.UNKNOWN,
     val supportsToolCalling: TriStateCapability = TriStateCapability.UNKNOWN,
     val supportsSearchGrounding: TriStateCapability = TriStateCapability.UNKNOWN,
+    val supportsThinking: TriStateCapability = TriStateCapability.UNKNOWN,
     val pricingPromptPerToken: String? = null,
     val pricingCompletionPerToken: String? = null
 ) {
     constructor(
         contextLength: Int? = null,
         maxOutputTokens: Int? = null,
-        supportsTools: TriStateCapability,
-        supportsVision: TriStateCapability = TriStateCapability.UNKNOWN
+        supportsTools: TriStateCapability = TriStateCapability.UNKNOWN,
+        supportsVision: TriStateCapability = TriStateCapability.UNKNOWN,
+        supportsThinking: TriStateCapability = TriStateCapability.UNKNOWN
     ) : this(
         contextLength = contextLength,
         maxOutputTokens = maxOutputTokens,
@@ -147,7 +149,8 @@ data class ModelCapabilities(
             TriStateCapability.UNSUPPORTED -> listOf("text")
             TriStateCapability.UNKNOWN -> null
         },
-        supportsToolCalling = supportsTools
+        supportsToolCalling = supportsTools,
+        supportsThinking = supportsThinking
     )
 
     val supportsTools: TriStateCapability
@@ -169,6 +172,7 @@ data class ModelCapabilities(
         put("supportsStreaming", supportsStreaming.name)
         put("supportsToolCalling", supportsToolCalling.name)
         put("supportsSearchGrounding", supportsSearchGrounding.name)
+        put("supportsThinking", supportsThinking.name)
         pricingPromptPerToken?.let { put("pricingPromptPerToken", it) }
         pricingCompletionPerToken?.let { put("pricingCompletionPerToken", it) }
     }
@@ -190,6 +194,7 @@ data class ModelCapabilities(
                 supportsStreaming = TriStateCapability.fromNameOrDefault(json.optString("supportsStreaming")),
                 supportsToolCalling = TriStateCapability.fromNameOrDefault(json.optString("supportsToolCalling")),
                 supportsSearchGrounding = TriStateCapability.fromNameOrDefault(json.optString("supportsSearchGrounding")),
+                supportsThinking = TriStateCapability.fromNameOrDefault(json.optString("supportsThinking")),
                 pricingPromptPerToken = json.optString("pricingPromptPerToken").takeIf { it.isNotBlank() },
                 pricingCompletionPerToken = json.optString("pricingCompletionPerToken").takeIf { it.isNotBlank() }
             )

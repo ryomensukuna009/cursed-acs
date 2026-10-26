@@ -134,6 +134,11 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
             }
             request.temperature?.let { put("temperature", it) }
             request.maxTokens?.let { put("max_tokens", it) }
+            request.reasoningEffort?.let { effort ->
+                if (effort != com.tom.rv2ide.artificial.models.ReasoningEffort.OFF) {
+                    put("reasoning_effort", effort.key)
+                }
+            }
 
             if (request.tools.isNotEmpty()) {
                 val toolsArr = JSONArray()

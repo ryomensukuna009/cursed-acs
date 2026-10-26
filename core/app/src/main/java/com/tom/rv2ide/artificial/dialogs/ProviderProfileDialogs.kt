@@ -134,6 +134,22 @@ object ProviderProfileDialogs {
             container.addView(this)
         }
 
+        if (profile.id.lowercase() in listOf("openai", "chatgpt", "gemini", "google", "claude", "anthropic")) {
+            val loginBtn = MaterialButton(context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                text = "🔑 Sign In with Account (OAuth / Device Code)"
+                setOnClickListener {
+                    com.tom.rv2ide.artificial.auth.ProviderOAuthManager.showAccountLoginDialog(
+                        context,
+                        scope,
+                        profile.id
+                    ) { token ->
+                        apiKeyInput.setText(token)
+                    }
+                }
+            }
+            container.addView(loginBtn)
+        }
+
         addLabel("Authentication Header Style")
         val authStyles = AuthStyle.entries
         val authSpinner = Spinner(context).apply {
@@ -406,6 +422,10 @@ object ProviderProfileDialogs {
 
         var displayedModels: List<DiscoveredModel> = currentModels
 
+        val catalog = com.tom.rv2ide.artificial.models.ModelCatalogManager.getInstance(context)
+        var modelAdapter: DiscoveredModelAdapter? = null
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+
         fun refreshList(query: String) {
             val q = query.trim().lowercase()
             displayedModels = if (q.isEmpty()) {
@@ -417,16 +437,24 @@ object ProviderProfileDialogs {
                         it.ownedBy?.lowercase()?.contains(q) == true
                 }
             }
-            val rows = if (displayedModels.isNotEmpty()) {
-                displayedModels.map { formatModelRow(it) }
+            if (modelAdapter == null) {
+                modelAdapter = DiscoveredModelAdapter(context, displayedModels, catalog) { chosen ->
+                    onModelSelected(chosen.id)
+                    dialog?.dismiss()
+                }
+                listView.adapter = modelAdapter
+                listView.divider = null
+                listView.dividerHeight = 0
             } else {
-                com.tom.rv2ide.artificial.agents.Agents(context)
-                    .getModelsForProvider(providerId)
-                    .filter { q.isEmpty() || it.lowercase().contains(q) }
-                    .map { "$it  [preset/manual]" }
+                modelAdapter?.updateItems(displayedModels)
             }
-            listView.adapter = ArrayAdapter(context, android.R.layout.simple_list_item_1, rows)
         }
+
+        dialog = MaterialAlertDialogBuilder(context)
+            .setTitle("Select Model — ${profile.displayName}")
+            .setView(root)
+            .setNegativeButton("Close", null)
+            .create()
 
         refreshList("")
 
@@ -437,12 +465,6 @@ object ProviderProfileDialogs {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
-
-        val dialog = MaterialAlertDialogBuilder(context)
-            .setTitle("Select Model — ${profile.displayName}")
-            .setView(root)
-            .setNegativeButton("Close", null)
-            .create()
 
         fetchBtn.setOnClickListener {
             fetchBtn.isEnabled = false
@@ -633,4 +655,79 @@ object ProviderProfileDialogs {
             .setNegativeButton("Cancel", null)
             .show()
     }
+
+class DiscoveredModelAdapter(
+    private val context: android.content.Context,
+    private var items: List<com.tom.rv2ide.artificial.providers.DiscoveredModel>,
+    private val catalog: com.tom.rv2ide.artificial.models.ModelCatalogManager,
+    private val onItemClick: (com.tom.rv2ide.artificial.providers.DiscoveredModel) -> Unit
+) : android.widget.BaseAdapter() {
+    override fun getCount(): Int = items.size
+    override fun getItem(position: Int): com.tom.rv2ide.artificial.providers.DiscoveredModel = items[position]
+    override fun getItemId(position: Int): Long = position.toLong()
+
+    fun updateItems(newItems: List<com.tom.rv2ide.artificial.providers.DiscoveredModel>) {
+        items = newItems
+        notifyDataSetChanged()
+    }
+
+    override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup?): android.view.View {
+        val view = convertView ?: android.view.LayoutInflater.from(context).inflate(com.tom.rv2ide.R.layout.item_discovered_model, parent, false)
+        val m = getItem(position)
+
+        val tvName = view.findViewById<android.widget.TextView>(com.tom.rv2ide.R.id.tvModelName)
+        val tvFamily = view.findViewById<android.widget.TextView>(com.tom.rv2ide.R.id.tvModelFamily)
+        val tvDesc = view.findViewById<android.widget.TextView>(com.tom.rv2ide.R.id.tvModelDescription)
+        val badgeVision = view.findViewById<android.widget.TextView>(com.tom.rv2ide.R.id.badgeVision)
+        val badgeTools = view.findViewById<android.widget.TextView>(com.tom.rv2ide.R.id.badgeTools)
+        val badgeThinking = view.findViewById<android.widget.TextView>(com.tom.rv2ide.R.id.badgeThinking)
+        val badgeContext = view.findViewById<android.widget.TextView>(com.tom.rv2ide.R.id.badgeContext)
+
+        val displayName = if (m.displayName.isNotBlank() && m.displayName != m.id) {
+            "${m.displayName} (${m.id})"
+        } else {
+            m.id
+        }
+        tvName.text = displayName
+
+        val family = m.ownedBy ?: m.id.substringBefore("/", "").takeIf { it.isNotBlank() }
+        if (!family.isNullOrBlank()) {
+            tvFamily.text = family
+            tvFamily.visibility = android.view.View.VISIBLE
+        } else {
+            tvFamily.visibility = android.view.View.GONE
+        }
+
+        if (!m.description.isNullOrBlank()) {
+            tvDesc.text = m.description
+            tvDesc.visibility = android.view.View.VISIBLE
+        } else {
+            tvDesc.visibility = android.view.View.GONE
+        }
+
+        val caps = m.capabilities
+        val isVision = caps.supportsVision == com.tom.rv2ide.artificial.providers.TriStateCapability.SUPPORTED || catalog.isVisionSupported(m.id)
+        val isTools = caps.supportsToolCalling == com.tom.rv2ide.artificial.providers.TriStateCapability.SUPPORTED || catalog.isToolCallingSupported(m.id)
+        val isThinking = caps.supportsThinking == com.tom.rv2ide.artificial.providers.TriStateCapability.SUPPORTED || catalog.isReasoningSupported(m.id)
+        val ctxLen = caps.contextLength ?: catalog.getCapabilities(m.id).contextLength
+
+        badgeVision.visibility = if (isVision) android.view.View.VISIBLE else android.view.View.GONE
+        badgeTools.visibility = if (isTools) android.view.View.VISIBLE else android.view.View.GONE
+        badgeThinking.visibility = if (isThinking) android.view.View.VISIBLE else android.view.View.GONE
+
+        if (ctxLen != null && ctxLen > 0) {
+            val k = if (ctxLen >= 1000000) "${ctxLen / 1000000}M" else "${ctxLen / 1000}k"
+            badgeContext.text = "⚡ $k"
+            badgeContext.visibility = android.view.View.VISIBLE
+        } else {
+            badgeContext.visibility = android.view.View.GONE
+        }
+
+        view.setOnClickListener {
+            onItemClick(m)
+        }
+        return view
+    }
+}
+
 }

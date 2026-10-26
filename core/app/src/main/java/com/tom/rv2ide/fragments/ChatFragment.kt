@@ -212,6 +212,7 @@ class ChatFragment : Fragment() {
     private lateinit var clearBtn: MaterialButton
 
     private lateinit var btnApprovalMode: MaterialButton
+    private lateinit var btnReasoningEffort: MaterialButton
 
     private lateinit var toolStatusBanner: MaterialTextView
 
@@ -610,6 +611,7 @@ class ChatFragment : Fragment() {
         clearBtn = view.findViewById(R.id.clearBtn)
 
         btnApprovalMode = view.findViewById(R.id.btnApprovalMode)
+        btnReasoningEffort = view.findViewById(R.id.btnReasoningEffort)
 
         toolStatusBanner = view.findViewById(R.id.toolStatusBanner)
 
@@ -1161,6 +1163,12 @@ class ChatFragment : Fragment() {
 
         }
 
+        updateReasoningEffortButton()
+        btnReasoningEffort.setOnClickListener {
+            showReasoningEffortDialog()
+        }
+
+
 
 
         holdRequestBanner.setOnClickListener {
@@ -1300,6 +1308,50 @@ class ChatFragment : Fragment() {
     }
 
 
+
+    private fun updateReasoningEffortButton() {
+        val effort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort(requireContext())
+        btnReasoningEffort.text = when (effort) {
+            com.tom.rv2ide.artificial.models.ReasoningEffort.OFF -> "🧠 Off"
+            com.tom.rv2ide.artificial.models.ReasoningEffort.LOW -> "🧠 Low"
+            com.tom.rv2ide.artificial.models.ReasoningEffort.MEDIUM -> "🧠 Med"
+            com.tom.rv2ide.artificial.models.ReasoningEffort.HIGH -> "🧠 High"
+        }
+    }
+
+    private fun showReasoningEffortDialog() {
+        val current = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort(requireContext())
+        val options = arrayOf(
+            "Off (Fast — standard response)",
+            "Low (~1,024 thinking tokens)",
+            "Medium (~4,096 thinking tokens — balanced)",
+            "High (~16,000 thinking tokens — deep reasoning)"
+        )
+        val selectedIdx = when (current) {
+            com.tom.rv2ide.artificial.models.ReasoningEffort.OFF -> 0
+            com.tom.rv2ide.artificial.models.ReasoningEffort.LOW -> 1
+            com.tom.rv2ide.artificial.models.ReasoningEffort.MEDIUM -> 2
+            com.tom.rv2ide.artificial.models.ReasoningEffort.HIGH -> 3
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Reasoning Effort (Thinking Budget)")
+            .setSingleChoiceItems(options, selectedIdx) { d, which ->
+                val chosen = when (which) {
+                    0 -> com.tom.rv2ide.artificial.models.ReasoningEffort.OFF
+                    1 -> com.tom.rv2ide.artificial.models.ReasoningEffort.LOW
+                    2 -> com.tom.rv2ide.artificial.models.ReasoningEffort.MEDIUM
+                    3 -> com.tom.rv2ide.artificial.models.ReasoningEffort.HIGH
+                    else -> com.tom.rv2ide.artificial.models.ReasoningEffort.MEDIUM
+                }
+                com.tom.rv2ide.artificial.preferences.AIAgentPreferences.setReasoningEffort(requireContext(), chosen)
+                updateReasoningEffortButton()
+                showSnackbar("Reasoning effort set to ${chosen.displayName}")
+                d.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 
     private fun toggleApprovalMode() {
 
@@ -1505,23 +1557,23 @@ class ChatFragment : Fragment() {
 
     private fun checkCurrentModelSupportsVision(): Boolean {
         return try {
-            val modelId = agentsHelper.getAgent().lowercase()
+            val rawModel = agentsHelper.getAgent()
             val providerId = agentsHelper.getProvider()
+            val catalog = com.tom.rv2ide.artificial.models.ModelCatalogManager.getInstance(requireContext())
+            if (catalog.isVisionSupported(rawModel)) {
+                return true
+            }
             val caps = com.tom.rv2ide.artificial.providers.ProviderRegistryManager.getInstance(requireContext())
-                .getEffectiveModelCapabilities(providerId, agentsHelper.getAgent())
+                .getEffectiveModelCapabilities(providerId, rawModel)
             if (caps.supportsVision == com.tom.rv2ide.artificial.providers.TriStateCapability.SUPPORTED) {
                 return true
             }
             if (caps.supportsVision == com.tom.rv2ide.artificial.providers.TriStateCapability.UNSUPPORTED) {
                 return false
             }
-
-            val visionKeywords = listOf("gemini", "gpt-4o", "gpt-4-turbo", "vision", "vl", "claude-3", "omni", "multimodal", "pixtral")
-            val nonVisionKeywords = listOf("deepseek", "coder", "text-only", "gpt-3.5", "embedding", "instruct")
-
-            if (nonVisionKeywords.any { modelId.contains(it) }) return false
-            if (visionKeywords.any { modelId.contains(it) }) return true
-            false
+            val norm = rawModel.lowercase()
+            val visionKeywords = listOf("gemini", "gpt-4o", "gpt-4-turbo", "vision", "-vl", "claude-3", "omni", "multimodal", "pixtral", "llava", "qwen-vl")
+            visionKeywords.any { norm.contains(it) }
         } catch (_: Exception) {
             false
         }
@@ -1715,6 +1767,7 @@ class ChatFragment : Fragment() {
             modeSwitcherChipBtn.isEnabled = !blocked
 
             btnApprovalMode.isEnabled = !blocked
+            btnReasoningEffort.isEnabled = !blocked
 
             activeModelChipBtn.isEnabled = !blocked
 

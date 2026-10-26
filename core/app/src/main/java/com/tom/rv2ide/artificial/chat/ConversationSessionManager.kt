@@ -730,11 +730,7 @@ class ConversationSessionManager(
     }
 
     private fun deriveConversationTitle(firstUserMessage: String): String {
-        val firstLine = firstUserMessage.lineSequence()
-            .map { it.trim() }
-            .firstOrNull { it.isNotEmpty() }
-            ?: "New Conversation"
-        return if (firstLine.length <= 44) firstLine else firstLine.take(41) + "..."
+        return SmartTitleGenerator.generateTitle(firstUserMessage)
     }
 
     private fun findMessageLocked(messageId: String): Triple<ChatConversation, Int, ChatMessageItem>? {

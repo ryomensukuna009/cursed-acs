@@ -306,7 +306,8 @@ data class UnifiedChatRequest(
     val enableGeminiNativeGrounding: Boolean = false,
     val stream: Boolean = true,
     val temperature: Double? = null,
-    val maxTokens: Int? = null
+    val maxTokens: Int? = null,
+    val reasoningEffort: com.tom.rv2ide.artificial.models.ReasoningEffort? = null
 )
 
 data class UnifiedChatResponse(

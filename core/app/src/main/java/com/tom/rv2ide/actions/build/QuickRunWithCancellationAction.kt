@@ -530,6 +530,8 @@ class QuickRunWithCancellationAction(context: Context, override val order: Int) 
         isOfflineBuildRunning = false
         withContext(Dispatchers.Main) {
           activity.editorViewModel.isBuildInProgress = false
+          activity.editorViewModel.isInitializing = false
+          activity.hideProgressIndicator()
           activity.invalidateOptionsMenu()
         }
       }

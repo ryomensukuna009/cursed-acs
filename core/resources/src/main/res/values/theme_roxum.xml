@@ -276,4 +276,99 @@
 
   <style name="Theme.AndroidIDE.SlateGrey.Dark" parent="Theme.AndroidIDE.SlateGrey" />
 
+
+
+  <!-- ======================================================== -->
+  <!-- 4. Theme: Kelivo Sleek (Theme.AndroidIDE.KelivoSleek) -->
+  <!-- Ultra-clean modern minimal dark charcoal + violet palette -->
+  <!-- ======================================================== -->
+
+  <color name="_kelivo_sleek_colorPrimary">#8B5CF6</color>
+  <color name="_kelivo_sleek_colorPrimaryContainer">#2E1E54</color>
+  <color name="_kelivo_sleek_colorPrimaryDark">#6D28D9</color>
+  <color name="_kelivo_sleek_colorPrimaryInverse">#C4B5FD</color>
+  <color name="_kelivo_sleek_colorOnPrimary">#FFFFFF</color>
+  <color name="_kelivo_sleek_colorOnPrimaryContainer">#EDE9FE</color>
+  <color name="_kelivo_sleek_colorSecondary">#A78BFA</color>
+  <color name="_kelivo_sleek_colorSecondaryContainer">#1E1B4B</color>
+  <color name="_kelivo_sleek_colorOnSecondary">#FFFFFF</color>
+  <color name="_kelivo_sleek_colorOnSecondaryContainer">#DDD6FE</color>
+  <color name="_kelivo_sleek_colorTertiary">#C084FC</color>
+  <color name="_kelivo_sleek_colorTertiaryContainer">#3B0764</color>
+  <color name="_kelivo_sleek_colorOnTertiary">#FFFFFF</color>
+  <color name="_kelivo_sleek_colorOnTertiaryContainer">#F3E8FF</color>
+  <color name="_kelivo_sleek_colorError">#F87171</color>
+  <color name="_kelivo_sleek_colorErrorContainer">#7F1D1D</color>
+  <color name="_kelivo_sleek_colorOnError">#FFFFFF</color>
+  <color name="_kelivo_sleek_colorOnErrorContainer">#FEE2E2</color>
+  <color name="_kelivo_sleek_colorBackground">#0D0F12</color>
+  <color name="_kelivo_sleek_colorOnBackground">#F3F4F6</color>
+  <color name="_kelivo_sleek_colorSurface">#161922</color>
+  <color name="_kelivo_sleek_colorSurfaceDim">#0D0F12</color>
+  <color name="_kelivo_sleek_colorSurfaceInverse">#F3F4F6</color>
+  <color name="_kelivo_sleek_colorSurfaceVariant">#1E222D</color>
+  <color name="_kelivo_sleek_colorSurfaceContainerLow">#12141A</color>
+  <color name="_kelivo_sleek_colorSurfaceContainer">#1E222D</color>
+  <color name="_kelivo_sleek_colorSurfaceContainerHigh">#252A38</color>
+  <color name="_kelivo_sleek_colorOnSurface">#F3F4F6</color>
+  <color name="_kelivo_sleek_colorOnSurfaceInverse">#0D0F12</color>
+  <color name="_kelivo_sleek_colorOnSurfaceVariant">#94A3B8</color>
+  <color name="_kelivo_sleek_colorOutline">#2E3444</color>
+  <color name="_kelivo_sleek_colorOutlineVariant">#3F475A</color>
+
+  <style name="Theme.AndroidIDE.KelivoSleek" parent="Theme.AndroidIDE.Base.Dark">
+    <item name="isLightTheme">false</item>
+    <item name="colorPrimary">@color/_kelivo_sleek_colorPrimary</item>
+    <item name="colorPrimaryContainer">@color/_kelivo_sleek_colorPrimaryContainer</item>
+    <item name="colorPrimaryDark">@color/_kelivo_sleek_colorPrimaryDark</item>
+    <item name="colorPrimaryInverse">@color/_kelivo_sleek_colorPrimaryInverse</item>
+    <item name="colorOnPrimary">@color/_kelivo_sleek_colorOnPrimary</item>
+    <item name="colorOnPrimaryContainer">@color/_kelivo_sleek_colorOnPrimaryContainer</item>
+    <item name="colorSecondary">@color/_kelivo_sleek_colorSecondary</item>
+    <item name="colorSecondaryContainer">@color/_kelivo_sleek_colorSecondaryContainer</item>
+    <item name="colorOnSecondary">@color/_kelivo_sleek_colorOnSecondary</item>
+    <item name="colorOnSecondaryContainer">@color/_kelivo_sleek_colorOnSecondaryContainer</item>
+    <item name="colorTertiary">@color/_kelivo_sleek_colorTertiary</item>
+    <item name="colorTertiaryContainer">@color/_kelivo_sleek_colorTertiaryContainer</item>
+    <item name="colorOnTertiary">@color/_kelivo_sleek_colorOnTertiary</item>
+    <item name="colorOnTertiaryContainer">@color/_kelivo_sleek_colorOnTertiaryContainer</item>
+    <item name="colorError">@color/_kelivo_sleek_colorError</item>
+    <item name="colorErrorContainer">@color/_kelivo_sleek_colorErrorContainer</item>
+    <item name="colorOnError">@color/_kelivo_sleek_colorOnError</item>
+    <item name="colorOnErrorContainer">@color/_kelivo_sleek_colorOnErrorContainer</item>
+    <item name="android:colorBackground">@color/_kelivo_sleek_colorBackground</item>
+    <item name="android:windowBackground">@color/_kelivo_sleek_colorBackground</item>
+    <item name="colorOnBackground">@color/_kelivo_sleek_colorOnBackground</item>
+    <item name="colorSurface">@color/_kelivo_sleek_colorSurface</item>
+    <item name="colorSurfaceDim">@color/_kelivo_sleek_colorSurfaceDim</item>
+    <item name="colorSurfaceInverse">@color/_kelivo_sleek_colorSurfaceInverse</item>
+    <item name="colorSurfaceVariant">@color/_kelivo_sleek_colorSurfaceVariant</item>
+    <item name="colorSurfaceContainerLow">@color/_kelivo_sleek_colorSurfaceContainerLow</item>
+    <item name="colorSurfaceContainer">@color/_kelivo_sleek_colorSurfaceContainer</item>
+    <item name="colorSurfaceContainerHigh">@color/_kelivo_sleek_colorSurfaceContainerHigh</item>
+    <item name="colorOnSurface">@color/_kelivo_sleek_colorOnSurface</item>
+    <item name="colorOnSurfaceInverse">@color/_kelivo_sleek_colorOnSurfaceInverse</item>
+    <item name="colorOnSurfaceVariant">@color/_kelivo_sleek_colorOnSurfaceVariant</item>
+    <item name="colorOutline">@color/_kelivo_sleek_colorOutline</item>
+    <item name="colorOutlineVariant">@color/_kelivo_sleek_colorOutlineVariant</item>
+    <item name="android:textColorPrimary">@color/_kelivo_sleek_colorOnSurface</item>
+    <item name="android:textColorSecondary">@color/_kelivo_sleek_colorOnSurfaceVariant</item>
+    <item name="android:textColor">@color/_kelivo_sleek_colorOnSurface</item>
+    <item name="colorControlNormal">@color/_kelivo_sleek_colorOnSurface</item>
+    <item name="colorControlActivated">@color/_kelivo_sleek_colorPrimary</item>
+    <item name="colorControlHighlight">#338B5CF6</item>
+    <item name="colorButtonNormal">@color/_kelivo_sleek_colorSurfaceContainer</item>
+
+    <item name="tabTextColor">@color/_kelivo_sleek_colorOnSurfaceVariant</item>
+    <item name="tabSelectedTextColor">@color/_kelivo_sleek_colorPrimary</item>
+    <item name="tabIndicatorColor">@color/_kelivo_sleek_colorPrimary</item>
+
+    <item name="extraKeysButtonTextColor">@color/_kelivo_sleek_colorOnSurface</item>
+    <item name="extraKeysButtonActiveTextColor">@color/_kelivo_sleek_colorPrimary</item>
+    <item name="extraKeysButtonBackgroundColor">@color/_kelivo_sleek_colorSurfaceContainer</item>
+    <item name="extraKeysButtonActiveBackgroundColor">@color/_kelivo_sleek_colorPrimaryContainer</item>
+  </style>
+
+  <style name="Theme.AndroidIDE.KelivoSleek.Dark" parent="Theme.AndroidIDE.KelivoSleek" />
+
 </resources>

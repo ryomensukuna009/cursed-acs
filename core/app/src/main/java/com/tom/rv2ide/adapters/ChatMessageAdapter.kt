@@ -241,41 +241,23 @@ class ChatMessageAdapter(
 
 
     private fun extractThoughtContent(content: String): ExtractedThoughts {
-
-
-
-        val pattern = Regex("""(?s)<(thought|think)>(.*?)(?:</\1>|$)""")
-
-
-
+        val pattern = Regex("""(?s)<(thought|think|reasoning|analysis)>(.*?)(?:</\1>|$)""")
         val matches = pattern.findAll(content).toList()
-
-
-
-        if (matches.isEmpty()) return ExtractedThoughts(null, content)
-
-
-
-
-
-
+        if (matches.isEmpty()) {
+            val detailsPattern = Regex("""(?s)<details>\s*<summary>(.*?)</summary>(.*?)</details>""")
+            val detailMatches = detailsPattern.findAll(content).toList()
+            if (detailMatches.isNotEmpty()) {
+                val detailsText = detailMatches.map { "${it.groupValues[1]}:\n${it.groupValues[2].trim()}" }.joinToString("\n\n")
+                val clean = detailsPattern.replace(content, "").trim()
+                return ExtractedThoughts(detailsText, clean)
+            }
+            return ExtractedThoughts(null, content)
+        }
 
         val thoughts = matches.map { it.groupValues[2].trim() }.filter { it.isNotEmpty() }
-
-
-
         val thoughtText = thoughts.joinToString("\n\n").ifEmpty { null }
-
-
-
         val cleanContent = pattern.replace(content, "").trim()
-
-
-
         return ExtractedThoughts(thoughtText, cleanContent)
-
-
-
     }
 
 
@@ -4036,35 +4018,33 @@ class ChatMessageAdapter(
 
 
 
-            val header = TextView(ctx).apply {
-
-
-
-                text = "🌐 Verified Web Sources (${citations.size})"
-
-
-
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-
-
-
-                val primaryColor = resolveAttrColor(ctx, android.R.attr.colorPrimary, Color.parseColor("#8AB4F8"))
-
-
-
-                setTextColor(primaryColor)
-
-
-
-                setTypeface(typeface, Typeface.BOLD)
-
-
-
+            val citationsList = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = View.GONE
             }
 
-
+            val header = TextView(ctx).apply {
+                text = "▶ 🌐 Verified Web Sources (${citations.size}) [Tap to view]"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                val primaryColor = resolveAttrColor(ctx, android.R.attr.colorPrimary, Color.parseColor("#8AB4F8"))
+                setTextColor(primaryColor)
+                setTypeface(typeface, Typeface.BOLD)
+                setPadding(dp(ctx, 4), dp(ctx, 4), dp(ctx, 4), dp(ctx, 4))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    if (citationsList.visibility == View.VISIBLE) {
+                        citationsList.visibility = View.GONE
+                        text = "▶ 🌐 Verified Web Sources (${citations.size}) [Tap to view]"
+                    } else {
+                        citationsList.visibility = View.VISIBLE
+                        text = "▼ 🌐 Verified Web Sources (${citations.size}) [Tap to collapse]"
+                    }
+                }
+            }
 
             box.addView(header)
+            box.addView(citationsList)
 
 
 
@@ -4140,7 +4120,7 @@ class ChatMessageAdapter(
 
 
 
-                box.addView(itemTv)
+                citationsList.addView(itemTv)
 
 
 

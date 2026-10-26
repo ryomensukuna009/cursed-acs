@@ -147,7 +147,18 @@ class AnthropicMessagesAdapter : ProtocolAdapter {
 
         val body = JSONObject().apply {
             put("model", request.modelId)
-            put("max_tokens", request.maxTokens ?: 4096)
+            var baseMaxTokens = request.maxTokens ?: 4096
+            request.reasoningEffort?.let { effort ->
+                if (effort != com.tom.rv2ide.artificial.models.ReasoningEffort.OFF) {
+                    val budget = effort.budgetTokens.coerceAtLeast(1024)
+                    put("thinking", JSONObject().apply {
+                        put("type", "enabled")
+                        put("budget_tokens", budget)
+                    })
+                    baseMaxTokens = baseMaxTokens.coerceAtLeast(budget + 1024)
+                }
+            }
+            put("max_tokens", baseMaxTokens)
             put("messages", messagesArray)
             put("stream", request.stream)
             if (systemParts.isNotEmpty()) {
