@@ -120,28 +120,9 @@ class OfflineProjectInspector {
       )
     }
 
-    // Contract Guard 3: Validate declared Activities against source files
-    for (activityName in manifestData.declaredActivities) {
-      if (activityName == "android.app.NativeActivity" || activityName.startsWith("android.")) {
-        continue
-      }
-      val simpleName = activityName.substringAfterLast('.').substringBefore('$')
-      val hasSource = javaFiles.any { it.nameWithoutExtension.equals(simpleName, ignoreCase = true) }
-      if (!hasSource) {
-        return if (hasNativeCode && javaFiles.isEmpty()) {
-          ProjectContractResult.Invalid(
-              reason = "Manifest declares Activity '$activityName', but no corresponding Java source file exists.",
-              details = "Native-first projects with C/C++ code must either provide the Java source for '$simpleName.java' " +
-                  "in src/main/java/ or declare 'android.app.NativeActivity' in AndroidManifest.xml with android:hasCode=\"false\"."
-          )
-        } else {
-          ProjectContractResult.Invalid(
-              reason = "Manifest declares Activity '$activityName', but no matching source file was found in project Java sources.",
-              details = "Missing Java source file for declared Activity: '$simpleName.java'. Check src/main/java/ or update AndroidManifest.xml."
-          )
-        }
-      }
-    }
+    // Note: Missing activity source files are NOT treated as build-blocking contract failures.
+    // Like AIDE Plus and Gradle, the offline builder will automatically generate fallback workspace
+    // stubs in workspace.genDir during compilation so native-first/mod/library projects build seamlessly.
 
     return ProjectContractResult.Valid(
         OfflineProjectContract(

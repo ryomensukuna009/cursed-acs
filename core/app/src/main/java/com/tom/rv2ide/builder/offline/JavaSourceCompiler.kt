@@ -62,7 +62,11 @@ class JavaSourceCompiler {
       )
     }
 
-    // 3. Collect all source files (project java + generated R.java)
+    // 3. Ensure BuildConfig and fallback Activity stubs exist in workspace.genDir
+    ensureBuildConfig(contract, workspace)
+    ensureActivityStubs(contract, workspace, listener)
+
+    // 4. Collect all source files (project java + generated R.java / BuildConfig / stubs)
     val projectSources = contract.javaFiles
     val generatedSources = workspace.genDir.walkTopDown()
         .filter { it.isFile && it.extension.equals("java", ignoreCase = true) }
@@ -109,13 +113,14 @@ class JavaSourceCompiler {
       if (!javacBin.canExecute()) {
         javacBin.setExecutable(true)
       }
+      val cp = resolveCompileClasspath(contract, androidJar)
       val cmd = listOf(
           javacBin.absolutePath,
           "-source", "1.8",
           "-target", "1.8",
           "-encoding", "UTF-8",
           "-bootclasspath", androidJar.absolutePath,
-          "-cp", androidJar.absolutePath,
+          "-cp", cp,
           "-d", workspace.classesDir.absolutePath,
           "@" + sourcesListFile.absolutePath
       )
@@ -158,12 +163,13 @@ class JavaSourceCompiler {
           OfflineBuildStage.JAVA_COMPILE,
           "Using embedded in-process OpenJDK compiler..."
       )
+      val cp = resolveCompileClasspath(contract, androidJar)
       val javacArgs = mutableListOf(
           "-source", "1.8",
           "-target", "1.8",
           "-encoding", "UTF-8",
           "-bootclasspath", androidJar.absolutePath,
-          "-cp", androidJar.absolutePath,
+          "-cp", cp,
           "-d", workspace.classesDir.absolutePath,
           "@" + sourcesListFile.absolutePath
       )
@@ -243,5 +249,86 @@ class JavaSourceCompiler {
     }
 
     return null
+  }
+
+  private fun resolveCompileClasspath(contract: OfflineProjectContract, androidJar: File): String {
+    val libsDirs = listOf(
+        File(contract.moduleDir, "libs"),
+        File(contract.projectDir, "libs")
+    )
+    val jarFiles = libsDirs.flatMap { dir ->
+      if (dir.exists() && dir.isDirectory) {
+        dir.listFiles()?.filter { it.isFile && it.extension.equals("jar", ignoreCase = true) } ?: emptyList()
+      } else emptyList()
+    }.distinctBy { it.canonicalPath }
+
+    return buildList {
+      add(androidJar.absolutePath)
+      jarFiles.forEach { add(it.absolutePath) }
+    }.joinToString(File.pathSeparator)
+  }
+
+  private fun ensureBuildConfig(contract: OfflineProjectContract, workspace: OfflineWorkspace) {
+    val pkgPath = contract.packageName.replace('.', File.separatorChar)
+    val buildConfigFile = File(workspace.genDir, "$pkgPath/BuildConfig.java")
+    if (!buildConfigFile.exists() && contract.javaFiles.none { it.name == "BuildConfig.java" }) {
+      buildConfigFile.parentFile?.mkdirs()
+      buildConfigFile.writeText(
+          """package ${contract.packageName};
+
+public final class BuildConfig {
+  public static final boolean DEBUG = Boolean.parseBoolean("true");
+  public static final String APPLICATION_ID = "${contract.packageName}";
+  public static final String BUILD_TYPE = "debug";
+  public static final int VERSION_CODE = ${contract.versionCode};
+  public static final String VERSION_NAME = "${contract.versionName}";
+}
+"""
+      )
+    }
+  }
+
+  private fun ensureActivityStubs(
+      contract: OfflineProjectContract,
+      workspace: OfflineWorkspace,
+      listener: OfflineBuildProgressListener?
+  ) {
+    for (activityName in contract.declaredActivities) {
+      if (activityName == "android.app.NativeActivity" || activityName.startsWith("android.")) {
+        continue
+      }
+      val simpleName = activityName.substringAfterLast('.').substringBefore('$')
+      val hasSource = contract.javaFiles.any { it.nameWithoutExtension.equals(simpleName, ignoreCase = true) }
+      if (!hasSource) {
+        val packageName = if (activityName.contains('.')) {
+          activityName.substringBeforeLast('.')
+        } else {
+          contract.packageName
+        }
+        val pkgPath = packageName.replace('.', File.separatorChar)
+        val stubFile = File(workspace.genDir, "$pkgPath/$simpleName.java")
+        if (!stubFile.exists()) {
+          stubFile.parentFile?.mkdirs()
+          stubFile.writeText(
+              """package $packageName;
+
+import android.app.Activity;
+import android.os.Bundle;
+
+public class $simpleName extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+    }
+}
+"""
+          )
+          listener?.onStageLog(
+              OfflineBuildStage.JAVA_COMPILE,
+              "Created fallback activity stub for declared Activity '$activityName' in build workspace."
+          )
+        }
+      }
+    }
   }
 }

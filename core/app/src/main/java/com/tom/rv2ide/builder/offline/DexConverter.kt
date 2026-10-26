@@ -79,6 +79,20 @@ class DexConverter {
       builder.addProgramFiles(classFile.toPath())
     }
 
+    val libsDirs = listOf(
+        File(contract.moduleDir, "libs"),
+        File(contract.projectDir, "libs")
+    )
+    val jarFiles = libsDirs.flatMap { dir ->
+      if (dir.exists() && dir.isDirectory) {
+        dir.listFiles()?.filter { it.isFile && it.extension.equals("jar", ignoreCase = true) } ?: emptyList()
+      } else emptyList()
+    }.distinctBy { it.canonicalPath }
+
+    for (jarFile in jarFiles) {
+      builder.addProgramFiles(jarFile.toPath())
+    }
+
     // 3. Run D8 in-process
     try {
       val d8Command = builder.build()
