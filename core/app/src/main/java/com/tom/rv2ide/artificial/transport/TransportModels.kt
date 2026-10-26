@@ -52,7 +52,9 @@ data class UnifiedChatMessage(
     val role: ChatRole,
     val content: String = "",
     val toolCalls: List<ToolCall> = emptyList(),
-    val toolResult: ToolResultMessage? = null
+    val toolResult: ToolResultMessage? = null,
+    val imageBase64: String? = null,
+    val imageMimeType: String? = null
 )
 
 data class ToolParameterProperty(

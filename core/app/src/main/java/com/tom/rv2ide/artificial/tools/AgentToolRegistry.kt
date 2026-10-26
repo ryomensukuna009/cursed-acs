@@ -46,6 +46,8 @@ object AgentToolRegistry {
     const val TOOL_MANAGE_TERMINAL_PROCESS = "manage_terminal_process"
     const val TOOL_TERMINAL_PROCESS = "terminal_process"
     const val TOOL_INSPECT_HISTORICAL_OUTPUT = "inspect_historical_output"
+    const val TOOL_MEMORY_UPDATE = "memory_update"
+    const val TOOL_MEMORY_DELETE = "memory_delete"
 
     val webSearchToolDefinition = ToolDefinition(
         name = TOOL_WEB_SEARCH,
@@ -467,6 +469,40 @@ object AgentToolRegistry {
         openUrlToolDefinition
     )
 
+
+    val memoryUpdateToolDefinition = ToolDefinition(
+        name = TOOL_MEMORY_UPDATE,
+        description = "Store or update a persistent long-term memory about developer preferences, coding guidelines, or project instructions.",
+        parameters = listOf(
+            ToolParameterProperty(
+                name = "type",
+                type = "string",
+                description = "Category of memory: 'identity', 'workflow', 'voice', or 'instruction'.",
+                required = true,
+                enumValues = listOf("identity", "workflow", "voice", "instruction")
+            ),
+            ToolParameterProperty(
+                name = "content",
+                type = "string",
+                description = "The fact or directive to remember permanently across sessions.",
+                required = true
+            )
+        )
+    )
+
+    val memoryDeleteToolDefinition = ToolDefinition(
+        name = TOOL_MEMORY_DELETE,
+        description = "Delete a persistent long-term memory entry by its UUID id.",
+        parameters = listOf(
+            ToolParameterProperty(
+                name = "id",
+                type = "string",
+                description = "The UUID of the memory entry to remove.",
+                required = true
+            )
+        )
+    )
+
     val ENGINEERING_TOOLS: List<ToolDefinition> = listOf(
         webSearchToolDefinition,
         openUrlToolDefinition,
@@ -492,7 +528,9 @@ object AgentToolRegistry {
         rollbackAgentBatchToolDefinition,
         getHistoricalToolOutputToolDefinition,
         runTerminalCommandToolDefinition,
-        manageTerminalProcessToolDefinition
+        manageTerminalProcessToolDefinition,
+        memoryUpdateToolDefinition,
+        memoryDeleteToolDefinition
     )
 
     val MUTATING_TOOL_NAMES: Set<String> = setOf(

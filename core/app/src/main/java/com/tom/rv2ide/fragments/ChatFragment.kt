@@ -164,6 +164,17 @@ class ChatFragment : Fragment() {
 
     private lateinit var aiAgent: AIAgentManager
 
+    private var currentPendingImageBase64: String? = null
+    private var currentPendingImageMime: String? = null
+
+    private val pickImageLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            handleImagePicked(uri)
+        }
+    }
+
     private lateinit var promptLayout: TextInputLayout
 
     private lateinit var promptInput: TextInputEditText
@@ -1202,6 +1213,11 @@ class ChatFragment : Fragment() {
 
         }
 
+        view?.findViewById<android.view.View>(R.id.btnRemoveAttachedImage)?.setOnClickListener {
+            clearAttachedImage()
+        }
+        updateVisionButtonState()
+
     }
 
 
@@ -1229,6 +1245,15 @@ class ChatFragment : Fragment() {
                 R.id.action_clear_chat -> {
 
                     confirmClearConversation()
+
+                    true
+
+                }
+
+                R.id.action_developer_stats -> {
+
+                    com.tom.rv2ide.artificial.stats.TokenTelemetryTracker.getInstance(requireContext())
+                        .showTelemetryDialog(requireContext())
 
                     true
 
@@ -1428,6 +1453,105 @@ class ChatFragment : Fragment() {
 
 
 
+    
+    private fun handleImagePicked(uri: android.net.Uri) {
+        try {
+            val ctx = context ?: return
+            val cr = ctx.contentResolver
+            val inputStream = cr.openInputStream(uri) ?: return
+            val originalBmp = android.graphics.BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            if (originalBmp != null) {
+                val maxDim = 1280
+                val w = originalBmp.width
+                val h = originalBmp.height
+                val scale = if (w > maxDim || h > maxDim) {
+                    minOf(maxDim.toFloat() / w, maxDim.toFloat() / h)
+                } else 1.0f
+
+                val finalBmp = if (scale < 1.0f) {
+                    android.graphics.Bitmap.createScaledBitmap(
+                        originalBmp,
+                        (w * scale).toInt(),
+                        (h * scale).toInt(),
+                        true
+                    )
+                } else originalBmp
+
+                val baos = java.io.ByteArrayOutputStream()
+                finalBmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, baos)
+                val bytes = baos.toByteArray()
+                currentPendingImageBase64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                currentPendingImageMime = "image/jpeg"
+
+                val container = view?.findViewById<android.view.View>(R.id.attachedImageContainer)
+                val preview = view?.findViewById<android.widget.ImageView>(R.id.attachedImagePreview)
+                container?.visibility = android.view.View.VISIBLE
+                preview?.setImageBitmap(finalBmp)
+            }
+        } catch (e: Exception) {
+            showSnackbar("Failed to attach image: ${e.message}")
+        }
+    }
+
+    private fun clearAttachedImage() {
+        currentPendingImageBase64 = null
+        currentPendingImageMime = null
+        val container = view?.findViewById<android.view.View>(R.id.attachedImageContainer)
+        val preview = view?.findViewById<android.widget.ImageView>(R.id.attachedImagePreview)
+        container?.visibility = android.view.View.GONE
+        preview?.setImageDrawable(null)
+    }
+
+    private fun checkCurrentModelSupportsVision(): Boolean {
+        return try {
+            val modelId = agentsHelper.getAgent().lowercase()
+            val providerId = agentsHelper.getProvider()
+            val caps = com.tom.rv2ide.artificial.providers.ProviderRegistryManager.getInstance(requireContext())
+                .getEffectiveModelCapabilities(providerId, agentsHelper.getAgent())
+            if (caps.supportsVision == com.tom.rv2ide.artificial.providers.TriStateCapability.SUPPORTED) {
+                return true
+            }
+            if (caps.supportsVision == com.tom.rv2ide.artificial.providers.TriStateCapability.UNSUPPORTED) {
+                return false
+            }
+
+            val visionKeywords = listOf("gemini", "gpt-4o", "gpt-4-turbo", "vision", "vl", "claude-3", "omni", "multimodal", "pixtral")
+            val nonVisionKeywords = listOf("deepseek", "coder", "text-only", "gpt-3.5", "embedding", "instruct")
+
+            if (nonVisionKeywords.any { modelId.contains(it) }) return false
+            if (visionKeywords.any { modelId.contains(it) }) return true
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun updateVisionButtonState() {
+        try {
+            val supportsVision = checkCurrentModelSupportsVision()
+            if (supportsVision) {
+                val tv = android.util.TypedValue()
+                val primaryColor = if (requireContext().theme.resolveAttribute(android.R.attr.colorPrimary, tv, true)) {
+                    tv.data
+                } else {
+                    android.graphics.Color.parseColor("#4285F4")
+                }
+                promptLayout.setStartIconTintList(android.content.res.ColorStateList.valueOf(primaryColor))
+                promptLayout.setStartIconOnClickListener {
+                    pickImageLauncher.launch("image/*")
+                }
+            } else {
+                val greyColor = android.graphics.Color.parseColor("#888888")
+                promptLayout.setStartIconTintList(android.content.res.ColorStateList.valueOf(greyColor))
+                promptLayout.setStartIconOnClickListener {
+                    showSnackbar("Selected model (${agentsHelper.getAgent()}) does not support vision / images")
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+
     private fun submitPrompt(userRequest: String) {
 
         codeCompletionManager.clearSuggestion()
@@ -1446,13 +1570,21 @@ class ChatFragment : Fragment() {
 
         jumpToLatestBtn.visibility = View.GONE
 
+        val imgBase64 = currentPendingImageBase64
+        val imgMime = currentPendingImageMime
+        clearAttachedImage()
+
         aiRequestHandler.execute(
 
             userRequest = userRequest,
 
             explicitWebSearch = explicitWebSearchActive,
 
-            appendUserTurn = true
+            appendUserTurn = true,
+
+            imageBase64 = imgBase64,
+
+            imageMimeType = imgMime
 
         )
 
@@ -2091,6 +2223,7 @@ class ChatFragment : Fragment() {
                 agentsHelper.setAgent(selectedModel)
 
                 aiAgent.reinitializeWithSelectedModel()
+                updateVisionButtonState()
 
                 refreshHeaderBar()
 
@@ -2131,6 +2264,7 @@ class ChatFragment : Fragment() {
                     aiAgent.setProvider(chosen.id)
 
                     aiAgent.reinitializeWithSelectedModel()
+                updateVisionButtonState()
 
                     refreshHeaderBar()
 
@@ -2223,6 +2357,7 @@ class ChatFragment : Fragment() {
                             agentsHelper.setAgent(selectedModel)
 
                             aiAgent.reinitializeWithSelectedModel()
+                updateVisionButtonState()
 
                             refreshHeaderBar()
 
@@ -2259,6 +2394,7 @@ class ChatFragment : Fragment() {
                                 aiAgent.setProvider(chosen.id)
 
                                 aiAgent.reinitializeWithSelectedModel()
+                updateVisionButtonState()
 
                                 refreshHeaderBar()
 

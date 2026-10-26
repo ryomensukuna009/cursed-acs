@@ -45,6 +45,7 @@ enum class PatchMatchTier {
     EXACT,
     LINE_ENDING_NORMALIZED,
     INDENTATION_TOLERANT,
+    BLOCK_ANCHOR,
     CONSERVATIVE_FUZZY,
     NONE
 }
@@ -566,7 +567,11 @@ object TransactionalFileCoordinator {
         val tier3 = tryIndentationTolerantMatch(baseContent, lineRecords, searchLines, replaceLines)
         if (tier3 != null) return tier3
 
-        // Tier 4 & 5: Conservative fuzzy match & Actionable diagnostics
+        // Tier 4: Block-anchor match (Kelivo/RikkaHub 3-tier algorithm)
+        val tier4 = tryBlockAnchorMatch(baseContent, lineRecords, searchLines, replaceLines)
+        if (tier4 != null) return tier4
+
+        // Tier 5: Conservative fuzzy match & Actionable diagnostics
         return tryConservativeFuzzyMatch(baseContent, lineRecords, searchBlock, replaceBlock, filePath)
     }
 
@@ -761,6 +766,65 @@ object TransactionalFileCoordinator {
         }
 
         return null
+    }
+
+
+    private fun tryBlockAnchorMatch(
+        baseContent: String,
+        lineRecords: List<LineRecord>,
+        searchLines: List<String>,
+        replaceLines: List<String>
+    ): PatchMatchResult? {
+        val m = searchLines.size
+        // Block anchor requires at least 3 lines: top anchor, middle content, bottom anchor
+        if (m < 3 || lineRecords.size < m) return null
+
+        val searchTrimmed = searchLines.map { it.trim() }
+        val firstAnchor = searchTrimmed.first()
+        val lastAnchor = searchTrimmed.last()
+
+        // Anchors must not be blank lines
+        if (firstAnchor.isEmpty() || lastAnchor.isEmpty()) return null
+
+        val matchIndices = mutableListOf<Int>()
+        for (i in 0..(lineRecords.size - m)) {
+            val candidateRecords = lineRecords.subList(i, i + m)
+            val windowFirst = candidateRecords.first().content.trim()
+            val windowLast = candidateRecords.last().content.trim()
+
+            if (windowFirst == firstAnchor && windowLast == lastAnchor) {
+                matchIndices.add(i)
+            }
+        }
+
+        // Only accept if strictly unique/unambiguous in the target file
+        if (matchIndices.size != 1) return null
+
+        val i = matchIndices[0]
+        val candidateRecords = lineRecords.subList(i, i + m)
+
+        // Attempt indentation preservation
+        val reindentedReplacement = tryComputeReindentedReplacement(candidateRecords, searchLines, replaceLines)
+            ?: replaceLines
+
+        val startChar = candidateRecords.first().startIndex
+        val endChar = candidateRecords.last().endIndex
+        val targetEnding = candidateRecords.first().lineEnding.ifEmpty { "\n" }
+        val hasTrailingEnding = candidateRecords.last().lineEnding.isNotEmpty()
+
+        val replacementBody = if (reindentedReplacement.isEmpty()) {
+            ""
+        } else if (hasTrailingEnding) {
+            reindentedReplacement.joinToString(targetEnding, postfix = targetEnding)
+        } else {
+            reindentedReplacement.joinToString(targetEnding)
+        }
+
+        val updated = baseContent.substring(0, startChar) + replacementBody + baseContent.substring(endChar)
+        return PatchMatchResult(
+            updatedContent = updated,
+            tier = PatchMatchTier.BLOCK_ANCHOR
+        )
     }
 
     private fun tryConservativeFuzzyMatch(

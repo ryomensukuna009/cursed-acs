@@ -341,6 +341,37 @@
                 style="@style/Widget.Material3.Button.TonalButton" />
         </LinearLayout>
 
+        <FrameLayout
+            android:id="@+id/attachedImageContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/attachedImagePreview"
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:scaleType="centerCrop"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRemoveAttachedImage"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|end"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:padding="0dp"
+                app:icon="@drawable/ic_clear"
+                app:iconSize="14dp"
+                app:iconGravity="textStart"
+                app:cornerRadius="11dp"
+                style="@style/Widget.Material3.Button.IconButton.Filled" />
+        </FrameLayout>
+
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/promptLayout"
             android:layout_width="match_parent"
@@ -350,6 +381,8 @@
             app:boxCornerRadiusTopEnd="12dp"
             app:boxCornerRadiusBottomStart="12dp"
             app:boxCornerRadiusBottomEnd="12dp"
+                        app:startIconDrawable="@drawable/ic_add"
+            app:startIconContentDescription="Attach photo or screenshot"
             app:endIconMode="custom"
             app:endIconDrawable="@drawable/ic_send"
             app:endIconTint="?attr/colorPrimary"

@@ -9,6 +9,10 @@
         android:icon="@drawable/ic_delete"
         android:title="Clean chat" />
     <item
+        android:id="@+id/action_developer_stats"
+        android:icon="@drawable/ic_ai_agent"
+        android:title="Developer AI Stats &amp; Telemetry" />
+    <item
         android:id="@+id/action_dismiss_keyboard"
         android:icon="@drawable/ic_keyboard_hide"
         android:title="Dismiss Keyboard" />

@@ -42,7 +42,7 @@ class TomIDEUpdater(private val context: Context) {
 
   companion object {
     private const val TAG = "TomIDEUpdater"
-    private const val UPDATE_JSON_URL = ""
+    private const val UPDATE_JSON_URL = "https://api.github.com/repos/ryomensukuna009/cursed-acs/releases/latest"
     private const val DOWNLOAD_NOTIFICATION_ID = 1001
   }
 
@@ -53,6 +53,7 @@ class TomIDEUpdater(private val context: Context) {
       val baseVersionName: String,
       val variants: Map<String, ArchVariant>,
       val changelogUrl: String,
+      val inlineChangelog: String? = null,
   )
 
   private var downloadJob: Job? = null
@@ -60,7 +61,7 @@ class TomIDEUpdater(private val context: Context) {
   private var progressIndicator: LinearProgressIndicator? = null
   private var progressText: TextView? = null
 
-  fun checkForUpdates() {
+  fun checkForUpdates(manual: Boolean = false) {
     if (UPDATE_JSON_URL.isBlank()) {
       return
     }
@@ -68,11 +69,28 @@ class TomIDEUpdater(private val context: Context) {
       try {
         val updateInfo = fetchUpdateInfo()
         if (updateInfo != null && isUpdateAvailable(updateInfo)) {
-          val changelog = fetchChangelog(updateInfo.changelogUrl)
+          val changelog = updateInfo.inlineChangelog?.ifBlank { null } ?: fetchChangelog(updateInfo.changelogUrl)
           withContext(Dispatchers.Main) { showUpdateDialog(updateInfo, changelog) }
+        } else if (manual) {
+          withContext(Dispatchers.Main) {
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.updater_no_updates_available),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+          }
         }
       } catch (e: Exception) {
         Log.e(TAG, "Error checking for updates", e)
+        if (manual) {
+          withContext(Dispatchers.Main) {
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.updater_check_failed),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+          }
+        }
       }
     }
   }
@@ -84,6 +102,8 @@ class TomIDEUpdater(private val context: Context) {
         val url = URL(UPDATE_JSON_URL)
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
+        connection.setRequestProperty("Accept", "application/vnd.github+json")
+        connection.setRequestProperty("User-Agent", "CURSED-ACS")
         connection.connectTimeout = 10000
         connection.readTimeout = 10000
 
@@ -105,6 +125,41 @@ class TomIDEUpdater(private val context: Context) {
   private fun parseUpdateInfo(jsonString: String): UpdateInfo? {
     return try {
       val jsonObject = JSONObject(jsonString)
+
+      // GitHub Release Payload
+      if (jsonObject.has("tag_name")) {
+        val tagName = jsonObject.getString("tag_name")
+        val body = jsonObject.optString("body", "")
+        val htmlUrl = jsonObject.optString("html_url", "")
+        val assets = jsonObject.optJSONArray("assets") ?: org.json.JSONArray()
+        val variants = mutableMapOf<String, ArchVariant>()
+
+        val cleanTag = tagName.removePrefix("v").removePrefix("V")
+        val approxVersionCode = parseSemanticVersionCode(cleanTag)
+
+        for (i in 0 until assets.length()) {
+          val asset = assets.getJSONObject(i)
+          val name = asset.getString("name").lowercase()
+          val downloadUrl = asset.getString("browser_download_url")
+
+          if (name.contains("arm64") || name.contains("v8a")) {
+            variants["arm64-v8a"] = ArchVariant(approxVersionCode, tagName, downloadUrl)
+          } else if (name.contains("arm32") || name.contains("v7a") || name.contains("armeabi")) {
+            variants["armeabi-v7a"] = ArchVariant(approxVersionCode, tagName, downloadUrl)
+          } else if (name.endsWith(".apk")) {
+            variants["universal"] = ArchVariant(approxVersionCode, tagName, downloadUrl)
+          }
+        }
+
+        return UpdateInfo(
+            baseVersionCode = approxVersionCode,
+            baseVersionName = tagName,
+            variants = variants,
+            changelogUrl = htmlUrl,
+            inlineChangelog = parseMarkdownToPlainText(body),
+        )
+      }
+
       val variantsJson = jsonObject.getJSONObject("variants")
       val variants = mutableMapOf<String, ArchVariant>()
 
@@ -128,6 +183,34 @@ class TomIDEUpdater(private val context: Context) {
       Log.e(TAG, context.getString(R.string.updater_parse_error), e)
       null
     }
+  }
+
+  private fun parseSemanticVersionCode(version: String): Int {
+    return try {
+      val parts = version.split(Regex("""[^0-9]+""")).filter { it.isNotBlank() }
+      var code = 0
+      if (parts.isNotEmpty()) code += parts[0].toInt() * 10000
+      if (parts.size > 1) code += parts[1].toInt() * 100
+      if (parts.size > 2) code += parts[2].toInt()
+      code.coerceAtLeast(1024)
+    } catch (_: Exception) {
+      1024
+    }
+  }
+
+  private fun isSemanticVersionNewer(remoteVersion: String, localVersion: String): Boolean {
+    val cleanRemote = remoteVersion.removePrefix("v").removePrefix("V").substringBefore("-").substringBefore("+")
+    val cleanLocal = localVersion.removePrefix("v").removePrefix("V").substringBefore("-").substringBefore("+")
+    val rParts = cleanRemote.split(".").mapNotNull { it.toIntOrNull() }
+    val lParts = cleanLocal.split(".").mapNotNull { it.toIntOrNull() }
+    val maxLen = maxOf(rParts.size, lParts.size)
+    for (i in 0 until maxLen) {
+      val r = rParts.getOrElse(i) { 0 }
+      val l = lParts.getOrElse(i) { 0 }
+      if (r > l) return true
+      if (r < l) return false
+    }
+    return false
   }
 
   private suspend fun fetchChangelog(changelogUrl: String): String {
@@ -193,19 +276,22 @@ class TomIDEUpdater(private val context: Context) {
       val currentArch = getDeviceArchitecture()
       val availableVariant =
           updateInfo.variants[currentArch]
-              ?: updateInfo.variants["armeabi-v7a"] // Fallback for arm64 devices
+              ?: updateInfo.variants["universal"]
+              ?: updateInfo.variants["armeabi-v7a"]
 
       if (availableVariant != null) {
+        val currentVersionName = try {
+          context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+        } catch (_: Exception) {
+          ""
+        }
+        val isNewer = isSemanticVersionNewer(availableVariant.versionName, currentVersionName) ||
+            (availableVariant.versionCode > currentVersionCode)
         Log.d(
             TAG,
-            context.getString(
-                R.string.updater_version_check_log,
-                currentVersionCode,
-                availableVariant.versionCode,
-                currentArch,
-            ),
+            "Update check: currentVersionName=$currentVersionName, remoteVersionName=${availableVariant.versionName}, currentCode=$currentVersionCode, remoteCode=${availableVariant.versionCode} -> isNewer=$isNewer"
         )
-        availableVariant.versionCode > currentVersionCode
+        isNewer
       } else {
         Log.w(TAG, context.getString(R.string.updater_no_compatible_variant, currentArch))
         false

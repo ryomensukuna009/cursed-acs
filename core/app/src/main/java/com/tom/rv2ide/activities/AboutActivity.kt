@@ -67,6 +67,7 @@ class AboutActivity : EdgeToEdgeIDEActivity() {
     private val ACTION_UPSTREAM_INFO = id++
     private val ACTION_LICENSES = id++
     private val ACTION_PRIVACY_SECURITY = id++
+    private val ACTION_CHECK_UPDATES = id++
     // private val ACTION_QQ_GROUP = id++
   }
 
@@ -131,6 +132,7 @@ class AboutActivity : EdgeToEdgeIDEActivity() {
       ACTION_UPSTREAM_INFO -> showUpstreamAttributionDialog()
       ACTION_LICENSES -> showLicensesDialog()
       ACTION_PRIVACY_SECURITY -> showPrivacySecurityDialog()
+      ACTION_CHECK_UPDATES -> TomIDEUpdater(this).checkForUpdates(manual = true)
     }
   }
 
@@ -261,6 +263,14 @@ class AboutActivity : EdgeToEdgeIDEActivity() {
 
   private fun createMiscItems(): List<IconTitleDescriptionItem> {
     return mutableListOf<IconTitleDescriptionItem>().apply {
+      add(
+          SimpleIconTitleDescriptionItem(
+              ACTION_CHECK_UPDATES,
+              ContextCompat.getDrawable(this@AboutActivity, R.drawable.ic_github),
+              "Check for Updates",
+              "Check GitHub releases for the latest CURSED ACS build",
+          )
+      )
       add(
           SimpleIconTitleDescriptionItem(
               ACTION_UPSTREAM_INFO,

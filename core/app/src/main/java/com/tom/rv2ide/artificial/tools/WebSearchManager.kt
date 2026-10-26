@@ -20,6 +20,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import org.jsoup.Jsoup
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -28,7 +29,7 @@ class WebSearchManager(
     private val baseHttpClient: OkHttpClient = defaultHttpClient()
 ) {
 
-    private val appContext: Context? = context?.applicationContext ?: context
+    val appContext: Context? = context?.applicationContext ?: context
     private val prefs: SharedPreferences? = try {
         appContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     } catch (_: Exception) {
@@ -75,6 +76,8 @@ class WebSearchManager(
         if (geminiNativeGroundingActive) return WebSearchStatus.READY
 
         return when (config.providerType) {
+            SearchProviderType.DUCKDUCKGO -> WebSearchStatus.READY
+            SearchProviderType.JINA -> WebSearchStatus.READY
             SearchProviderType.TAVILY, SearchProviderType.BRAVE_SEARCH -> {
                 if (hasSearchApiKey(config.providerType)) {
                     WebSearchStatus.READY
@@ -120,6 +123,20 @@ class WebSearchManager(
             .build()
 
         when (config.providerType) {
+            SearchProviderType.DUCKDUCKGO -> executeDuckDuckGoSearch(
+                client = client,
+                query = cleanQuery,
+                limit = limit,
+                secrets = secrets
+            )
+            SearchProviderType.JINA -> executeJinaSearch(
+                client = client,
+                query = cleanQuery,
+                limit = limit,
+                apiKey = apiKey,
+                customUrl = config.customEndpointUrl,
+                secrets = secrets
+            )
             SearchProviderType.TAVILY -> executeTavilySearch(
                 client = client,
                 query = cleanQuery,
@@ -180,7 +197,126 @@ class WebSearchManager(
         }
     }
 
-    private fun executeTavilySearch(
+    
+    private fun executeDuckDuckGoSearch(
+        client: OkHttpClient,
+        query: String,
+        limit: Int,
+        secrets: List<String>
+    ): WebSearchResponse {
+        val httpUrl = "https://html.duckduckgo.com/html/".toHttpUrlOrNull()?.newBuilder()
+            ?.addQueryParameter("q", query)
+            ?.addQueryParameter("kl", "us-en")
+            ?.build()
+            ?: throw MalformedApiResponseException("Invalid DuckDuckGo endpoint URL")
+
+        val request = Request.Builder()
+            .url(httpUrl)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .get()
+            .build()
+
+        val html = executeSearchHttp(client, request, secrets)
+        val doc = Jsoup.parse(html)
+        val results = doc.select(".result")
+
+        val items = mutableListOf<WebSearchResultItem>()
+        for (res in results) {
+            if (items.size >= limit) break
+            val a = res.selectFirst(".result__a") ?: continue
+            val rawHref = a.attr("href").trim()
+            val url = resolveDuckDuckGoUrl(rawHref)
+            if (url.isEmpty() || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+                continue
+            }
+            val title = a.text().trim().ifBlank { url }
+            val snippet = res.selectFirst(".result__snippet")?.text()?.trim().orEmpty()
+
+            items.add(
+                WebSearchResultItem(
+                    title = title,
+                    url = url,
+                    snippet = snippet.take(1200),
+                    publishedDate = null,
+                    source = "duckduckgo"
+                )
+            )
+        }
+
+        return WebSearchResponse(
+            query = query,
+            results = items,
+            providerUsed = SearchProviderType.DUCKDUCKGO
+        )
+    }
+
+    private fun resolveDuckDuckGoUrl(rawHref: String): String {
+        var raw = rawHref
+        if (raw.startsWith("//")) raw = "https:$raw"
+        if (!raw.startsWith("http")) return ""
+        val uri = raw.toHttpUrlOrNull() ?: return raw
+        val uddg = uri.queryParameter("uddg")
+        return uddg ?: raw
+    }
+
+    private fun executeJinaSearch(
+        client: OkHttpClient,
+        query: String,
+        limit: Int,
+        apiKey: String?,
+        customUrl: String,
+        secrets: List<String>
+    ): WebSearchResponse {
+        val endpoint = customUrl.trim().ifBlank { "https://s.jina.ai/" }
+        val bodyJson = JSONObject().apply {
+            put("q", query)
+        }
+
+        val reqBuilder = Request.Builder()
+            .url(endpoint)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .post(bodyJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+
+        val cleanKey = apiKey?.trim().orEmpty()
+        if (cleanKey.isNotEmpty()) {
+            reqBuilder.header("Authorization", "Bearer $cleanKey")
+        }
+
+        val rawBody = executeSearchHttp(client, reqBuilder.build(), secrets)
+        val items = mutableListOf<WebSearchResultItem>()
+        try {
+            val root = JSONObject(rawBody)
+            val dataArr = root.optJSONArray("data") ?: root.optJSONArray("results") ?: JSONArray()
+            for (i in 0 until dataArr.length()) {
+                if (items.size >= limit) break
+                val obj = dataArr.optJSONObject(i) ?: continue
+                val url = obj.optString("url", "").trim()
+                if (url.isEmpty() || (!url.startsWith("http://") && !url.startsWith("https://"))) continue
+                val title = obj.optString("title", url).trim()
+                val description = obj.optString("description", obj.optString("content", "")).trim()
+                items.add(
+                    WebSearchResultItem(
+                        title = title,
+                        url = url,
+                        snippet = description.take(1200),
+                        source = "jina"
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            throw MalformedApiResponseException("Invalid JSON from Jina search: ${e.message}", e)
+        }
+
+        return WebSearchResponse(
+            query = query,
+            results = items,
+            providerUsed = SearchProviderType.JINA
+        )
+    }
+
+private fun executeTavilySearch(
         client: OkHttpClient,
         query: String,
         limit: Int,

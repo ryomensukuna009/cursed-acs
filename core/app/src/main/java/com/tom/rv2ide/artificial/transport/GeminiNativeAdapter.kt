@@ -47,15 +47,26 @@ class GeminiNativeAdapter : ProtocolAdapter {
                     i++
                 }
                 ChatRole.USER -> {
+                    val parts = JSONArray()
+                    if (msg.content.isNotBlank()) {
+                        parts.put(JSONObject().put("text", msg.content))
+                    }
+                    if (!msg.imageBase64.isNullOrBlank()) {
+                        val mime = msg.imageMimeType ?: "image/jpeg"
+                        parts.put(JSONObject().apply {
+                            put("inline_data", JSONObject().apply {
+                                put("mime_type", mime)
+                                put("data", msg.imageBase64)
+                            })
+                        })
+                    }
+                    if (parts.length() == 0) {
+                        parts.put(JSONObject().put("text", ""))
+                    }
                     contentsArray.put(
                         JSONObject().apply {
                             put("role", "user")
-                            put(
-                                "parts",
-                                JSONArray().put(
-                                    JSONObject().put("text", msg.content)
-                                )
-                            )
+                            put("parts", parts)
                         }
                     )
                     lastModelToolCalls = emptyList()

@@ -723,7 +723,8 @@ class ToolOrchestrator(
                             }
                         }
                     }
-                    else -> {}
+        
+            else -> {}
                 }
 
                 workingMessages.add(
@@ -2780,6 +2781,75 @@ class ToolOrchestrator(
                     executionStarted = true,
                     mutationOccurred = false
                 )
+            }
+
+            
+            AgentToolRegistry.TOOL_MEMORY_UPDATE -> {
+                val typeStr = args.optString("type", "workflow")
+                val type = com.tom.rv2ide.artificial.memory.MemoryType.fromId(typeStr)
+                val memContent = args.optString("content", "").trim()
+                val ctx = webSearchManager.appContext
+                if (memContent.isEmpty()) {
+                    ToolResultMessage(
+                        toolCallId = toolCall.id,
+                        toolName = toolCall.name,
+                        content = "Error: 'content' parameter is required for memory_update.",
+                        isError = true,
+                        status = ToolExecutionStatus.INVALID_ARGUMENTS,
+                        executionStarted = false,
+                        mutationOccurred = false
+                    )
+                } else if (ctx == null) {
+                    ToolResultMessage(
+                        toolCallId = toolCall.id,
+                        toolName = toolCall.name,
+                        content = "Error: Application context unavailable for memory_update.",
+                        isError = true,
+                        status = ToolExecutionStatus.EXECUTION_FAILURE,
+                        executionStarted = false,
+                        mutationOccurred = false
+                    )
+                } else {
+                    val entry = com.tom.rv2ide.artificial.memory.AIMemoryManager.getInstance(ctx)
+                        .addOrUpdateMemory(type, memContent)
+                    ToolResultMessage(
+                        toolCallId = toolCall.id,
+                        toolName = toolCall.name,
+                        content = "Successfully stored memory [${entry.id}] under category '${entry.type.id}': \"${entry.content}\"",
+                        isError = false,
+                        status = ToolExecutionStatus.SUCCESS,
+                        executionStarted = true,
+                        mutationOccurred = true
+                    )
+                }
+            }
+
+            AgentToolRegistry.TOOL_MEMORY_DELETE -> {
+                val id = args.optString("id", "").trim()
+                val ctx = webSearchManager.appContext
+                if (ctx == null) {
+                    ToolResultMessage(
+                        toolCallId = toolCall.id,
+                        toolName = toolCall.name,
+                        content = "Error: Application context unavailable for memory_delete.",
+                        isError = true,
+                        status = ToolExecutionStatus.EXECUTION_FAILURE,
+                        executionStarted = false,
+                        mutationOccurred = false
+                    )
+                } else {
+                    val deleted = com.tom.rv2ide.artificial.memory.AIMemoryManager.getInstance(ctx)
+                        .deleteMemory(id)
+                    ToolResultMessage(
+                        toolCallId = toolCall.id,
+                        toolName = toolCall.name,
+                        content = if (deleted) "Successfully deleted memory with id '$id'." else "Memory entry with id '$id' was not found.",
+                        isError = !deleted,
+                        status = if (deleted) ToolExecutionStatus.SUCCESS else ToolExecutionStatus.EXECUTION_FAILURE,
+                        executionStarted = true,
+                        mutationOccurred = deleted
+                    )
+                }
             }
 
             else -> {

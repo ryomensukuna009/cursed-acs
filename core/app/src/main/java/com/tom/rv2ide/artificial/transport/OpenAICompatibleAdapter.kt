@@ -47,13 +47,37 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
 
         for (msg in request.messages) {
             when (msg.role) {
-                ChatRole.SYSTEM, ChatRole.USER -> {
+                ChatRole.SYSTEM -> {
                     messagesArray.put(
                         JSONObject().apply {
-                            put("role", msg.role.wireName)
+                            put("role", "system")
                             put("content", msg.content)
                         }
                     )
+                }
+                ChatRole.USER -> {
+                    val msgObj = JSONObject().apply {
+                        put("role", "user")
+                        if (!msg.imageBase64.isNullOrBlank()) {
+                            val mime = msg.imageMimeType ?: "image/jpeg"
+                            val parts = JSONArray().apply {
+                                put(JSONObject().apply {
+                                    put("type", "text")
+                                    put("text", msg.content)
+                                })
+                                put(JSONObject().apply {
+                                    put("type", "image_url")
+                                    put("image_url", JSONObject().apply {
+                                        put("url", "data:$mime;base64,${msg.imageBase64}")
+                                    })
+                                })
+                            }
+                            put("content", parts)
+                        } else {
+                            put("content", msg.content)
+                        }
+                    }
+                    messagesArray.put(msgObj)
                 }
                 ChatRole.ASSISTANT -> {
                     val msgObj = JSONObject().apply {

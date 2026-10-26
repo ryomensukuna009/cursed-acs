@@ -4,13 +4,15 @@ import com.tom.rv2ide.artificial.transport.CitationItem
 import org.json.JSONObject
 
 enum class SearchProviderType(val id: String, val displayName: String) {
+    DUCKDUCKGO("duckduckgo", "DuckDuckGo (Free / No Key)"),
+    JINA("jina", "Jina AI Search (Free / Low Cost)"),
     TAVILY("tavily", "Tavily Search API"),
     BRAVE_SEARCH("brave_search", "Brave Search API"),
     CUSTOM_JSON("custom_json", "Custom JSON Search Endpoint");
 
     companion object {
         fun fromId(id: String?): SearchProviderType {
-            return entries.firstOrNull { it.id.equals(id?.trim(), ignoreCase = true) } ?: TAVILY
+            return entries.firstOrNull { it.id.equals(id?.trim(), ignoreCase = true) } ?: DUCKDUCKGO
         }
     }
 }
@@ -23,7 +25,7 @@ enum class WebSearchStatus(val label: String) {
 
 data class WebSearchConfig(
     val enabled: Boolean = false,
-    val providerType: SearchProviderType = SearchProviderType.TAVILY,
+    val providerType: SearchProviderType = SearchProviderType.DUCKDUCKGO,
     val customEndpointUrl: String = "",
     val allowCleartextCustomEndpoint: Boolean = false,
     val resultLimit: Int = 5,
@@ -41,7 +43,7 @@ data class WebSearchConfig(
     companion object {
         fun fromJson(obj: JSONObject): WebSearchConfig = WebSearchConfig(
             enabled = obj.optBoolean("enabled", false),
-            providerType = SearchProviderType.fromId(obj.optString("providerType", SearchProviderType.TAVILY.id)),
+            providerType = SearchProviderType.fromId(obj.optString("providerType", SearchProviderType.DUCKDUCKGO.id)),
             customEndpointUrl = obj.optString("customEndpointUrl", ""),
             allowCleartextCustomEndpoint = obj.optBoolean("allowCleartextCustomEndpoint", false),
             resultLimit = obj.optInt("resultLimit", 5).coerceIn(1, 10),

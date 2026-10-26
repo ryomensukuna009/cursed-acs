@@ -297,13 +297,29 @@ class UniversalProviderAgent(
             val shouldUseWebSearch = explicitWebSearch || globalWebSearchEnabled
             val currentMode = com.tom.rv2ide.artificial.policy.AgentExecutionMode.getSavedMode(appContext)
 
+            val currentProjectDir = com.tom.rv2ide.builder.SharedBuildOrchestrator.getActiveProjectDir()
+            val currentProjectKey = currentProjectDir?.absolutePath.orEmpty()
+            val memoryBlock = com.tom.rv2ide.artificial.memory.AIMemoryManager.getInstance(appContext)
+                .buildMemoryPromptBlock(currentProjectKey)
+            val worldBookBlock = com.tom.rv2ide.artificial.worldbook.WorldBookManager.getInstance(appContext)
+                .buildWorldBookInjection(prompt, conversationHistory.map { it.content })
+            val skillsBlock = com.tom.rv2ide.artificial.skills.SkillManager.getInstance(appContext)
+                .buildAvailableSkillsPromptBlock(currentProjectDir)
+
+            val compositeSystemPrompt = buildString {
+                append(writingRules.useThis()).append("\n\n")
+                if (memoryBlock.isNotBlank()) append(memoryBlock).append("\n\n")
+                if (worldBookBlock.isNotBlank()) append(worldBookBlock).append("\n\n")
+                if (skillsBlock.isNotBlank()) append(skillsBlock).append("\n\n")
+            }.trim()
+
             val response = toolOrchestrator.executeOrchestratedChat(
                 profile = profile,
                 modelId = modelId,
                 modelCapabilities = capabilities,
                 apiKey = effectiveKey,
                 messages = requestMessages,
-                systemPrompt = writingRules.useThis(),
+                systemPrompt = compositeSystemPrompt,
                 webSearchRequested = shouldUseWebSearch,
                 forceSearchPrefetch = false,
                 stream = profile.streamingEnabled,
@@ -324,7 +340,16 @@ class UniversalProviderAgent(
             lastModifiedFiles = response.modifiedFiles
             lastTokenUsage = response.usage
             lastCompletionReport = response.completionReport
-            response.usage?.let { cumulativeTokenUsage += it }
+            response.usage?.let { usage ->
+                cumulativeTokenUsage += usage
+                com.tom.rv2ide.artificial.stats.TokenTelemetryTracker.getInstance(appContext)
+                    .recordTurnUsage(
+                        promptTokens = usage.promptTokens,
+                        completionTokens = usage.completionTokens,
+                        cachedTokens = usage.cachedPromptTokens ?: 0,
+                        latencyMs = 0
+                    )
+            }
 
             conversationHistory.add(UnifiedChatMessage(role = ChatRole.USER, content = prompt))
             conversationHistory.add(UnifiedChatMessage(role = ChatRole.ASSISTANT, content = response.text))

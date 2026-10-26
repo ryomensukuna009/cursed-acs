@@ -51,7 +51,9 @@ class AIRequestHandler(
     fun execute(
         userRequest: String,
         explicitWebSearch: Boolean = false,
-        appendUserTurn: Boolean = true
+        appendUserTurn: Boolean = true,
+        imageBase64: String? = null,
+        imageMimeType: String? = null
     ) {
         aiAgent.cancelActiveRequest()
         executionJob?.cancel()
@@ -67,7 +69,9 @@ class AIRequestHandler(
                 content = userRequest,
                 providerId = providerId,
                 providerName = providerName,
-                modelId = modelId
+                modelId = modelId,
+                imageBase64 = imageBase64,
+                imageMimeType = imageMimeType
             )
         }
 

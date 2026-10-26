@@ -222,7 +222,9 @@ class ConversationSessionManager(
         providerId: String? = null,
         providerName: String? = null,
         modelId: String? = null,
-        projectPath: String = currentProjectKey
+        projectPath: String = currentProjectKey,
+        imageBase64: String? = null,
+        imageMimeType: String? = null
     ): ChatMessageItem {
         val conv = getActiveConversation(projectPath)
         val msg = ChatMessageItem(
@@ -233,7 +235,9 @@ class ConversationSessionManager(
             timestamp = System.currentTimeMillis(),
             providerId = providerId,
             providerName = providerName,
-            modelId = modelId
+            modelId = modelId,
+            imageBase64 = imageBase64,
+            imageMimeType = imageMimeType
         )
         val newTitle = if (conv.messages.isEmpty() || conv.title == "New Conversation") {
             deriveConversationTitle(content)
@@ -525,7 +529,9 @@ class ConversationSessionManager(
             when (item.role) {
                 ChatRole.USER -> UnifiedChatMessage(
                     role = ChatRole.USER,
-                    content = item.content
+                    content = item.content,
+                    imageBase64 = item.imageBase64,
+                    imageMimeType = item.imageMimeType
                 )
                 ChatRole.ASSISTANT -> {
                     if (item.isError && item.content.startsWith("❌")) {
@@ -617,7 +623,15 @@ class ConversationSessionManager(
         }
 
         result.addAll(keptRecent)
-        result.add(UnifiedChatMessage(role = ChatRole.USER, content = latestUserPromptWithProjectContext))
+        val lastUserMsg = conv.messages.lastOrNull { it.role == ChatRole.USER }
+        result.add(
+            UnifiedChatMessage(
+                role = ChatRole.USER,
+                content = latestUserPromptWithProjectContext,
+                imageBase64 = lastUserMsg?.imageBase64,
+                imageMimeType = lastUserMsg?.imageMimeType
+            )
+        )
         return result
     }
 

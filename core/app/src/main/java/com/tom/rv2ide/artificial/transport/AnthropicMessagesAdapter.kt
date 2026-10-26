@@ -58,12 +58,38 @@ class AnthropicMessagesAdapter : ProtocolAdapter {
                 }
                 ChatRole.USER -> {
                     flushPendingToolResults()
-                    messagesArray.put(
-                        JSONObject().apply {
-                            put("role", "user")
-                            put("content", msg.content)
+                    if (!msg.imageBase64.isNullOrBlank()) {
+                        val mime = msg.imageMimeType ?: "image/jpeg"
+                        val contentBlocks = JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("type", "image")
+                                put("source", JSONObject().apply {
+                                    put("type", "base64")
+                                    put("media_type", mime)
+                                    put("data", msg.imageBase64)
+                                })
+                            })
+                            if (msg.content.isNotBlank()) {
+                                put(JSONObject().apply {
+                                    put("type", "text")
+                                    put("text", msg.content)
+                                })
+                            }
                         }
-                    )
+                        messagesArray.put(
+                            JSONObject().apply {
+                                put("role", "user")
+                                put("content", contentBlocks)
+                            }
+                        )
+                    } else {
+                        messagesArray.put(
+                            JSONObject().apply {
+                                put("role", "user")
+                                put("content", msg.content)
+                            }
+                        )
+                    }
                 }
                 ChatRole.ASSISTANT -> {
                     flushPendingToolResults()
