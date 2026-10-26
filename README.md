@@ -22,13 +22,13 @@
 ## ⚡ Core Capabilities
 
 - **🛠️ Standalone Offline Native NDK & CMake:** Zero-internet C/C++ compilation via embedded Clang, LLVM, and CMake. Direct `.zip` / `.tar.gz` NDK archive import with zip-slip protection.
+- **📦 Full Gradle Build System & OpenJDK 17:** Compiles production Java & Kotlin Android apps with official AGP 7.2–8.x, AAPT2, D8/R8, and one-tap on-device APK signing.
 - **🧠 Jujutsu Cursed AI Coding Agent:**
   - Multiple API Support: Gemini, Claude, OpenAI, DeepSeek, xAI Grok, xkiro, CUSTOM PROVIDER.
   - Advance errors detection: Advance Error Detection system and fix them with AI in one click.
   - Autonomous Multi-File Editing: Context-aware codebase indexing and atomic code diff application.
   - One-Tap Compiler Diagnostics: Ingests Gradle/NDK build failures and auto-generates contextual fixes.
   - Token Telemetry: Live context usage metering and auto-compaction.
-- **📦 Full Gradle Build System & OpenJDK 17:** Compiles production Java & Kotlin Android apps with official AGP 7.2–8.x, AAPT2, D8/R8, and one-tap on-device APK signing.
 - **💻 Embedded Linux Terminal & Git:** Full Termux bash environment with package manager (`clang`, `make`, `git`, `openssh`). Built-in Git client for branches, diffs, commits, and remotes.
 - **🩺 Build Toolchain Doctor:** 10-point automated IDE diagnostic auditing SDK, Java runtime, Gradle, NDK versions, CMake, storage, and permissions.
 - **🎨 Modern Editor & Material 3 UI:** Sora Editor with Tree-Sitter highlighting, Eclipse JDT (Java) / Kotlin / Clangd LSP, visual XML layout designer, dynamic Day/Night theming, and edge-to-edge support.
@@ -39,7 +39,7 @@
 **BEST FOR MODDERS, CHEAT MAKERS**
 
 
-**SEPARATE - SEPARATE GRADLE BUILD SYSTEM AND NDK BUILD SYSTEM[YOU CAN USE aide_ndk_arm64.tar.gz or aide_ndk_arm32.tar.gz ]**
+**for NDK BUILD- aide_ndk_arm64.tar.gz or aide_ndk_arm32.tar.gz**
 ---
 
 ## 📱 System Requirements
