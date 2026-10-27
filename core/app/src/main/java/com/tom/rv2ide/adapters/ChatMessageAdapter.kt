@@ -3981,7 +3981,10 @@ class ChatMessageAdapter(
 
 
 
-                background = shape
+                val rippleColor = android.content.res.ColorStateList.valueOf(
+                    resolveAttrColor(ctx, android.R.attr.colorControlHighlight, Color.parseColor("#338AB4F8"))
+                )
+                background = android.graphics.drawable.RippleDrawable(rippleColor, shape, shape)
 
 
 

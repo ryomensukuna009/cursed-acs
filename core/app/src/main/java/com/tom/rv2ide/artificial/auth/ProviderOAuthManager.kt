@@ -46,8 +46,8 @@ import java.util.concurrent.TimeUnit
  */
 object ProviderOAuthManager {
 
-    // OpenAI Codex device auth
-    private const val OPENAI_CLIENT_ID = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh"
+    // OpenAI Codex device auth (Official Kelivo client ID and flow)
+    private const val OPENAI_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
     private const val OPENAI_USER_CODE_URL = "https://auth.openai.com/api/accounts/deviceauth/usercode"
     private const val OPENAI_DEVICE_VERIFY_URL = "https://auth.openai.com/codex/device"
     private const val OPENAI_TOKEN_URL = "https://auth.openai.com/api/accounts/deviceauth/token"
@@ -343,6 +343,10 @@ object ProviderOAuthManager {
 
                 val initReq = Request.Builder()
                     .url(OPENAI_USER_CODE_URL)
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("originator", "kelivo")
+                    .header("User-Agent", "Kelivo")
                     .post(jsonPayload.toRequestBody("application/json".toMediaType()))
                     .build()
 
@@ -352,7 +356,7 @@ object ProviderOAuthManager {
                 if (!initResp.isSuccessful) {
                     withContext(Dispatchers.Main) {
                         progressBar.visibility = View.GONE
-                        statusTv.text = "❌ Failed to initiate OpenAI login: HTTP ${initResp.code}"
+                        statusTv.text = "❌ Failed to initiate OpenAI login: HTTP ${initResp.code}\n${initBody.take(150)}"
                     }
                     return@launch
                 }
@@ -367,7 +371,22 @@ object ProviderOAuthManager {
                     codeTv.text = userCode
                     codeCard.visibility = View.VISIBLE
                     openBrowserBtn.visibility = View.VISIBLE
-                    statusTv.text = "1. Copy the code below\n2. Open the OpenAI page and enter the code\n3. Return here once approved"
+                    statusTv.text = "1. Code $userCode copied to clipboard!\n2. Opening browser to verify...\n3. Approve access and return here once finished."
+
+                    // Auto copy code to clipboard
+                    try {
+                        val clip = android.content.ClipData.newPlainText("OpenAI Device Code", userCode)
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(clip)
+                        Toast.makeText(context, "Code $userCode copied to clipboard!", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) {}
+
+                    // Auto launch verification page in browser
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(OPENAI_DEVICE_VERIFY_URL)).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
                 }
 
                 val pollPayload = JSONObject().apply {
@@ -376,10 +395,15 @@ object ProviderOAuthManager {
                 }.toString()
 
                 var acquiredToken: String? = null
+                var acquiredRefreshToken: String? = null
                 for (poll in 0 until 120) {
                     delay(intervalSec * 1000L)
                     val tokenReq = Request.Builder()
                         .url(OPENAI_TOKEN_URL)
+                        .header("Accept", "application/json")
+                        .header("Content-Type", "application/json")
+                        .header("originator", "kelivo")
+                        .header("User-Agent", "Kelivo")
                         .post(pollPayload.toRequestBody("application/json".toMediaType()))
                         .build()
 
@@ -392,10 +416,46 @@ object ProviderOAuthManager {
 
                     if (tokenResp.isSuccessful) {
                         val tokenJson = JSONObject(tokenBody)
-                        val accessToken = tokenJson.optString("access_token")
-                        if (accessToken.isNotBlank()) {
-                            acquiredToken = accessToken
+                        // If direct access token returned
+                        val directToken = tokenJson.optString("access_token")
+                        if (directToken.isNotBlank()) {
+                            acquiredToken = directToken
+                            acquiredRefreshToken = tokenJson.optString("refresh_token")
                             break
+                        }
+
+                        // Check authorization_code flow
+                        val authCode = tokenJson.optString("authorization_code")
+                        val codeVerifier = tokenJson.optString("code_verifier")
+                        if (authCode.isNotBlank() && codeVerifier.isNotBlank()) {
+                            // Step 2: Exchange authorization_code with token endpoint
+                            val exchangeForm = FormBody.Builder()
+                                .add("grant_type", "authorization_code")
+                                .add("client_id", OPENAI_CLIENT_ID)
+                                .add("code", authCode)
+                                .add("code_verifier", codeVerifier)
+                                .add("redirect_uri", "https://auth.openai.com/deviceauth/callback")
+                                .build()
+
+                            val exchangeReq = Request.Builder()
+                                .url("https://auth.openai.com/oauth/token")
+                                .header("Accept", "application/json")
+                                .header("originator", "kelivo")
+                                .header("User-Agent", "Kelivo")
+                                .post(exchangeForm)
+                                .build()
+
+                            val exchangeResp = httpClient.newCall(exchangeReq).execute()
+                            val exchangeBody = exchangeResp.body?.string().orEmpty()
+                            if (exchangeResp.isSuccessful) {
+                                val exchangeJson = JSONObject(exchangeBody)
+                                val finalToken = exchangeJson.optString("access_token")
+                                if (finalToken.isNotBlank()) {
+                                    acquiredToken = finalToken
+                                    acquiredRefreshToken = exchangeJson.optString("refresh_token")
+                                    break
+                                }
+                            }
                         }
                     }
                 }
@@ -410,10 +470,12 @@ object ProviderOAuthManager {
                             email = email.ifBlank { "ChatGPT User" },
                             plan = plan.ifBlank { "Codex" },
                             accessToken = acquiredToken,
+                            refreshToken = acquiredRefreshToken.orEmpty(),
                             expiresAt = System.currentTimeMillis() + 86400_000L * 30,
                             isActive = true
                         )
                         OAuthAccountRegistry.getInstance(context).saveAccount(account)
+                        OAuthAccountRegistry.getInstance(context).setActiveAccount("openai", account.id)
                         fetchAndRegisterCodexModels(context, acquiredToken)
                         Toast.makeText(context, "✅ Signed in to OpenAI successfully! (${account.email})", Toast.LENGTH_LONG).show()
                         dialog.dismiss()
@@ -567,7 +629,20 @@ object ProviderOAuthManager {
                     codeTv.text = userCode
                     codeCard.visibility = View.VISIBLE
                     openBrowserBtn.visibility = View.VISIBLE
-                    statusTv.text = "1. Copy the code below\n2. Open the xAI verification page\n3. Approve access and return here"
+                    statusTv.text = "1. Code $userCode copied to clipboard!\n2. Opening browser to verify...\n3. Approve access and return here once finished."
+
+                    try {
+                        val clip = android.content.ClipData.newPlainText("Grok Device Code", userCode)
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(clip)
+                        Toast.makeText(context, "Code $userCode copied to clipboard!", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) {}
+
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(verifyUrl)).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
                 }
 
                 var acquiredToken: String? = null
@@ -763,7 +838,20 @@ object ProviderOAuthManager {
                     codeTv.text = userCode
                     codeCard.visibility = View.VISIBLE
                     openBrowserBtn.visibility = View.VISIBLE
-                    statusTv.text = "1. Copy the code below\n2. Open the Kimi authorization page\n3. Approve and return here"
+                    statusTv.text = "1. Code $userCode copied to clipboard!\n2. Opening browser to verify...\n3. Approve and return here once finished."
+
+                    try {
+                        val clip = android.content.ClipData.newPlainText("Kimi Device Code", userCode)
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(clip)
+                        Toast.makeText(context, "Code $userCode copied to clipboard!", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) {}
+
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(verifyUrl)).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
                 }
 
                 var acquiredToken: String? = null

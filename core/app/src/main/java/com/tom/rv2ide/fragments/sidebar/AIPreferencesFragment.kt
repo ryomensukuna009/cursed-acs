@@ -654,7 +654,7 @@ class AIPreferencesFragment(
                 insetBottom = 0
                 setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
                 setOnClickListener {
-                    ProviderOAuthManager.showOAuthAccountsHubDialog(ctx, lifecycleScope) { connected ->
+                    ProviderOAuthManager.showAccountLoginDialog(ctx, lifecycleScope, p.id) { connected ->
                         aiAgent.refreshRegisteredProfiles()
                         renderAccountCards()
                         showSnackbar("Account connected: $connected")
@@ -753,20 +753,169 @@ class AIPreferencesFragment(
         val mcpManager = McpClientManager.getInstance(ctx)
         val servers = mcpManager.getServers()
 
+        // Section 1: Configured Servers
+        val sec1Header = TextView(ctx).apply {
+            text = "⚡ Configured MCP Tool Servers"
+            textSize = 13.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(resolveThemeColor(ctx, android.R.attr.colorPrimary, android.graphics.Color.WHITE))
+            setPadding(0, (4 * density).toInt(), 0, (8 * density).toInt())
+        }
+        mcpServersListContainer.addView(sec1Header)
+
         if (servers.isEmpty()) {
             val emptyTv = TextView(ctx).apply {
-                text = "No MCP servers configured. Tap '+ Add Server' to register an MCP tool server."
-                textSize = 13f
+                text = "No custom MCP servers configured yet. Install from recommended below or tap '+ Add Server'."
+                textSize = 12f
                 setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
-                setPadding(0, (12 * density).toInt(), 0, 0)
+                setPadding(0, 0, 0, (12 * density).toInt())
             }
             mcpServersListContainer.addView(emptyTv)
-            return
+        } else {
+            for (srv in servers) {
+                val card = MaterialCardView(ctx).apply {
+                    radius = 10 * density
+                    strokeWidth = (1 * density).toInt()
+                    strokeColor = resolveThemeColor(ctx, com.google.android.material.R.attr.colorOutlineVariant, android.graphics.Color.DKGRAY)
+                    setCardBackgroundColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceContainer, android.graphics.Color.parseColor("#1E1E2E")))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = (8 * density).toInt()
+                    }
+                }
+
+                val cardContent = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+                }
+
+                val infoCol = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val titleTv = TextView(ctx).apply {
+                    text = srv.name
+                    textSize = 13.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE))
+                }
+
+                val subTv = TextView(ctx).apply {
+                    val detail = if (srv.transportType == McpTransportType.STDIO) "STDIO: ${srv.command}" else "SSE: ${srv.endpointUrl}"
+                    text = detail
+                    textSize = 11f
+                    setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
+                }
+
+                infoCol.addView(titleTv)
+                infoCol.addView(subTv)
+                cardContent.addView(infoCol)
+
+                val toggle = com.google.android.material.materialswitch.MaterialSwitch(ctx).apply {
+                    isChecked = srv.enabled
+                    setOnCheckedChangeListener { _, isChecked ->
+                        mcpManager.saveServer(srv.copy(enabled = isChecked))
+                        showSnackbar("MCP server ${srv.name} ${if (isChecked) "enabled" else "disabled"}")
+                    }
+                }
+                cardContent.addView(toggle)
+
+                val deleteBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    text = "✕"
+                    textSize = 11f
+                    insetTop = 0
+                    insetBottom = 0
+                    setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+                    setOnClickListener {
+                        mcpManager.deleteServer(srv.id)
+                        renderMcpServers()
+                        showSnackbar("Deleted server ${srv.name}")
+                    }
+                }
+                cardContent.addView(deleteBtn)
+
+                card.addView(cardContent)
+                mcpServersListContainer.addView(card)
+            }
         }
 
-        for (srv in servers) {
+        // Section 2: Recommended Curated MCP Servers (1-Click Install)
+        val sec2Header = TextView(ctx).apply {
+            text = "⭐ Recommended MCP Tool Servers (1-Click Install)"
+            textSize = 13.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(resolveThemeColor(ctx, android.R.attr.colorPrimary, android.graphics.Color.WHITE))
+            setPadding(0, (14 * density).toInt(), 0, (8 * density).toInt())
+        }
+        mcpServersListContainer.addView(sec2Header)
+
+        data class RecommendedMcp(
+            val id: String,
+            val name: String,
+            val description: String,
+            val transportType: McpTransportType,
+            val command: String,
+            val endpointUrl: String,
+            val icon: String
+        )
+
+        val recommended = listOf(
+            RecommendedMcp(
+                "rec-filesystem",
+                "Filesystem MCP",
+                "Fast local directory scanning, reading, and line-level diff code edits.",
+                McpTransportType.STDIO,
+                "mcp-server-filesystem",
+                "",
+                "📁"
+            ),
+            RecommendedMcp(
+                "rec-android-tools",
+                "Android Tools & ADB",
+                "Execute ADB shell commands, capture logcat traces, inspect view hierarchy.",
+                McpTransportType.STDIO,
+                "android-tools-mcp",
+                "",
+                "🤖"
+            ),
+            RecommendedMcp(
+                "rec-web-fetch",
+                "Web Fetch & Search",
+                "Crawl web pages, fetch documentation markdown, and perform deep research.",
+                McpTransportType.SSE_HTTP,
+                "",
+                "http://127.0.0.1:3000/sse",
+                "🌐"
+            ),
+            RecommendedMcp(
+                "rec-sqlite",
+                "SQLite & Room Database",
+                "Direct database inspection, live SQL queries, and schema migration debug.",
+                McpTransportType.STDIO,
+                "sqlite-mcp",
+                "",
+                "🗄️"
+            ),
+            RecommendedMcp(
+                "rec-memory",
+                "Memory & Knowledge Base",
+                "Persistent cross-session knowledge graph for architecture and project notes.",
+                McpTransportType.STDIO,
+                "memory-mcp",
+                "",
+                "🧠"
+            )
+        )
+
+        for (rec in recommended) {
+            val isInstalled = servers.any { it.name.equals(rec.name, ignoreCase = true) || it.id == rec.id }
+
             val card = MaterialCardView(ctx).apply {
-                radius = 12 * density
+                radius = 10 * density
                 strokeWidth = (1 * density).toInt()
                 strokeColor = resolveThemeColor(ctx, com.google.android.material.R.attr.colorOutlineVariant, android.graphics.Color.DKGRAY)
                 setCardBackgroundColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceContainer, android.graphics.Color.parseColor("#1E1E2E")))
@@ -781,8 +930,15 @@ class AIPreferencesFragment(
             val cardContent = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding((12 * density).toInt(), (12 * density).toInt(), (12 * density).toInt(), (12 * density).toInt())
+                setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
             }
+
+            val iconTv = TextView(ctx).apply {
+                text = rec.icon
+                textSize = 20f
+                setPadding(0, 0, (10 * density).toInt(), 0)
+            }
+            cardContent.addView(iconTv)
 
             val infoCol = LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
@@ -790,45 +946,55 @@ class AIPreferencesFragment(
             }
 
             val titleTv = TextView(ctx).apply {
-                text = srv.name
-                textSize = 14f
+                text = rec.name
+                textSize = 13.5f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
                 setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE))
             }
 
-            val subTv = TextView(ctx).apply {
-                val detail = if (srv.transportType == McpTransportType.STDIO) "STDIO: ${srv.command}" else "SSE: ${srv.endpointUrl}"
-                text = detail
-                textSize = 11.5f
+            val descTv = TextView(ctx).apply {
+                text = rec.description
+                textSize = 11f
                 setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
             }
 
             infoCol.addView(titleTv)
-            infoCol.addView(subTv)
+            infoCol.addView(descTv)
             cardContent.addView(infoCol)
 
-            val toggle = com.google.android.material.materialswitch.MaterialSwitch(ctx).apply {
-                isChecked = srv.enabled
-                setOnCheckedChangeListener { _, isChecked ->
-                    mcpManager.saveServer(srv.copy(enabled = isChecked))
-                    showSnackbar("MCP server ${srv.name} ${if (isChecked) "enabled" else "disabled"}")
+            if (isInstalled) {
+                val installedBadge = TextView(ctx).apply {
+                    text = "✓ Installed"
+                    textSize = 11.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(android.graphics.Color.parseColor("#10B981"))
+                    setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
                 }
-            }
-            cardContent.addView(toggle)
-
-            val deleteBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                text = "✕"
-                textSize = 11f
-                insetTop = 0
-                insetBottom = 0
-                setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
-                setOnClickListener {
-                    mcpManager.deleteServer(srv.id)
-                    renderMcpServers()
-                    showSnackbar("Deleted server ${srv.name}")
+                cardContent.addView(installedBadge)
+            } else {
+                val installBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonTonalStyle).apply {
+                    text = "📥 Install"
+                    textSize = 11.5f
+                    insetTop = 0
+                    insetBottom = 0
+                    cornerRadius = (8 * density).toInt()
+                    setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
+                    setOnClickListener {
+                        val cfg = McpServerConfig(
+                            id = rec.id,
+                            name = rec.name,
+                            transportType = rec.transportType,
+                            command = rec.command,
+                            endpointUrl = rec.endpointUrl,
+                            enabled = true
+                        )
+                        mcpManager.saveServer(cfg)
+                        renderMcpServers()
+                        showSnackbar("✅ Installed MCP server: ${rec.name}")
+                    }
                 }
+                cardContent.addView(installBtn)
             }
-            cardContent.addView(deleteBtn)
 
             card.addView(cardContent)
             mcpServersListContainer.addView(card)
@@ -886,20 +1052,149 @@ class AIPreferencesFragment(
         val skillManager = SkillManager.getInstance(ctx)
         val skills = skillManager.discoverSkills()
 
+        // Section 1: Active Skills
+        val sec1Header = TextView(ctx).apply {
+            text = "🛠️ Active Agent Skills"
+            textSize = 13.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(resolveThemeColor(ctx, android.R.attr.colorPrimary, android.graphics.Color.WHITE))
+            setPadding(0, (4 * density).toInt(), 0, (8 * density).toInt())
+        }
+        skillsListContainer.addView(sec1Header)
+
         if (skills.isEmpty()) {
             val emptyTv = TextView(ctx).apply {
-                text = "No skills discovered. Tap '+ Add Skill' to register custom skills."
-                textSize = 13f
+                text = "No skills discovered yet. Install from recommended below or tap '+ Add Skill'."
+                textSize = 12f
                 setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
-                setPadding(0, (12 * density).toInt(), 0, 0)
+                setPadding(0, 0, 0, (12 * density).toInt())
             }
             skillsListContainer.addView(emptyTv)
-            return
+        } else {
+            for (sk in skills) {
+                val card = MaterialCardView(ctx).apply {
+                    radius = 10 * density
+                    strokeWidth = (1 * density).toInt()
+                    strokeColor = resolveThemeColor(ctx, com.google.android.material.R.attr.colorOutlineVariant, android.graphics.Color.DKGRAY)
+                    setCardBackgroundColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceContainer, android.graphics.Color.parseColor("#1E1E2E")))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = (8 * density).toInt()
+                    }
+                }
+
+                val cardContent = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+                }
+
+                val infoCol = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val titleTv = TextView(ctx).apply {
+                    text = sk.name
+                    textSize = 13.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE))
+                }
+
+                val subTv = TextView(ctx).apply {
+                    text = sk.description.ifBlank { "Custom Agent Workflow Skill" }
+                    textSize = 11f
+                    setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
+                }
+
+                infoCol.addView(titleTv)
+                infoCol.addView(subTv)
+                cardContent.addView(infoCol)
+
+                val toggle = com.google.android.material.materialswitch.MaterialSwitch(ctx).apply {
+                    isChecked = sk.enabled
+                    setOnCheckedChangeListener { _, isChecked ->
+                        skillManager.setSkillEnabled(sk.id, isChecked)
+                        showSnackbar("Skill ${sk.name} ${if (isChecked) "enabled" else "disabled"}")
+                    }
+                }
+                cardContent.addView(toggle)
+
+                card.addView(cardContent)
+                skillsListContainer.addView(card)
+            }
         }
 
-        for (sk in skills) {
+        // Section 2: Recommended Curated Agent Skills (1-Click Install)
+        val sec2Header = TextView(ctx).apply {
+            text = "⭐ Recommended Agent Skills (1-Click Install)"
+            textSize = 13.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(resolveThemeColor(ctx, android.R.attr.colorPrimary, android.graphics.Color.WHITE))
+            setPadding(0, (14 * density).toInt(), 0, (8 * density).toInt())
+        }
+        skillsListContainer.addView(sec2Header)
+
+        data class RecommendedSkill(
+            val id: String,
+            val name: String,
+            val description: String,
+            val instructions: String,
+            val icon: String
+        )
+
+        val recommended = listOf(
+            RecommendedSkill(
+                "android-compose-expert",
+                "Android & Compose Expert",
+                "Specialist in Jetpack Compose UI, Material 3, Navigation, Coroutines & Flow.",
+                "1. Build idiomatic Jetpack Compose UI with Material 3 standards.\n2. Keep composables stateless and hoist events.\n3. Utilize remember and derivedStateOf for 60fps rendering.\n4. Structure ViewModels with StateFlow.",
+                "🎨"
+            ),
+            RecommendedSkill(
+                "ndk-cpp-jni-wizard",
+                "NDK C++ JNI Wizard",
+                "Native C/C++ development, CMakeLists.txt tuning, JNI bridges, and memory safety.",
+                "1. Maintain correct JNIEXPORT JNICALL signatures matching package namespaces.\n2. Ensure proper CMake target linking (log, android, EGL, GLESv3).\n3. Safely manage LocalRef and GlobalRef to prevent JNI leaks.\n4. Optimize SIMD (NEON) and multithreading.",
+                "⚡"
+            ),
+            RecommendedSkill(
+                "bug-hunter-diagnosis",
+                "Bug Hunter & Error Diagnosis",
+                "Scans Gradle build logs, logcat crash traces, and runtime exceptions with exact fixes.",
+                "1. Isolate the exact exception and root cause stacktrace line.\n2. Diagnose classpath conflicts, manifest issues, or missing permissions.\n3. Implement surgical minimal fixes without introducing side-effects.",
+                "🐛"
+            ),
+            RecommendedSkill(
+                "ui-ux-designer-animator",
+                "UI/UX Designer & Animator",
+                "Modern sleek aesthetic polish, smooth transitions, custom drawables, and responsive design.",
+                "1. Enforce smooth rounded rectangle geometry (8-12dp corners) across all buttons.\n2. Choose harmonized color palettes with clear contrast hierarchy.\n3. Ensure fluid touch ripple feedback and zero UI clutter.",
+                "✨"
+            ),
+            RecommendedSkill(
+                "clean-architecture-refactor",
+                "Clean Architecture & Refactoring",
+                "MVVM/MVI architecture, repository patterns, dependency injection, and clean refactoring.",
+                "1. Decouple presentation from domain and data storage logic.\n2. Use clean repository interfaces.\n3. Keep business rules pure and easily testable.",
+                "🏛️"
+            ),
+            RecommendedSkill(
+                "web-search-research",
+                "Web Search & Deep Research",
+                "Autonomous web search, documentation fetching, GitHub open source exploration.",
+                "1. Search technical documentation for current SDK APIs.\n2. Verify method signatures against official reference.\n3. Summarize key technical insights concisely.",
+                "🌐"
+            )
+        )
+
+        for (rec in recommended) {
+            val isInstalled = skills.any { it.name.equals(rec.name, ignoreCase = true) || it.id == rec.id }
+
             val card = MaterialCardView(ctx).apply {
-                radius = 12 * density
+                radius = 10 * density
                 strokeWidth = (1 * density).toInt()
                 strokeColor = resolveThemeColor(ctx, com.google.android.material.R.attr.colorOutlineVariant, android.graphics.Color.DKGRAY)
                 setCardBackgroundColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceContainer, android.graphics.Color.parseColor("#1E1E2E")))
@@ -914,8 +1209,15 @@ class AIPreferencesFragment(
             val cardContent = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding((12 * density).toInt(), (12 * density).toInt(), (12 * density).toInt(), (12 * density).toInt())
+                setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
             }
+
+            val iconTv = TextView(ctx).apply {
+                text = rec.icon
+                textSize = 20f
+                setPadding(0, 0, (10 * density).toInt(), 0)
+            }
+            cardContent.addView(iconTv)
 
             val infoCol = LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
@@ -923,30 +1225,56 @@ class AIPreferencesFragment(
             }
 
             val titleTv = TextView(ctx).apply {
-                text = sk.name
-                textSize = 14f
+                text = rec.name
+                textSize = 13.5f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
                 setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE))
             }
 
-            val subTv = TextView(ctx).apply {
-                text = sk.description.ifBlank { "Custom Agent Workflow Skill" }
-                textSize = 11.5f
+            val descTv = TextView(ctx).apply {
+                text = rec.description
+                textSize = 11f
                 setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
             }
 
             infoCol.addView(titleTv)
-            infoCol.addView(subTv)
+            infoCol.addView(descTv)
             cardContent.addView(infoCol)
 
-            val toggle = com.google.android.material.materialswitch.MaterialSwitch(ctx).apply {
-                isChecked = sk.enabled
-                setOnCheckedChangeListener { _, isChecked ->
-                    skillManager.setSkillEnabled(sk.id, isChecked)
-                    showSnackbar("Skill ${sk.name} ${if (isChecked) "enabled" else "disabled"}")
+            if (isInstalled) {
+                val installedBadge = TextView(ctx).apply {
+                    text = "✓ Installed"
+                    textSize = 11.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(android.graphics.Color.parseColor("#10B981"))
+                    setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
                 }
+                cardContent.addView(installedBadge)
+            } else {
+                val installBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonTonalStyle).apply {
+                    text = "📥 Install"
+                    textSize = 11.5f
+                    insetTop = 0
+                    insetBottom = 0
+                    cornerRadius = (8 * density).toInt()
+                    setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
+                    setOnClickListener {
+                        val ok = skillManager.installPresetSkill(
+                            id = rec.id,
+                            name = rec.name,
+                            description = rec.description,
+                            instructions = rec.instructions
+                        )
+                        if (ok) {
+                            renderSkills()
+                            showSnackbar("✅ Installed skill: ${rec.name}")
+                        } else {
+                            showSnackbar("❌ Failed to install skill ${rec.name}")
+                        }
+                    }
+                }
+                cardContent.addView(installBtn)
             }
-            cardContent.addView(toggle)
 
             card.addView(cardContent)
             skillsListContainer.addView(card)

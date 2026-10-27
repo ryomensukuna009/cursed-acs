@@ -174,6 +174,32 @@ class SkillManager private constructor(context: Context) {
         }
     }
 
+    /**
+     * Installs or registers a preset recommended skill directly into `globalSkillsDir`.
+     */
+    @Synchronized
+    fun installPresetSkill(id: String, name: String, description: String, instructions: String): Boolean {
+        return try {
+            val skillDir = File(globalSkillsDir, id.trim().lowercase().replace(" ", "-"))
+            if (!skillDir.exists()) skillDir.mkdirs()
+            val skillMd = File(skillDir, "SKILL.md")
+            val content = """---
+name: $name
+description: $description
+---
+# $name
+
+$instructions
+"""
+            skillMd.writeText(content)
+            setSkillEnabled(id.trim().lowercase().replace(" ", "-"), true)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to install preset skill $id", e)
+            false
+        }
+    }
+
     private fun seedDefaultSkillIfEmpty() {
         val defaultDir = File(globalSkillsDir, "android-development")
         if (!defaultDir.exists()) {

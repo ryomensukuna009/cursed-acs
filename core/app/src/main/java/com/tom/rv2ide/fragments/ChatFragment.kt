@@ -178,6 +178,8 @@ class ChatFragment : Fragment() {
     private var classicPromptLayout: TextInputLayout? = null
     private var kelivoComposerCard: View? = null
     private var modeControlPanel: View? = null
+    private var classicTopChipRow: View? = null
+    private var modeChipScrollView: View? = null
     private lateinit var promptLayout: TextInputLayout
 
     private lateinit var promptInput: TextInputEditText
@@ -226,7 +228,6 @@ class ChatFragment : Fragment() {
     private var btnComposerWebSearch: com.google.android.material.button.MaterialButton? = null
     private var btnComposerReasoning: com.google.android.material.button.MaterialButton? = null
     private var btnComposerAttach: com.google.android.material.button.MaterialButton? = null
-    private var btnComposerAccounts: com.google.android.material.button.MaterialButton? = null
     private var btnComposerSend: com.google.android.material.button.MaterialButton? = null
 
     private lateinit var progressIndicator: CircularProgressIndicator
@@ -586,6 +587,8 @@ class ChatFragment : Fragment() {
         classicPromptLayout = view.findViewById(R.id.classicPromptLayout)
         kelivoComposerCard = view.findViewById(R.id.kelivoComposerCard)
         modeControlPanel = view.findViewById(R.id.modeControlPanel)
+        classicTopChipRow = view.findViewById(R.id.classicTopChipRow)
+        modeChipScrollView = view.findViewById(R.id.modeChipScrollView)
 
         val isKelivoTheme = com.tom.rv2ide.ui.themes.ThemeManager().getCurrentTheme() == com.tom.rv2ide.ui.themes.IDETheme.KELIVO_SLEEK
         if (isKelivoTheme) {
@@ -596,12 +599,16 @@ class ChatFragment : Fragment() {
             classicPromptLayout?.visibility = View.GONE
             kelivoComposerCard?.visibility = View.VISIBLE
             modeControlPanel?.visibility = View.GONE
+            classicTopChipRow?.visibility = View.GONE
+            modeChipScrollView?.visibility = View.GONE
         } else {
             promptLayout = classicPromptLayout ?: view.findViewById(R.id.promptLayout)
             promptInput = view.findViewById<com.tom.rv2ide.ui.ChatComposerEditText>(R.id.classicAnyText) ?: view.findViewById(R.id.anyText)
             kelivoComposerCard?.visibility = View.GONE
             classicPromptLayout?.visibility = View.VISIBLE
             modeControlPanel?.visibility = View.VISIBLE
+            classicTopChipRow?.visibility = View.VISIBLE
+            modeChipScrollView?.visibility = View.VISIBLE
         }
 
         activeModelChipBtn = view.findViewById(R.id.activeModelChipBtn)
@@ -642,7 +649,6 @@ class ChatFragment : Fragment() {
         btnComposerWebSearch = view.findViewById(R.id.btnComposerWebSearch)
         btnComposerReasoning = view.findViewById(R.id.btnComposerReasoning)
         btnComposerAttach = view.findViewById(R.id.btnComposerAttach)
-        btnComposerAccounts = view.findViewById(R.id.btnComposerAccounts)
         btnComposerSend = view.findViewById(R.id.btnComposerSend)
 
         toolStatusBanner = view.findViewById(R.id.toolStatusBanner)
@@ -1244,22 +1250,6 @@ class ChatFragment : Fragment() {
                 showSnackbar("Selected model (${agentsHelper.getAgent()}) does not support vision / images")
             }
         }
-        btnComposerAccounts?.setOnClickListener {
-            com.tom.rv2ide.artificial.auth.ProviderOAuthManager.showOAuthAccountsHubDialog(
-                requireContext(),
-                viewLifecycleOwner.lifecycleScope
-            ) { connected ->
-                aiAgent.refreshRegisteredProfiles()
-                if (connected.isNotBlank()) {
-                    agentsHelper.setProvider(connected)
-                    aiAgent.setProvider(connected)
-                    aiAgent.reinitializeWithSelectedModel()
-                    updateVisionButtonState()
-                    refreshHeaderBar()
-                    showSnackbar("Switched to $connected")
-                }
-            }
-        }
         btnComposerSend?.setOnClickListener {
             if (aiRequestHandler.isGenerating()) {
                 aiRequestHandler.cancel()
@@ -1412,7 +1402,9 @@ class ChatFragment : Fragment() {
 
 
     private fun updateReasoningEffortButton() {
-        val effort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort(requireContext())
+        val currentModel = agentsHelper.getAgent()
+        val effort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getEffectiveReasoningEffort(requireContext(), currentModel)
+        val fromModel = com.tom.rv2ide.artificial.models.ReasoningEffort.detectFromModelId(currentModel)
         val effortText = when (effort) {
             com.tom.rv2ide.artificial.models.ReasoningEffort.AUTO -> "🧠 Auto"
             com.tom.rv2ide.artificial.models.ReasoningEffort.OFF -> "🧠 Off"
@@ -1437,7 +1429,12 @@ class ChatFragment : Fragment() {
     }
 
     private fun showReasoningEffortDialog() {
-        val current = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort(requireContext())
+        val currentModel = agentsHelper.getAgent()
+        val detected = com.tom.rv2ide.artificial.models.ReasoningEffort.detectFromModelId(currentModel)
+        if (detected != null) {
+            showSnackbar("Model has requested reasoning effort: ${detected.displayName}")
+        }
+        val current = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getEffectiveReasoningEffort(requireContext(), currentModel)
         com.tom.rv2ide.artificial.dialogs.ReasoningEffortSliderDialog.show(
             requireContext(),
             current

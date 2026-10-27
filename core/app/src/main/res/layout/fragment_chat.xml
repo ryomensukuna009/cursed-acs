@@ -18,18 +18,21 @@
         android:paddingBottom="6dp"
         android:elevation="2dp">
 
+        <!-- Classic Top Header: Model Chip & Web Toggle (Only in classic Crimson/Cyan themes) -->
         <LinearLayout
+            android:id="@+id/classicTopChipRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/activeModelChipBtn"
                 android:layout_width="0dp"
-                android:layout_height="42dp"
+                android:layout_height="38dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="6dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:paddingHorizontal="8dp"
@@ -37,49 +40,21 @@
                 android:singleLine="true"
                 android:ellipsize="end"
                 android:textSize="11.5sp"
+                app:cornerRadius="8dp"
                 style="@style/Widget.Material3.Button.TonalButton" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/webSearchToggleBtn"
                 android:layout_width="wrap_content"
-                android:layout_height="42dp"
-                android:layout_marginEnd="4dp"
+                android:layout_height="38dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
-                android:minWidth="42dp"
-                android:paddingHorizontal="6dp"
+                android:minWidth="38dp"
+                android:paddingHorizontal="8dp"
                 android:text="🌐 Off"
                 android:textSize="11.5sp"
+                app:cornerRadius="8dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/newChatBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="42dp"
-                android:layout_marginEnd="2dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:minWidth="42dp"
-                android:paddingHorizontal="6dp"
-                android:text="＋ New"
-                android:textSize="11.5sp"
-                style="@style/Widget.Material3.Button.TonalButton" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/chatOverflowMenuBtn"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:insetLeft="0dp"
-                android:insetRight="0dp"
-                android:minWidth="42dp"
-                android:padding="0dp"
-                android:contentDescription="Chat options"
-                app:icon="@drawable/ic_more_vert"
-                app:iconGravity="textStart"
-                app:iconPadding="0dp"
-                style="@style/Widget.Material3.Button.IconButton" />
 
         </LinearLayout>
 
@@ -88,10 +63,9 @@
             android:id="@+id/sessionSubheader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="4dp">
+            android:orientation="vertical">
 
-            <!-- Title & Live Token Telemetry Row -->
+            <!-- Title & Live Token Telemetry Row (Includes New Chat & Options Menu) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -106,7 +80,7 @@
                     android:text="New Conversation"
                     android:singleLine="true"
                     android:ellipsize="end"
-                    android:textSize="11.5sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -119,12 +93,45 @@
                     android:paddingVertical="2dp"
                     android:text="0 tk"
                     android:textSize="10.5sp"
+                    android:layout_marginEnd="6dp"
                     android:textColor="?attr/colorPrimary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/newChatBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:layout_marginEnd="4dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="34dp"
+                    android:paddingHorizontal="8dp"
+                    android:text="＋ New"
+                    android:textSize="11sp"
+                    app:cornerRadius="8dp"
+                    style="@style/Widget.Material3.Button.TonalButton" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/chatOverflowMenuBtn"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:minWidth="34dp"
+                    android:padding="0dp"
+                    android:contentDescription="Chat options"
+                    app:cornerRadius="8dp"
+                    app:icon="@drawable/ic_more_vert"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    style="@style/Widget.Material3.Button.IconButton" />
 
             </LinearLayout>
 
             <!-- Mode Chips & Live Activity Banner Scroll Row -->
             <HorizontalScrollView
+                android:id="@+id/modeChipScrollView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -503,6 +510,7 @@
                                 android:layout_marginEnd="6dp"
                                 android:text="📦 Model"
                                 android:textSize="11.5sp"
+                                app:cornerRadius="8dp"
                                 style="@style/Widget.Material3.Button.TonalButton" />
 
                             <!-- Web Search Button (Kelivo Globe) -->
@@ -519,6 +527,7 @@
                                 android:layout_marginEnd="6dp"
                                 android:text="🌐"
                                 android:textSize="13sp"
+                                app:cornerRadius="8dp"
                                 style="@style/Widget.Material3.Button.IconButton.Filled" />
 
                             <!-- Attach Image / File Button (Kelivo Plus) -->
@@ -536,22 +545,7 @@
                                 android:text="+"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
-                                style="@style/Widget.Material3.Button.IconButton.Filled" />
-
-                            <!-- Accounts Hub Button (Kelivo 1-Click Login) -->
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnComposerAccounts"
-                                android:layout_width="32dp"
-                                android:layout_height="32dp"
-                                android:insetTop="0dp"
-                                android:insetBottom="0dp"
-                                android:insetLeft="0dp"
-                                android:insetRight="0dp"
-                                android:padding="0dp"
-                                android:minWidth="32dp"
-                                android:layout_marginEnd="4dp"
-                                android:text="🔑"
-                                android:textSize="13sp"
+                                app:cornerRadius="8dp"
                                 style="@style/Widget.Material3.Button.IconButton.Filled" />
 
                             <!-- Reasoning Effort Button (Kelivo Brain) -->
@@ -567,6 +561,7 @@
                                 android:layout_marginEnd="6dp"
                                 android:text="🧠 Med"
                                 android:textSize="11.5sp"
+                                app:cornerRadius="8dp"
                                 style="@style/Widget.Material3.Button.TonalButton" />
 
                         </LinearLayout>
@@ -584,7 +579,7 @@
                         android:padding="0dp"
                         android:minWidth="36dp"
                         android:layout_marginStart="6dp"
-                        app:cornerRadius="18dp"
+                        app:cornerRadius="10dp"
                         app:icon="@drawable/ic_arrow_upward"
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"

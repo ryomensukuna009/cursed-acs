@@ -16,6 +16,20 @@ object AIAgentPreferences {
         return ReasoningEffort.fromKey(key)
     }
 
+    /**
+     * Resolves effective reasoning effort:
+     * If the model name explicitly declares reasoning effort (e.g. qwen...:low, ...:medium, ...:xhigh),
+     * respects and listens to the model's requested effort.
+     * Otherwise, falls back to the user's slider setting.
+     */
+    fun getEffectiveReasoningEffort(context: Context? = null, modelId: String? = null): ReasoningEffort {
+        val modelDeclared = ReasoningEffort.detectFromModelId(modelId)
+        if (modelDeclared != null) {
+            return modelDeclared
+        }
+        return getReasoningEffort(context)
+    }
+
     fun setReasoningEffort(context: Context, effort: ReasoningEffort) {
         val pref = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         pref.edit().putString(KEY_REASONING_EFFORT, effort.key).apply()

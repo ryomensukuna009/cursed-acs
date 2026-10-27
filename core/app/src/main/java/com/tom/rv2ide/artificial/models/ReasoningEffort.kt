@@ -21,5 +21,26 @@ enum class ReasoningEffort(
                 (key.equals("max", ignoreCase = true) && it == MAXIMUM)
             } ?: AUTO
         }
+
+        /**
+         * Detects explicit reasoning effort declared in model names / IDs (e.g. `qwen...:low`,
+         * `...-medium`, `...:high`, `...:xhigh`).
+         * Returns detected ReasoningEffort, or null if the model name does not declare effort.
+         */
+        fun detectFromModelId(modelId: String?): ReasoningEffort? {
+            if (modelId.isNullOrBlank()) return null
+            val lower = modelId.lowercase()
+            return when {
+                lower.contains(":xhigh") || lower.contains("-xhigh") || lower.endsWith("-xhigh") ||
+                lower.contains(":max") || lower.contains("-max") || lower.endsWith("-max") -> MAXIMUM
+                lower.contains(":high") || lower.contains("-high") || lower.endsWith("-high") -> HIGH
+                lower.contains(":medium") || lower.contains("-medium") || lower.endsWith("-medium") ||
+                lower.contains(":med") || lower.contains("-med") || lower.endsWith("-med") -> MEDIUM
+                lower.contains(":low") || lower.contains("-low") || lower.endsWith("-low") -> LOW
+                lower.contains(":off") || lower.contains("-off") || lower.endsWith("-off") ||
+                lower.contains(":none") || lower.contains("-none") || lower.endsWith("-none") -> OFF
+                else -> null
+            }
+        }
     }
 }

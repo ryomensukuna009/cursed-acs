@@ -420,7 +420,7 @@ class ToolOrchestrator(
                 stream = stream,
                 temperature = temperature,
                 maxTokens = maxTokens,
-                reasoningEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort()
+                reasoningEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getEffectiveReasoningEffort(modelId = modelId)
             )
             if (useGeminiGrounding) {
                 onEvent(StreamEvent.StatusUpdate("Grounding with Google Search..."))
@@ -500,7 +500,7 @@ class ToolOrchestrator(
                 stream = stream,
                 temperature = temperature,
                 maxTokens = maxTokens,
-                reasoningEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort()
+                reasoningEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getEffectiveReasoningEffort(modelId = modelId)
             )
 
             var compactionRetried = false
@@ -786,7 +786,7 @@ class ToolOrchestrator(
             stream = stream,
             temperature = temperature,
             maxTokens = maxTokens,
-            reasoningEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort()
+            reasoningEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getEffectiveReasoningEffort(modelId = modelId)
         )
         var synthesisCompactionRetried = false
         val synthesisResponse = try {
@@ -923,7 +923,7 @@ class ToolOrchestrator(
             stream = stream,
             temperature = temperature,
             maxTokens = maxTokens,
-            reasoningEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort()
+            reasoningEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getEffectiveReasoningEffort(modelId = modelId)
         )
 
         val resp = transportClient.executeChat(
