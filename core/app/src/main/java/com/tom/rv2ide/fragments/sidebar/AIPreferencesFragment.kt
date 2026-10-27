@@ -707,6 +707,33 @@ class AIPreferencesFragment(
                     infoCol.addView(statusTv)
                     accRow.addView(infoCol)
 
+                    val btnRow = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                    }
+
+                    val modelsBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                        text = "Models"
+                        textSize = 11f
+                        insetTop = 0
+                        insetBottom = 0
+                        setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
+                        setOnClickListener {
+                            ProviderProfileDialogs.showSearchableModelPickerDialog(
+                                context = ctx,
+                                scope = viewLifecycleOwner.lifecycleScope,
+                                providerId = p.id
+                            ) { selectedModel ->
+                                agents.setProvider(p.id)
+                                agents.setAgent(selectedModel)
+                                aiAgent.setProvider(p.id)
+                                aiAgent.reinitializeWithSelectedModel()
+                                showSnackbar("Selected model: $selectedModel on ${p.name}")
+                            }
+                        }
+                    }
+                    btnRow.addView(modelsBtn)
+
                     if (!acc.isActive) {
                         val makeActiveBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonTonalStyle).apply {
                             text = "Use"
@@ -716,11 +743,14 @@ class AIPreferencesFragment(
                             setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
                             setOnClickListener {
                                 registry.setActiveAccount(p.id, acc.id)
+                                agents.setProvider(p.id)
+                                aiAgent.setProvider(p.id)
+                                aiAgent.reinitializeWithSelectedModel()
                                 renderAccountCards()
                                 showSnackbar("Active account set to ${acc.email.ifBlank { acc.id.take(8) }}")
                             }
                         }
-                        accRow.addView(makeActiveBtn)
+                        btnRow.addView(makeActiveBtn)
                     }
 
                     val removeBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
@@ -730,15 +760,49 @@ class AIPreferencesFragment(
                         insetBottom = 0
                         setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
                         setOnClickListener {
-                            registry.removeAccount(acc.id)
-                            renderAccountCards()
-                            showSnackbar("Removed account")
+                            MaterialAlertDialogBuilder(ctx)
+                                .setTitle("Log Out / Remove Account")
+                                .setMessage("Are you sure you want to sign out and remove ${acc.email.ifBlank { acc.id.take(8) }} from ${p.name}?")
+                                .setPositiveButton("Log Out") { _, _ ->
+                                    registry.removeAccount(acc.id)
+                                    renderAccountCards()
+                                    showSnackbar("Removed account from ${p.name}")
+                                }
+                                .setNegativeButton("Cancel", null)
+                                .show()
                         }
                     }
-                    accRow.addView(removeBtn)
+                    btnRow.addView(removeBtn)
+                    accRow.addView(btnRow)
 
                     cardContent.addView(accRow)
                 }
+
+                val bottomActionRow = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.END
+                    setPadding(0, (8 * density).toInt(), 0, 0)
+                }
+
+                val selectModelsBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonTonalStyle).apply {
+                    text = "🔍 Select ${p.name} Models"
+                    textSize = 11.5f
+                    setOnClickListener {
+                        ProviderProfileDialogs.showSearchableModelPickerDialog(
+                            context = ctx,
+                            scope = viewLifecycleOwner.lifecycleScope,
+                            providerId = p.id
+                        ) { selectedModel ->
+                            agents.setProvider(p.id)
+                            agents.setAgent(selectedModel)
+                            aiAgent.setProvider(p.id)
+                            aiAgent.reinitializeWithSelectedModel()
+                            showSnackbar("Selected model: $selectedModel on ${p.name}")
+                        }
+                    }
+                }
+                bottomActionRow.addView(selectModelsBtn)
+                cardContent.addView(bottomActionRow)
             }
 
             card.addView(cardContent)

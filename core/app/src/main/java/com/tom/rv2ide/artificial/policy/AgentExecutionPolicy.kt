@@ -20,6 +20,13 @@ enum class AgentExecutionMode(
         description = "Autonomous multi-step coding, builds, and repair loops with transactional safety.",
         iconRes = R.drawable.ic_nav_ai_agent_badass
     ),
+    PLAN_MODE(
+        key = "plan_mode",
+        displayName = "Architect Plan Mode",
+        shortBadge = "📋 Plan",
+        description = "Read-only architectural analysis and step-by-step plan. No code modifications without approval.",
+        iconRes = R.drawable.ic_search
+    ),
     SIDE_AGENT(
         key = "side_agent",
         displayName = "Side Agent",

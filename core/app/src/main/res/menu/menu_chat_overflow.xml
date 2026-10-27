@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
+        android:id="@+id/action_plan_mode"
+        android:icon="@drawable/ic_search"
+        android:title="Toggle Plan Mode vs Act Mode" />
+    <item
+        android:id="@+id/action_rollback_edits"
+        android:icon="@drawable/ic_update"
+        android:title="↺ Rollback Last AI Edits (Checkpoints)" />
+    <item
+        android:id="@+id/action_project_rules"
+        android:icon="@drawable/ic_edit"
+        android:title="Project Rules (AGENTS.md)" />
+    <item
         android:id="@+id/action_compact_context"
         android:icon="@drawable/ic_clear"
         android:title="Compact Context Window (/compact)" />

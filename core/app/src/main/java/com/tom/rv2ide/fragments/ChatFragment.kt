@@ -1331,6 +1331,21 @@ class ChatFragment : Fragment() {
 
             when (menuItem.itemId) {
 
+                R.id.action_plan_mode -> {
+                    toggleAgentExecutionMode()
+                    true
+                }
+
+                R.id.action_rollback_edits -> {
+                    triggerLastSessionRollback()
+                    true
+                }
+
+                R.id.action_project_rules -> {
+                    showProjectRulesDialog()
+                    true
+                }
+
                 R.id.action_compact_context -> {
 
                     performManualContextCompaction()
@@ -1475,43 +1490,101 @@ class ChatFragment : Fragment() {
 
 
     private fun updateModeSwitcherButton(mode: com.tom.rv2ide.artificial.policy.AgentExecutionMode) {
-
         modeSwitcherChipBtn.text = mode.shortBadge
-
-        if (mode == com.tom.rv2ide.artificial.policy.AgentExecutionMode.AUTONOMOUS) {
-
-            modeSwitcherChipBtn.setIconResource(R.drawable.ic_nav_ai_agent_badass)
-
-        } else {
-
-            modeSwitcherChipBtn.setIconResource(R.drawable.ic_chat)
-
+        when (mode) {
+            com.tom.rv2ide.artificial.policy.AgentExecutionMode.AUTONOMOUS ->
+                modeSwitcherChipBtn.setIconResource(R.drawable.ic_nav_ai_agent_badass)
+            com.tom.rv2ide.artificial.policy.AgentExecutionMode.PLAN_MODE ->
+                modeSwitcherChipBtn.setIconResource(R.drawable.ic_search)
+            else ->
+                modeSwitcherChipBtn.setIconResource(R.drawable.ic_chat)
         }
-
     }
 
-
-
     private fun toggleAgentExecutionMode() {
-
         val current = com.tom.rv2ide.artificial.policy.AgentExecutionMode.getSavedMode(requireContext())
-
-        val next = if (current == com.tom.rv2ide.artificial.policy.AgentExecutionMode.AUTONOMOUS) {
-
-            com.tom.rv2ide.artificial.policy.AgentExecutionMode.SIDE_AGENT
-
-        } else {
-
-            com.tom.rv2ide.artificial.policy.AgentExecutionMode.AUTONOMOUS
-
+        val next = when (current) {
+            com.tom.rv2ide.artificial.policy.AgentExecutionMode.AUTONOMOUS ->
+                com.tom.rv2ide.artificial.policy.AgentExecutionMode.PLAN_MODE
+            com.tom.rv2ide.artificial.policy.AgentExecutionMode.PLAN_MODE ->
+                com.tom.rv2ide.artificial.policy.AgentExecutionMode.SIDE_AGENT
+            else ->
+                com.tom.rv2ide.artificial.policy.AgentExecutionMode.AUTONOMOUS
         }
 
         com.tom.rv2ide.artificial.policy.AgentExecutionMode.saveMode(requireContext(), next)
-
         updateModeSwitcherButton(next)
-
         showSnackbar("Mode: ${next.displayName} • ${next.description}")
+    }
 
+    private fun triggerLastSessionRollback() {
+        val messages = sessionManager.getActiveConversation().messages.reversed()
+        val candidate = messages.firstOrNull { msg ->
+            val rep = msg.completionReport
+            rep != null && !rep.rollbackSessionId.isNullOrBlank() && !rep.filesModified.isNullOrEmpty()
+        }
+        if (candidate == null) {
+            showSnackbar("No recent file modifications found to roll back.")
+            return
+        }
+        val rep = candidate.completionReport!!
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("↺ Rollback Last AI Changes")
+            .setMessage("Do you want to roll back modifications to ${rep.filesModified.size} file(s)?\n\n${rep.filesModified.joinToString("\n")}")
+            .setPositiveButton("Rollback") { _, _ ->
+                val projectRoot = com.tom.rv2ide.builder.SharedBuildOrchestrator.getActiveProjectDir()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val result = com.tom.rv2ide.artificial.coding.AutonomousRollbackManager.rollbackSession(
+                        sessionId = rep.rollbackSessionId!!,
+                        projectRootOverride = projectRoot
+                    )
+                    withContext(Dispatchers.Main) {
+                        if (!isAdded) return@withContext
+                        if (result.revertedCount > 0) {
+                            sessionManager.markSessionRolledBack(candidate.id)
+                            refreshCurrentEditor()
+                        }
+                        showSnackbar("Rollback complete: ${result.revertedCount} file(s) reverted.")
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showProjectRulesDialog() {
+        val projectRoot = com.tom.rv2ide.builder.SharedBuildOrchestrator.getActiveProjectDir()
+        if (projectRoot == null) {
+            showSnackbar("No active project opened.")
+            return
+        }
+        val rulesFile = java.io.File(projectRoot, "AGENTS.md")
+        val density = resources.displayMetrics.density
+        val input = EditText(requireContext()).apply {
+            textSize = 13f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setPadding((12 * density).toInt(), (8 * density).toInt(), (12 * density).toInt(), (8 * density).toInt())
+            if (rulesFile.exists()) {
+                setText(try { rulesFile.readText() } catch (_: Exception) { "" })
+            } else {
+                hint = "# Project Rules\nDefine coding guidelines, forbidden libraries, or formatting requirements here for the AI Agent..."
+            }
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Project Rules (AGENTS.md)")
+            .setMessage("The AI Agent automatically reads and adheres to AGENTS.md on every prompt.")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val text = input.text?.toString().orEmpty()
+                try {
+                    rulesFile.writeText(text)
+                    showSnackbar("Saved AGENTS.md (${text.lines().size} lines)")
+                } catch (e: Exception) {
+                    showSnackbar("Failed to save rules: ${e.message}")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
 
@@ -2509,8 +2582,13 @@ class ChatFragment : Fragment() {
                             if (connected.isNotBlank()) {
                                 agentsHelper.setProvider(connected)
                                 aiAgent.setProvider(connected)
+                                val p = registryManager.getProfile(connected)
+                                if (p != null && p.selectedModelId.isNotBlank()) {
+                                    agentsHelper.setAgent(p.selectedModelId)
+                                }
                                 aiAgent.reinitializeWithSelectedModel()
                                 updateVisionButtonState()
+                                updateReasoningEffortButton()
                                 refreshHeaderBar()
                                 showSnackbar("Switched to $connected")
                             }

@@ -306,8 +306,27 @@ class UniversalProviderAgent(
             val skillsBlock = com.tom.rv2ide.artificial.skills.SkillManager.getInstance(appContext)
                 .buildAvailableSkillsPromptBlock(currentProjectDir)
 
+            val projectRulesBlock = currentProjectDir?.let { dir ->
+                listOf("AGENTS.md", "PROJECT_RULES.md", ".agentrules", ".cursorrules")
+                    .map { java.io.File(dir, it) }
+                    .firstOrNull { it.exists() && it.isFile && it.length() > 0 }
+                    ?.let { file ->
+                        try {
+                            "\n# PROJECT CODING INSTRUCTIONS (${file.name}):\n" +
+                            "You must strictly adhere to the following project-specific guidelines, architecture patterns, and constraints:\n" +
+                            file.readText().take(12000)
+                        } catch (_: Exception) { null }
+                    }
+            }.orEmpty()
+
+            val planModePrompt = if (currentMode == com.tom.rv2ide.artificial.policy.AgentExecutionMode.PLAN_MODE) {
+                "\n[PLAN MODE ENFORCED]\nYou are operating in PLAN MODE. Provide a thorough, structured, step-by-step implementation plan. Detail exactly which files to create or modify, the logic, and dependencies. DO NOT write or edit code files directly until the user reviews and confirms."
+            } else ""
+
             val compositeSystemPrompt = buildString {
                 append(writingRules.useThis()).append("\n\n")
+                if (projectRulesBlock.isNotBlank()) append(projectRulesBlock).append("\n\n")
+                if (planModePrompt.isNotBlank()) append(planModePrompt).append("\n\n")
                 if (memoryBlock.isNotBlank()) append(memoryBlock).append("\n\n")
                 if (worldBookBlock.isNotBlank()) append(worldBookBlock).append("\n\n")
                 if (skillsBlock.isNotBlank()) append(skillsBlock).append("\n\n")

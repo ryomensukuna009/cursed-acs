@@ -171,6 +171,10 @@ class ModelCatalogManager private constructor(context: Context) {
     /**
      * Looks up capabilities from the catalog with intelligent pattern fallbacks.
      */
+    fun inferCapabilities(providerId: String?, rawModelId: String): ModelCapabilities {
+        return getCapabilities(rawModelId, providerId)
+    }
+
     fun getCapabilities(rawModelId: String, providerId: String? = null): ModelCapabilities {
         val normId = normalizeId(rawModelId)
         val bareId = if (normId.contains("/")) normId.substringAfterLast("/") else normId
@@ -207,17 +211,17 @@ class ModelCatalogManager private constructor(context: Context) {
     }
 
     private val KELIVO_VISION_REGEX = Regex(
-        """(gpt-4o|gpt-4\.1|gpt-5|gpt-6|o\d|gemini|claude|kimi-k2|kimi-k3|grok|muse-spark|doubao|step-3|intern-s1|minimax-m3|mimo-v2|sensenova|vision|-vl|omni|pixtral|llava|minicpm-v|internvl|phi-3-vision|phi-4-multimodal|qwen-vl|qwen2\.5-vl|qwen2-vl)""",
+        """(gpt-4o|gpt-4\.1|gpt-5|gpt-6|o\d|gemini|claude|kimi|grok|muse-spark|doubao|step-3|intern-s1|minimax-m3|mimo-v2|sensenova|vision|-vl|omni|pixtral|llava|minicpm-v|internvl|phi-3-vision|phi-4-multimodal|qwen-vl|qwen2\.5-vl|qwen2-vl)""",
         RegexOption.IGNORE_CASE
     )
 
     private val KELIVO_REASONING_REGEX = Regex(
-        """(gpt-oss|gpt-5|gpt-6|o\d|gemini-(?:2\.5|3|4)|gemini-(?:flash-latest|pro-latest)|gemini-3-pro|gemma[-_]?4|claude|qwen-?3|doubao|grok-4|kimi-k2|kimi-k3|muse-spark|step-3|intern-s1|glm-4|glm-5|minimax-(?:m2|m3)|deepseek-(?:r1|v3|v4|flash)|deepseek-reasoner|mimo-v2|qwq|thinking|reasoner)""",
+        """(gpt-oss|gpt-5|gpt-6|o\d|gemini-(?:2\.5|3|4)|gemini-(?:flash-latest|pro-latest)|gemini-3-pro|gemma[-_]?4|claude|qwen-?3|doubao|grok(?:-[2-4])?|grok-3-mini|kimi|muse-spark|step-3|intern-s1|glm-4|glm-5|minimax-(?:m2|m3)|deepseek-(?:r1|v3|v4|flash)|deepseek-reasoner|mimo-v2|qwq|thinking|reasoner)""",
         RegexOption.IGNORE_CASE
     )
 
     private val KELIVO_TOOL_REGEX = Regex(
-        """(gpt-4o|gpt-4\.1|gpt-oss|gpt-5|gpt-6|o\d|gemini|claude|qwen-?3|doubao|grok-4|kimi-k2|kimi-k3|muse-spark|step-3|intern-s1|glm-4|glm-5|minimax|deepseek|mimo-v2|sensenova)""",
+        """(gpt-4o|gpt-4\.1|gpt-oss|gpt-5|gpt-6|o\d|gemini|claude|qwen-?3|doubao|grok|kimi|muse-spark|step-3|intern-s1|glm-4|glm-5|minimax|deepseek|mimo-v2|sensenova)""",
         RegexOption.IGNORE_CASE
     )
 

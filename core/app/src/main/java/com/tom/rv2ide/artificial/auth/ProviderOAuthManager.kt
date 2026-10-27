@@ -58,7 +58,9 @@ object ProviderOAuthManager {
     private const val OPENAI_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
     private const val OPENAI_USER_CODE_URL = "https://auth.openai.com/api/accounts/deviceauth/usercode"
     private const val OPENAI_DEVICE_VERIFY_URL = "https://auth.openai.com/codex/device"
-    private const val OPENAI_TOKEN_URL = "https://auth.openai.com/api/accounts/deviceauth/token"
+    private const val OPENAI_DEVICE_TOKEN_URL = "https://auth.openai.com/api/accounts/deviceauth/token"
+    private const val OPENAI_OAUTH_TOKEN_URL = "https://auth.openai.com/oauth/token"
+    private const val OPENAI_TOKEN_URL = OPENAI_OAUTH_TOKEN_URL
 
     // Grok (xAI) device auth
     private const val GROK_CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828"
@@ -168,7 +170,10 @@ object ProviderOAuthManager {
         )
 
         accounts.forEach { acc ->
-            val hasKey = SecureKeyStore.hasProviderApiKey(context, acc.id)
+            val registry = OAuthAccountRegistry.getInstance(context)
+            val providerAccounts = registry.getAccounts(acc.id)
+            val hasKey = SecureKeyStore.hasProviderApiKey(context, acc.id) || providerAccounts.isNotEmpty()
+            val activeAcc = registry.getActiveAccount(acc.id)
 
             val card = MaterialCardView(context).apply {
                 radius = 12 * density
@@ -210,9 +215,13 @@ object ProviderOAuthManager {
             }
 
             val subTv = TextView(context).apply {
-                text = acc.subtitle
+                text = if (activeAcc != null) {
+                    "✓ Active: ${activeAcc.email} (${activeAcc.plan})"
+                } else {
+                    acc.subtitle
+                }
                 textSize = 11.5f
-                setTextColor(resolveAttr(context, com.google.android.material.R.attr.colorOnSurfaceVariant))
+                setTextColor(if (activeAcc != null) android.graphics.Color.parseColor("#10B981") else resolveAttr(context, com.google.android.material.R.attr.colorOnSurfaceVariant))
                 infoLayout.addView(this)
             }
 
@@ -220,7 +229,7 @@ object ProviderOAuthManager {
 
             val actionBtn = MaterialButton(context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
                 if (hasKey) {
-                    text = "✓ Connected"
+                    text = "Manage"
                     setTextColor(android.graphics.Color.parseColor("#10B981"))
                 } else {
                     text = "🔑 Sign In"
@@ -230,7 +239,48 @@ object ProviderOAuthManager {
                 insetBottom = 0
                 setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
                 setOnClickListener {
-                    acc.action()
+                    if (hasKey) {
+                        val actions = arrayOf(
+                            "Use ${acc.name} in Chat",
+                            "Select / Search Models",
+                            "+ Add Another Account",
+                            "Log Out / Remove Account"
+                        )
+                        MaterialAlertDialogBuilder(context)
+                            .setTitle("${acc.name} Account Options")
+                            .setItems(actions) { _, which ->
+                                when (which) {
+                                    0 -> {
+                                        onAccountConnected(acc.id)
+                                        hubDialog?.dismiss()
+                                    }
+                                    1 -> {
+                                        com.tom.rv2ide.artificial.dialogs.ProviderProfileDialogs.showSearchableModelPickerDialog(
+                                            context = context,
+                                            scope = scope,
+                                            providerId = acc.id
+                                        ) { _ ->
+                                            onAccountConnected(acc.id)
+                                            hubDialog?.dismiss()
+                                        }
+                                    }
+                                    2 -> acc.action()
+                                    3 -> {
+                                        if (activeAcc != null) {
+                                            registry.removeAccount(activeAcc.id)
+                                        } else {
+                                            SecureKeyStore.clearProviderApiKey(acc.id)
+                                        }
+                                        Toast.makeText(context, "Logged out from ${acc.name}", Toast.LENGTH_SHORT).show()
+                                        hubDialog?.dismiss()
+                                        showOAuthAccountsHubDialog(context, scope, onAccountConnected)
+                                    }
+                                }
+                            }
+                            .show()
+                    } else {
+                        acc.action()
+                    }
                 }
                 cardContent.addView(this)
             }
@@ -433,7 +483,7 @@ object ProviderOAuthManager {
                     statusTv.text = "Exchanging authorization token with OpenAI..."
                 }
 
-                // Step 2: Exchange authorization_code with token endpoint
+                // Step 2: Exchange authorization_code with OAuth token endpoint
                 val exchangeForm = FormBody.Builder()
                     .add("grant_type", "authorization_code")
                     .add("client_id", OPENAI_CLIENT_ID)
@@ -442,16 +492,39 @@ object ProviderOAuthManager {
                     .add("redirect_uri", redirectUri)
                     .build()
 
-                val exchangeReq = Request.Builder()
-                    .url(OPENAI_TOKEN_URL)
+                var exchangeReq = Request.Builder()
+                    .url(OPENAI_OAUTH_TOKEN_URL)
                     .header("Accept", "application/json")
                     .header("originator", "kelivo")
                     .header("User-Agent", "Kelivo")
                     .post(exchangeForm)
                     .build()
 
-                val exchangeResp = httpClient.newCall(exchangeReq).execute()
-                val exchangeBody = exchangeResp.body?.string().orEmpty()
+                var exchangeResp = httpClient.newCall(exchangeReq).execute()
+                var exchangeBody = exchangeResp.body?.string().orEmpty()
+
+                // If form payload returned HTTP 400 with dictionary / schema error, retry with application/json
+                if (!exchangeResp.isSuccessful && (exchangeResp.code == 400 || exchangeBody.contains("dictionary"))) {
+                    val jsonPayload = JSONObject().apply {
+                        put("grant_type", "authorization_code")
+                        put("client_id", OPENAI_CLIENT_ID)
+                        put("code", receivedCode)
+                        put("code_verifier", verifier)
+                        put("redirect_uri", redirectUri)
+                    }.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+
+                    exchangeReq = Request.Builder()
+                        .url(OPENAI_OAUTH_TOKEN_URL)
+                        .header("Accept", "application/json")
+                        .header("Content-Type", "application/json")
+                        .header("originator", "kelivo")
+                        .header("User-Agent", "Kelivo")
+                        .post(jsonPayload)
+                        .build()
+
+                    exchangeResp = httpClient.newCall(exchangeReq).execute()
+                    exchangeBody = exchangeResp.body?.string().orEmpty()
+                }
 
                 if (!exchangeResp.isSuccessful) {
                     withContext(Dispatchers.Main) {
@@ -488,6 +561,13 @@ object ProviderOAuthManager {
                     )
                     OAuthAccountRegistry.getInstance(context).saveAccount(account)
                     OAuthAccountRegistry.getInstance(context).setActiveAccount("openai", account.id)
+
+                    val reg = ProviderRegistryManager.getInstance(context)
+                    val openAiProf = reg.getProfile("openai")
+                    if (openAiProf != null && !openAiProf.enabled) {
+                        reg.saveProfile(openAiProf.copy(enabled = true))
+                    }
+
                     fetchAndRegisterCodexModels(context, acquiredToken)
                     Toast.makeText(context, "✅ Signed in to OpenAI successfully! (${account.email})", Toast.LENGTH_LONG).show()
                     dialog.dismiss()
@@ -662,6 +742,7 @@ object ProviderOAuthManager {
                 }
 
                 var acquiredToken: String? = null
+                var acquiredRefreshToken: String? = null
                 for (poll in 0 until 120) {
                     delay(intervalSec * 1000L)
                     val pollForm = FormBody.Builder()
@@ -685,6 +766,7 @@ object ProviderOAuthManager {
                     if (tokenResp.isSuccessful) {
                         val tokenJson = JSONObject(tokenBody)
                         val accessToken = tokenJson.optString("access_token")
+                        acquiredRefreshToken = tokenJson.optString("refresh_token")
                         if (accessToken.isNotBlank()) {
                             acquiredToken = accessToken
                             break
@@ -692,11 +774,57 @@ object ProviderOAuthManager {
                     }
                 }
 
+                var userEmail = ""
+                var accountSub = ""
+                if (acquiredToken != null) {
+                    try {
+                        val userReq = Request.Builder()
+                            .url("https://auth.x.ai/oauth2/userinfo")
+                            .header("Authorization", "Bearer $acquiredToken")
+                            .header("X-XAI-Token-Auth", "xai-grok-cli")
+                            .get()
+                            .build()
+                        val userResp = httpClient.newCall(userReq).execute()
+                        val uBody = userResp.body?.string().orEmpty()
+                        if (userResp.isSuccessful && uBody.isNotBlank()) {
+                            val uJson = JSONObject(uBody)
+                            userEmail = uJson.optString("email")
+                            accountSub = uJson.optString("sub")
+                        }
+                    } catch (_: Exception) {}
+                    if (userEmail.isBlank()) {
+                        val (jwtEmail, _) = extractJwtProfile(acquiredToken)
+                        userEmail = jwtEmail
+                    }
+                }
+
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     if (acquiredToken != null) {
                         SecureKeyStore.putProviderApiKey(context, "grok", acquiredToken)
-                        Toast.makeText(context, "✅ Signed in to Grok successfully!", Toast.LENGTH_LONG).show()
+                        SecureKeyStore.putProviderApiKey(context, "xai", acquiredToken)
+
+                        val account = OAuthAccount(
+                            provider = "grok",
+                            email = userEmail.ifBlank { "Grok User" + if (accountSub.isNotBlank()) " (${accountSub.take(6)})" else "" },
+                            plan = "SuperGrok / Pro",
+                            accessToken = acquiredToken,
+                            refreshToken = acquiredRefreshToken.orEmpty(),
+                            expiresAt = System.currentTimeMillis() + 86400_000L * 30,
+                            isActive = true,
+                            accountId = accountSub.takeIf { it.isNotBlank() }
+                        )
+                        OAuthAccountRegistry.getInstance(context).saveAccount(account)
+                        OAuthAccountRegistry.getInstance(context).setActiveAccount("grok", account.id)
+
+                        val reg = ProviderRegistryManager.getInstance(context)
+                        val grokProfile = reg.getProfile("grok")
+                        if (grokProfile != null) {
+                            reg.saveProfile(grokProfile.copy(enabled = true, selectedModelId = "grok-2-latest"))
+                        }
+
+                        fetchAndRegisterGrokModels(context, acquiredToken)
+                        Toast.makeText(context, "✅ Signed in to Grok successfully! (${account.email})", Toast.LENGTH_LONG).show()
                         dialog.dismiss()
                         onSuccess(acquiredToken)
                     } else {
@@ -907,7 +1035,27 @@ object ProviderOAuthManager {
                     progressBar.visibility = View.GONE
                     if (acquiredToken != null) {
                         SecureKeyStore.putProviderApiKey(context, "kimi", acquiredToken)
-                        Toast.makeText(context, "✅ Signed in to Kimi Code successfully!", Toast.LENGTH_LONG).show()
+                        SecureKeyStore.putProviderApiKey(context, "moonshot", acquiredToken)
+
+                        val account = OAuthAccount(
+                            provider = "kimi",
+                            email = "Kimi User (${deviceId.take(6)})",
+                            plan = "Kimi Code Pro",
+                            accessToken = acquiredToken,
+                            expiresAt = System.currentTimeMillis() + 86400_000L * 30,
+                            isActive = true
+                        )
+                        OAuthAccountRegistry.getInstance(context).saveAccount(account)
+                        OAuthAccountRegistry.getInstance(context).setActiveAccount("kimi", account.id)
+
+                        val reg = ProviderRegistryManager.getInstance(context)
+                        val kimiProf = reg.getProfile("kimi")
+                        if (kimiProf != null) {
+                            reg.saveProfile(kimiProf.copy(enabled = true, selectedModelId = "moonshot-v1-8k"))
+                        }
+
+                        fetchAndRegisterKimiModels(context, acquiredToken)
+                        Toast.makeText(context, "✅ Signed in to Kimi Code successfully! (${account.email})", Toast.LENGTH_LONG).show()
                         dialog.dismiss()
                         onSuccess(acquiredToken)
                     } else {
@@ -975,6 +1123,25 @@ object ProviderOAuthManager {
                 if (key.isNotEmpty()) {
                     SecureKeyStore.putProviderApiKey(context, "claude", key)
                     SecureKeyStore.putProviderApiKey(context, "anthropic", key)
+
+                    val account = OAuthAccount(
+                        provider = "claude",
+                        email = "Claude Account (${key.take(8)}...)",
+                        plan = "Anthropic Pro / Console",
+                        accessToken = key,
+                        expiresAt = System.currentTimeMillis() + 86400_000L * 30,
+                        isActive = true
+                    )
+                    OAuthAccountRegistry.getInstance(context).saveAccount(account)
+                    OAuthAccountRegistry.getInstance(context).setActiveAccount("claude", account.id)
+
+                    val reg = ProviderRegistryManager.getInstance(context)
+                    val prof = reg.getProfile("anthropic")
+                    if (prof != null) {
+                        reg.saveProfile(prof.copy(enabled = true, selectedModelId = "claude-3-5-sonnet-20241022"))
+                    }
+
+                    fetchAndRegisterClaudeModels(context, key)
                     Toast.makeText(context, "✅ Claude connected successfully!", Toast.LENGTH_SHORT).show()
                     onSuccess(key)
                 }
@@ -1033,6 +1200,26 @@ object ProviderOAuthManager {
                 val key = input.text?.toString()?.trim().orEmpty()
                 if (key.isNotEmpty()) {
                     SecureKeyStore.putProviderApiKey(context, "gemini", key)
+                    SecureKeyStore.putProviderApiKey(context, "google", key)
+
+                    val account = OAuthAccount(
+                        provider = "gemini",
+                        email = "Google AI Studio (${key.take(8)}...)",
+                        plan = "Gemini Flash / Pro",
+                        accessToken = key,
+                        expiresAt = System.currentTimeMillis() + 86400_000L * 30,
+                        isActive = true
+                    )
+                    OAuthAccountRegistry.getInstance(context).saveAccount(account)
+                    OAuthAccountRegistry.getInstance(context).setActiveAccount("gemini", account.id)
+
+                    val reg = ProviderRegistryManager.getInstance(context)
+                    val prof = reg.getProfile("gemini") ?: reg.getProfile("gemini_native")
+                    if (prof != null) {
+                        reg.saveProfile(prof.copy(enabled = true, selectedModelId = "gemini-2.0-flash"))
+                    }
+
+                    fetchAndRegisterGeminiModels(context, key)
                     Toast.makeText(context, "✅ Google Gemini connected successfully!", Toast.LENGTH_SHORT).show()
                     onSuccess(key)
                 }
@@ -1067,8 +1254,11 @@ object ProviderOAuthManager {
         return Pair("", "")
     }
 
-    private fun fetchAndRegisterCodexModels(context: Context, token: String) {
+    fun fetchAndRegisterCodexModels(context: Context, token: String) {
         CoroutineScope(Dispatchers.IO).launch {
+            val modelsFound = mutableListOf<com.tom.rv2ide.artificial.providers.DiscoveredModel>()
+            val catalog = ModelCatalogManager.getInstance(context)
+
             try {
                 val req = Request.Builder()
                     .url("https://chatgpt.com/backend-api/codex/models")
@@ -1083,18 +1273,347 @@ object ProviderOAuthManager {
                     val json = JSONObject(body)
                     val data = json.optJSONArray("data") ?: json.optJSONArray("models")
                     if (data != null) {
-                        val catalog = ModelCatalogManager.getInstance(context)
                         for (i in 0 until data.length()) {
                             val m = data.getJSONObject(i)
                             val id = m.optString("id").ifBlank { m.optString("slug") }
                             val name = m.optString("name", id)
                             if (id.isNotBlank()) {
                                 catalog.registerModel("openai", id, name)
+                                val caps = catalog.inferCapabilities("openai", id)
+                                modelsFound.add(
+                                    com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                                        providerId = "openai",
+                                        id = id,
+                                        displayName = name,
+                                        capabilities = caps,
+                                        discoveredAtMs = System.currentTimeMillis()
+                                    )
+                                )
                             }
                         }
                     }
                 }
             } catch (_: Exception) {}
+
+            if (modelsFound.isEmpty()) {
+                val defaults = listOf(
+                    "gpt-4o" to "GPT-4o (Omni Multimodal & Vision)",
+                    "chatgpt-4o-latest" to "ChatGPT-4o Latest",
+                    "o1" to "OpenAI o1 (Advanced Reasoning)",
+                    "o3-mini" to "OpenAI o3-mini (High-Speed Reasoning)",
+                    "gpt-4o-mini" to "GPT-4o Mini",
+                    "gpt-4-turbo" to "GPT-4 Turbo"
+                )
+                for ((id, name) in defaults) {
+                    catalog.registerModel("openai", id, name)
+                    val caps = catalog.inferCapabilities("openai", id)
+                    modelsFound.add(
+                        com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                            providerId = "openai",
+                            id = id,
+                            displayName = name,
+                            capabilities = caps,
+                            discoveredAtMs = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+
+            val distinct = modelsFound.distinctBy { it.id }
+            val reg = ProviderRegistryManager.getInstance(context)
+            reg.cacheDiscoveredModels("openai", distinct)
+        }
+    }
+
+    fun fetchAndRegisterGrokModels(context: Context, token: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val modelsFound = mutableListOf<com.tom.rv2ide.artificial.providers.DiscoveredModel>()
+            val catalog = ModelCatalogManager.getInstance(context)
+
+            val urls = listOf(
+                "https://cli-chat-proxy.grok.com/v1/models-v2",
+                "https://api.x.ai/v1/models"
+            )
+            for (url in urls) {
+                try {
+                    val req = Request.Builder()
+                        .url(url)
+                        .header("Authorization", "Bearer $token")
+                        .header("X-XAI-Token-Auth", "xai-grok-cli")
+                        .get()
+                        .build()
+                    val resp = httpClient.newCall(req).execute()
+                    val body = resp.body?.string().orEmpty()
+                    if (resp.isSuccessful && body.isNotBlank()) {
+                        val json = JSONObject(body)
+                        val data = json.optJSONArray("data") ?: json.optJSONArray("models")
+                        if (data != null) {
+                            for (i in 0 until data.length()) {
+                                val item = data.optJSONObject(i) ?: continue
+                                val meta = item.optJSONObject("_meta")
+                                val id = item.optString("model").ifBlank {
+                                    item.optString("modelId").ifBlank {
+                                        item.optString("id").ifBlank {
+                                            meta?.optString("model").orEmpty()
+                                        }
+                                    }
+                                }
+                                if (id.isBlank() || item.optBoolean("hidden", false)) continue
+                                val name = item.optString("name", id)
+                                catalog.registerModel("grok", id, name)
+                                val caps = catalog.inferCapabilities("grok", id)
+                                modelsFound.add(
+                                    com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                                        providerId = "grok",
+                                        id = id,
+                                        displayName = name,
+                                        capabilities = caps,
+                                        discoveredAtMs = System.currentTimeMillis()
+                                    )
+                                )
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            if (modelsFound.isEmpty()) {
+                val defaults = listOf(
+                    "grok-3" to "Grok 3 (Deep Thinking & Multimodal)",
+                    "grok-3-mini" to "Grok 3 Mini (Fast & Reasoning)",
+                    "grok-2-latest" to "Grok 2 Latest (Vision & Tools)",
+                    "grok-2" to "Grok 2",
+                    "grok-vision-beta" to "Grok Vision Beta",
+                    "grok-beta" to "Grok Beta"
+                )
+                for ((id, name) in defaults) {
+                    catalog.registerModel("grok", id, name)
+                    val caps = catalog.inferCapabilities("grok", id)
+                    modelsFound.add(
+                        com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                            providerId = "grok",
+                            id = id,
+                            displayName = name,
+                            capabilities = caps,
+                            discoveredAtMs = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+
+            val distinct = modelsFound.distinctBy { it.id }
+            val reg = ProviderRegistryManager.getInstance(context)
+            reg.cacheDiscoveredModels("grok", distinct)
+        }
+    }
+
+    fun fetchAndRegisterKimiModels(context: Context, token: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val modelsFound = mutableListOf<com.tom.rv2ide.artificial.providers.DiscoveredModel>()
+            val catalog = ModelCatalogManager.getInstance(context)
+
+            val urls = listOf("https://api.kimi.com/coding/v1/models", "https://api.moonshot.cn/v1/models")
+            for (url in urls) {
+                try {
+                    val req = Request.Builder()
+                        .url(url)
+                        .header("Authorization", "Bearer $token")
+                        .header("User-Agent", "KimiCLI/1.0")
+                        .get()
+                        .build()
+                    val resp = httpClient.newCall(req).execute()
+                    val body = resp.body?.string().orEmpty()
+                    if (resp.isSuccessful && body.isNotBlank()) {
+                        val json = JSONObject(body)
+                        val data = json.optJSONArray("data")
+                        if (data != null) {
+                            for (i in 0 until data.length()) {
+                                val item = data.optJSONObject(i) ?: continue
+                                val id = item.optString("id")
+                                if (id.isBlank()) continue
+                                val name = item.optString("name", id)
+                                catalog.registerModel("kimi", id, name)
+                                val caps = catalog.inferCapabilities("kimi", id)
+                                modelsFound.add(
+                                    com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                                        providerId = "kimi",
+                                        id = id,
+                                        displayName = name,
+                                        capabilities = caps,
+                                        discoveredAtMs = System.currentTimeMillis()
+                                    )
+                                )
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            if (modelsFound.isEmpty()) {
+                val defaults = listOf(
+                    "moonshot-v1-8k" to "Moonshot v1 8K (Coding)",
+                    "moonshot-v1-32k" to "Moonshot v1 32K (Large Context)",
+                    "moonshot-v1-128k" to "Moonshot v1 128K (Massive Context)",
+                    "kimi-latest" to "Kimi Latest"
+                )
+                for ((id, name) in defaults) {
+                    catalog.registerModel("kimi", id, name)
+                    val caps = catalog.inferCapabilities("kimi", id)
+                    modelsFound.add(
+                        com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                            providerId = "kimi",
+                            id = id,
+                            displayName = name,
+                            capabilities = caps,
+                            discoveredAtMs = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+
+            val distinct = modelsFound.distinctBy { it.id }
+            val reg = ProviderRegistryManager.getInstance(context)
+            reg.cacheDiscoveredModels("kimi", distinct)
+        }
+    }
+
+    fun fetchAndRegisterClaudeModels(context: Context, key: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val modelsFound = mutableListOf<com.tom.rv2ide.artificial.providers.DiscoveredModel>()
+            val catalog = ModelCatalogManager.getInstance(context)
+
+            try {
+                val req = Request.Builder()
+                    .url("https://api.anthropic.com/v1/models")
+                    .header("x-api-key", key)
+                    .header("anthropic-version", "2023-06-01")
+                    .get()
+                    .build()
+                val resp = httpClient.newCall(req).execute()
+                val body = resp.body?.string().orEmpty()
+                if (resp.isSuccessful && body.isNotBlank()) {
+                    val json = JSONObject(body)
+                    val data = json.optJSONArray("data")
+                    if (data != null) {
+                        for (i in 0 until data.length()) {
+                            val item = data.optJSONObject(i) ?: continue
+                            val id = item.optString("id")
+                            if (id.isBlank()) continue
+                            val name = item.optString("display_name", id)
+                            catalog.registerModel("claude", id, name)
+                            catalog.registerModel("anthropic", id, name)
+                            val caps = catalog.inferCapabilities("anthropic", id)
+                            modelsFound.add(
+                                com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                                    providerId = "anthropic",
+                                    id = id,
+                                    displayName = name,
+                                    capabilities = caps,
+                                    discoveredAtMs = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            if (modelsFound.isEmpty()) {
+                val defaults = listOf(
+                    "claude-3-7-sonnet-20250219" to "Claude 3.7 Sonnet (Hybrid Thinking & Vision)",
+                    "claude-3-5-sonnet-20241022" to "Claude 3.5 Sonnet (State of the Art)",
+                    "claude-3-5-haiku-20241022" to "Claude 3.5 Haiku (Lightning Fast)",
+                    "claude-3-opus-20240229" to "Claude 3 Opus"
+                )
+                for ((id, name) in defaults) {
+                    catalog.registerModel("claude", id, name)
+                    catalog.registerModel("anthropic", id, name)
+                    val caps = catalog.inferCapabilities("anthropic", id)
+                    modelsFound.add(
+                        com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                            providerId = "anthropic",
+                            id = id,
+                            displayName = name,
+                            capabilities = caps,
+                            discoveredAtMs = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+
+            val distinct = modelsFound.distinctBy { it.id }
+            val reg = ProviderRegistryManager.getInstance(context)
+            reg.cacheDiscoveredModels("anthropic", distinct)
+            reg.cacheDiscoveredModels("claude", distinct)
+        }
+    }
+
+    fun fetchAndRegisterGeminiModels(context: Context, key: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val modelsFound = mutableListOf<com.tom.rv2ide.artificial.providers.DiscoveredModel>()
+            val catalog = ModelCatalogManager.getInstance(context)
+
+            try {
+                val req = Request.Builder()
+                    .url("https://generativelanguage.googleapis.com/v1beta/models?key=$key")
+                    .get()
+                    .build()
+                val resp = httpClient.newCall(req).execute()
+                val body = resp.body?.string().orEmpty()
+                if (resp.isSuccessful && body.isNotBlank()) {
+                    val json = JSONObject(body)
+                    val data = json.optJSONArray("models")
+                    if (data != null) {
+                        for (i in 0 until data.length()) {
+                            val item = data.optJSONObject(i) ?: continue
+                            val rawName = item.optString("name")
+                            val id = if (rawName.startsWith("models/")) rawName.removePrefix("models/") else rawName
+                            if (id.isBlank() || !id.contains("gemini")) continue
+                            val displayName = item.optString("displayName", id)
+                            catalog.registerModel("gemini", id, displayName)
+                            catalog.registerModel("gemini_native", id, displayName)
+                            catalog.registerModel("gemini_openai", id, displayName)
+                            val caps = catalog.inferCapabilities("gemini", id)
+                            modelsFound.add(
+                                com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                                    providerId = "gemini",
+                                    id = id,
+                                    displayName = displayName,
+                                    capabilities = caps,
+                                    discoveredAtMs = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            if (modelsFound.isEmpty()) {
+                val defaults = listOf(
+                    "gemini-2.0-flash" to "Gemini 2.0 Flash (Next-Gen Multimodal)",
+                    "gemini-2.0-flash-thinking-exp-01-21" to "Gemini 2.0 Flash Thinking",
+                    "gemini-1.5-pro" to "Gemini 1.5 Pro (1M Context)",
+                    "gemini-1.5-flash" to "Gemini 1.5 Flash (Fast)"
+                )
+                for ((id, name) in defaults) {
+                    catalog.registerModel("gemini", id, name)
+                    val caps = catalog.inferCapabilities("gemini", id)
+                    modelsFound.add(
+                        com.tom.rv2ide.artificial.providers.DiscoveredModel(
+                            providerId = "gemini",
+                            id = id,
+                            displayName = name,
+                            capabilities = caps,
+                            discoveredAtMs = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+
+            val distinct = modelsFound.distinctBy { it.id }
+            val reg = ProviderRegistryManager.getInstance(context)
+            reg.cacheDiscoveredModels("gemini", distinct)
+            reg.cacheDiscoveredModels("gemini_native", distinct)
+            reg.cacheDiscoveredModels("gemini_openai", distinct)
         }
     }
 }

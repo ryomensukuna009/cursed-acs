@@ -163,6 +163,18 @@ object ProviderTemplates {
         isPresetTemplate = true
     )
 
+    fun defaultKimi(): ProviderProfile = ProviderProfile(
+        id = "kimi",
+        displayName = "Moonshot Kimi",
+        protocol = ApiProtocol.OPENAI_COMPATIBLE,
+        baseUrl = "https://api.moonshot.cn/v1",
+        authStyle = AuthStyle.BEARER_HEADER,
+        modelsEndpointPath = "/models",
+        chatEndpointPath = "/chat/completions",
+        selectedModelId = "moonshot-v1-8k",
+        isPresetTemplate = true
+    )
+
     fun defaultLocalLLM(
         savedBaseUrl: String? = null,
         savedModelName: String? = null
@@ -269,6 +281,7 @@ object ProviderTemplates {
         defaultMistral(),
         defaultTogether(),
         defaultGrok(),
+        defaultKimi(),
         defaultOllama(),
         defaultLocalLLM(legacyLocalBaseUrl, legacyLocalModel)
     )
