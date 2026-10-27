@@ -64,6 +64,14 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAccountsHub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="🔑 Connected Accounts (ChatGPT, Claude, Grok, Kimi)"
+            style="@style/Widget.Material3.Button.TonalButton" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

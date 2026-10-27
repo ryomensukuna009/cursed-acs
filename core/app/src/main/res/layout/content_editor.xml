@@ -37,6 +37,7 @@
           android:layout_height="wrap_content"
           app:wavelength="20dp"
           app:waveAmplitude="1dp"
+          android:visibility="gone"
           android:indeterminate="true" />
 
         <com.google.android.material.tabs.TabLayout

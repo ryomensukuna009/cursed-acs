@@ -3543,90 +3543,42 @@ class ChatMessageAdapter(
 
 
             }
-
-
-
-
-
-
+            var isReportExpanded = false
+            val detailsTv = TextView(ctx).apply {
+                text = report.formatSummaryText()
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
+                setTextColor(textFgColor)
+                visibility = View.GONE
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dp(ctx, 4)
+                }
+            }
 
             val titleTv = TextView(ctx).apply {
-
-
-
-                text = titleText
-
-
-
+                text = "▶ " + titleText + " [Tap to view details]"
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-
-
-
                 setTextColor(borderColor)
-
-
-
                 setTypeface(typeface, Typeface.BOLD)
-
-
-
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    isReportExpanded = !isReportExpanded
+                    if (isReportExpanded) {
+                        text = "▼ " + titleText + " [Tap to collapse]"
+                        detailsTv.visibility = View.VISIBLE
+                    } else {
+                        text = "▶ " + titleText + " [Tap to view details]"
+                        detailsTv.visibility = View.GONE
+                    }
+                }
             }
-
-
 
             box.addView(titleTv)
-
-
-
-
-
-
-
-            val detailsTv = TextView(ctx).apply {
-
-
-
-                text = report.formatSummaryText()
-
-
-
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
-
-
-
-                setTextColor(textFgColor)
-
-
-
-                layoutParams = LinearLayout.LayoutParams(
-
-
-
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-
-
-
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-
-
-
-                ).apply {
-
-
-
-                    topMargin = dp(ctx, 4)
-
-
-
-                }
-
-
-
-            }
-
-
-
             box.addView(detailsTv)
+
 
 
 

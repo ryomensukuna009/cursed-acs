@@ -354,7 +354,9 @@ class ProviderRegistryManager(
         val cached = getCachedModels(providerId).firstOrNull { it.id == modelId }?.capabilities
         val baseCaps = cached ?: catalogCaps
 
-        val effectiveVision = if (baseCaps.supportsVision != TriStateCapability.UNKNOWN) {
+        val effectiveVision = if (catalogCaps.supportsVision == TriStateCapability.SUPPORTED || baseCaps.supportsVision == TriStateCapability.SUPPORTED) {
+            TriStateCapability.SUPPORTED
+        } else if (baseCaps.supportsVision != TriStateCapability.UNKNOWN) {
             baseCaps.supportsVision
         } else {
             catalogCaps.supportsVision
@@ -362,13 +364,17 @@ class ProviderRegistryManager(
 
         val effectiveTools = if (profile?.userOverrideToolCalling != null && profile.userOverrideToolCalling != TriStateCapability.UNKNOWN) {
             profile.userOverrideToolCalling
+        } else if (catalogCaps.supportsToolCalling == TriStateCapability.SUPPORTED || baseCaps.supportsToolCalling == TriStateCapability.SUPPORTED) {
+            TriStateCapability.SUPPORTED
         } else if (baseCaps.supportsToolCalling != TriStateCapability.UNKNOWN) {
             baseCaps.supportsToolCalling
         } else {
             catalogCaps.supportsToolCalling
         }
 
-        val effectiveThinking = if (baseCaps.supportsThinking != TriStateCapability.UNKNOWN) {
+        val effectiveThinking = if (catalogCaps.supportsThinking == TriStateCapability.SUPPORTED || baseCaps.supportsThinking == TriStateCapability.SUPPORTED) {
+            TriStateCapability.SUPPORTED
+        } else if (baseCaps.supportsThinking != TriStateCapability.UNKNOWN) {
             baseCaps.supportsThinking
         } else {
             catalogCaps.supportsThinking

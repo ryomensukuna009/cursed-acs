@@ -1401,6 +1401,8 @@ override fun onApplySystemBarInsets(insets: Insets) {
 
   fun hideProgressIndicator() {
     runOnUiThread {
+      editorViewModel.isBuildInProgress = false
+      editorViewModel.isInitializing = false
       content.progressIndicator.hide()
       content.progressIndicator.visibility = View.GONE
     }

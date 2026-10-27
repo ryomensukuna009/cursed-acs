@@ -123,6 +123,8 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
 
     GeneralPreferences.isFirstBuild = false
     activity.editorViewModel.isBuildInProgress = false
+    activity.editorViewModel.isInitializing = false
+    activity.hideProgressIndicator()
 
     activity.flashSuccess(R.string.build_status_sucess)
   }
@@ -148,6 +150,8 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
 
     GeneralPreferences.isFirstBuild = false
     activity.editorViewModel.isBuildInProgress = false
+    activity.editorViewModel.isInitializing = false
+    activity.hideProgressIndicator()
 
     activity.flashError(R.string.build_status_failed)
   }

@@ -219,6 +219,12 @@ class ChatFragment : Fragment() {
     private lateinit var statusText: MaterialTextView
 
     private lateinit var summaryText: MaterialTextView
+    private var btnComposerModel: com.google.android.material.button.MaterialButton? = null
+    private var btnComposerWebSearch: com.google.android.material.button.MaterialButton? = null
+    private var btnComposerReasoning: com.google.android.material.button.MaterialButton? = null
+    private var btnComposerAttach: com.google.android.material.button.MaterialButton? = null
+    private var btnComposerAccounts: com.google.android.material.button.MaterialButton? = null
+    private var btnComposerSend: com.google.android.material.button.MaterialButton? = null
 
     private lateinit var progressIndicator: CircularProgressIndicator
 
@@ -612,6 +618,12 @@ class ChatFragment : Fragment() {
 
         btnApprovalMode = view.findViewById(R.id.btnApprovalMode)
         btnReasoningEffort = view.findViewById(R.id.btnReasoningEffort)
+        btnComposerModel = view.findViewById(R.id.btnComposerModel)
+        btnComposerWebSearch = view.findViewById(R.id.btnComposerWebSearch)
+        btnComposerReasoning = view.findViewById(R.id.btnComposerReasoning)
+        btnComposerAttach = view.findViewById(R.id.btnComposerAttach)
+        btnComposerAccounts = view.findViewById(R.id.btnComposerAccounts)
+        btnComposerSend = view.findViewById(R.id.btnComposerSend)
 
         toolStatusBanner = view.findViewById(R.id.toolStatusBanner)
 
@@ -1187,6 +1199,52 @@ class ChatFragment : Fragment() {
 
 
 
+        btnComposerModel?.setOnClickListener {
+            showQuickProviderModelMenu()
+        }
+        btnComposerWebSearch?.setOnClickListener {
+            webSearchToggleBtn.performClick()
+        }
+        btnComposerWebSearch?.setOnLongClickListener {
+            webSearchToggleBtn.performLongClick()
+        }
+        btnComposerReasoning?.setOnClickListener {
+            showReasoningEffortDialog()
+        }
+        btnComposerAttach?.setOnClickListener {
+            if (checkCurrentModelSupportsVision()) {
+                pickImageLauncher.launch("image/*")
+            } else {
+                showSnackbar("Selected model (${agentsHelper.getAgent()}) does not support vision / images")
+            }
+        }
+        btnComposerAccounts?.setOnClickListener {
+            com.tom.rv2ide.artificial.auth.ProviderOAuthManager.showOAuthAccountsHubDialog(
+                requireContext(),
+                viewLifecycleOwner.lifecycleScope
+            ) { connected ->
+                aiAgent.refreshRegisteredProfiles()
+                if (connected.isNotBlank()) {
+                    agentsHelper.setProvider(connected)
+                    aiAgent.setProvider(connected)
+                    aiAgent.reinitializeWithSelectedModel()
+                    updateVisionButtonState()
+                    refreshHeaderBar()
+                    showSnackbar("Switched to $connected")
+                }
+            }
+        }
+        btnComposerSend?.setOnClickListener {
+            if (aiRequestHandler.isGenerating()) {
+                aiRequestHandler.cancel()
+                com.tom.rv2ide.artificial.policy.ActionPolicyGate.cancelHold()
+                updateStopButtonState(false)
+                showSnackbar("Stopped generation")
+            } else {
+                executeBtn.performClick()
+            }
+        }
+
         promptLayout.setEndIconOnClickListener {
 
             if (aiRequestHandler.isGenerating()) {
@@ -1568,11 +1626,8 @@ class ChatFragment : Fragment() {
             if (caps.supportsVision == com.tom.rv2ide.artificial.providers.TriStateCapability.SUPPORTED) {
                 return true
             }
-            if (caps.supportsVision == com.tom.rv2ide.artificial.providers.TriStateCapability.UNSUPPORTED) {
-                return false
-            }
             val norm = rawModel.lowercase()
-            val visionKeywords = listOf("gemini", "gpt-4o", "gpt-4-turbo", "vision", "-vl", "claude-3", "omni", "multimodal", "pixtral", "llava", "qwen-vl")
+            val visionKeywords = listOf("gemini", "gpt-4o", "gpt-4-turbo", "vision", "-vl", "claude", "omni", "multimodal", "pixtral", "llava", "qwen-vl", "o1", "o3", "grok", "kimi")
             visionKeywords.any { norm.contains(it) }
         } catch (_: Exception) {
             false
@@ -1599,6 +1654,10 @@ class ChatFragment : Fragment() {
                 promptLayout.setStartIconOnClickListener {
                     showSnackbar("Selected model (${agentsHelper.getAgent()}) does not support vision / images")
                 }
+            }
+            btnComposerAttach?.let { btn ->
+                btn.isEnabled = supportsVision
+                btn.alpha = if (supportsVision) 1.0f else 0.4f
             }
         } catch (_: Exception) {}
     }
@@ -1736,6 +1795,19 @@ class ChatFragment : Fragment() {
 
             promptLayout.endIconContentDescription = if (isRunning) "Stop generation" else "Send message"
 
+        }
+        btnComposerSend?.let { btn ->
+            btn.post {
+                if (isRunning) {
+                    btn.setIconResource(R.drawable.ic_stop)
+                    btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#EF4444"))
+                } else {
+                    btn.setIconResource(R.drawable.ic_arrow_upward)
+                    val tv = android.util.TypedValue()
+                    val primaryColor = if (requireContext().theme.resolveAttribute(android.R.attr.colorPrimary, tv, true)) tv.data else android.graphics.Color.parseColor("#8B5CF6")
+                    btn.backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor)
+                }
+            }
         }
 
     }
@@ -2033,7 +2105,28 @@ class ChatFragment : Fragment() {
 
         val toolHint = if (caps.supportsTools == TriStateCapability.UNSUPPORTED) " [no-tools]" else ""
 
-        activeModelChipBtn.text = "$connDot $providerName • $modelId$toolHint"
+                activeModelChipBtn.text = "$connDot $providerName • $modelId$toolHint"
+        val shortModel = modelId.substringAfterLast("/")
+        val displayModel = if (shortModel.length > 10) shortModel.take(9) + "…" else shortModel
+        btnComposerModel?.text = "📦 $displayModel"
+        val currentEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort(requireContext())
+        val shortEffort = when (currentEffort.name.lowercase()) {
+            "high" -> "Hi"
+            "medium" -> "Med"
+            "low" -> "Low"
+            else -> "Med"
+        }
+        btnComposerReasoning?.text = "🧠 $shortEffort"
+        val isWebSearchOn = explicitWebSearchActive || webSearchManager.getConfig().enabled
+        btnComposerWebSearch?.let { btn ->
+            if (isWebSearchOn) {
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#06B6D4"))
+            } else {
+                val tv = android.util.TypedValue()
+                val containerColor = if (requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorSurfaceContainerHighest, tv, true)) tv.data else android.graphics.Color.parseColor("#2A2F3D")
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(containerColor)
+            }
+        }
 
 
 
@@ -2374,28 +2467,34 @@ class ChatFragment : Fragment() {
         val profile = registryManager.getProfile(providerId)
 
         val options = arrayOf(
-
+            "🔑 Connected Accounts (ChatGPT, Claude, Grok, Kimi, Gemini)",
             "Select / Search Model (${agentsHelper.getAgent()})",
-
             "Switch AI Provider (${profile?.displayName ?: providerId})",
-
             "Configure Current Provider / API Key",
-
             "+ Add New Custom Provider Profile"
-
         )
 
-
-
         MaterialAlertDialogBuilder(requireContext())
-
             .setTitle("AI Model & Provider")
-
             .setItems(options) { _, which ->
-
                 when (which) {
-
                     0 -> {
+                        com.tom.rv2ide.artificial.auth.ProviderOAuthManager.showOAuthAccountsHubDialog(
+                            requireContext(),
+                            viewLifecycleOwner.lifecycleScope
+                        ) { connected ->
+                            aiAgent.refreshRegisteredProfiles()
+                            if (connected.isNotBlank()) {
+                                agentsHelper.setProvider(connected)
+                                aiAgent.setProvider(connected)
+                                aiAgent.reinitializeWithSelectedModel()
+                                updateVisionButtonState()
+                                refreshHeaderBar()
+                                showSnackbar("Switched to $connected")
+                            }
+                        }
+                    }
+                    1 -> {
 
                         ProviderProfileDialogs.showSearchableModelPickerDialog(
 
@@ -2420,7 +2519,7 @@ class ChatFragment : Fragment() {
 
                     }
 
-                    1 -> {
+                    2 -> {
 
                         val profiles = registryManager.getEnabledProfiles()
 
@@ -2459,7 +2558,7 @@ class ChatFragment : Fragment() {
 
                     }
 
-                    2 -> {
+                    3 -> {
 
                         if (profile != null) {
 
@@ -2489,7 +2588,7 @@ class ChatFragment : Fragment() {
 
                     }
 
-                    3 -> {
+                    4 -> {
 
                         ProviderProfileDialogs.showAddFromTemplateDialog(
 

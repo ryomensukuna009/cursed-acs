@@ -52,8 +52,8 @@ object SmartTitleGenerator {
             }
         }
 
-        // If only greetings were given, e.g. "Hello", give a clean greeting topic title
-        val fallbackWord = lines.first().split(Regex("""\s+""")).firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "Conversation"
-        return "$fallbackWord Discussion"
+        // If only greetings/fillers were given, e.g. "Hello", keep as "New Conversation"
+        // so subsequent messages can derive the real topic
+        return "New Conversation"
     }
 }

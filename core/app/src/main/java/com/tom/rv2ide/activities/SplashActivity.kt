@@ -83,7 +83,7 @@ class SplashActivity : AppCompatActivity() {
 
     val logoView = findViewById<ShapeableImageView>(R.id.splashLogo)
     if (logoView != null) {
-      logoView.setImageResource(com.tom.rv2ide.resources.R.drawable.logo_sukuna_full)
+      AppLogoManager.bindLogo(logoView)
     }
 
     val container = findViewById<View>(R.id.splashContainer)

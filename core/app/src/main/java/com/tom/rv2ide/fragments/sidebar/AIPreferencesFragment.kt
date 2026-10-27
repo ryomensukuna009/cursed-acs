@@ -166,6 +166,19 @@ class AIPreferencesFragment(
     }
 
     private fun setupProviderActionButtons() {
+        view?.findViewById<com.google.android.material.button.MaterialButton>(com.tom.rv2ide.R.id.btnAccountsHub)?.setOnClickListener {
+            com.tom.rv2ide.artificial.auth.ProviderOAuthManager.showOAuthAccountsHubDialog(
+                requireContext(),
+                viewLifecycleOwner.lifecycleScope
+            ) { connected ->
+                aiAgent.refreshRegisteredProfiles()
+                setupProviderDropdown()
+                val profile = registryManager.getProfile(connected)
+                if (profile != null) {
+                    handleProviderChange(profile.id, profile.displayName)
+                }
+            }
+        }
         editProviderBtn.setOnClickListener {
             val currentId = agents.getProvider()
             val profile = registryManager.getProfile(currentId) ?: currentProfilesList.firstOrNull() ?: return@setOnClickListener

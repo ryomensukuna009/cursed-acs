@@ -239,11 +239,22 @@ class ConversationSessionManager(
             imageBase64 = imageBase64,
             imageMimeType = imageMimeType
         )
-        val newTitle = if (conv.messages.isEmpty() || conv.title == "New Conversation") {
-            deriveConversationTitle(content)
+        val isGenericTitle = conv.title == "New Conversation" ||
+            conv.title.endsWith(" Discussion") ||
+            conv.title.equals("Hello", ignoreCase = true) ||
+            conv.title.equals("Hi", ignoreCase = true) ||
+            conv.title.startsWith("Hello ") ||
+            conv.title.startsWith("Hi ")
+
+        val derived = deriveConversationTitle(content)
+        val newTitle = if ((conv.messages.isEmpty() || isGenericTitle) && derived != "New Conversation") {
+            derived
+        } else if (conv.title == "New Conversation") {
+            derived
         } else {
             conv.title
         }
+
         val updated = conv.copy(
             title = newTitle,
             updatedAt = msg.timestamp,

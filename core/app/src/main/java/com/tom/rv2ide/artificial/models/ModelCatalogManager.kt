@@ -184,12 +184,27 @@ class ModelCatalogManager private constructor(context: Context) {
         )
     }
 
+    private val KELIVO_VISION_REGEX = Regex(
+        """(gpt-4o|gpt-4\.1|gpt-5|gpt-6|o\d|gemini|claude|kimi-k2|kimi-k3|grok|muse-spark|doubao|step-3|intern-s1|minimax-m3|mimo-v2|sensenova|vision|-vl|omni|pixtral|llava|minicpm-v|internvl|phi-3-vision|phi-4-multimodal|qwen-vl|qwen2\.5-vl|qwen2-vl)""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private val KELIVO_REASONING_REGEX = Regex(
+        """(gpt-oss|gpt-5|gpt-6|o\d|gemini-(?:2\.5|3|4)|gemini-(?:flash-latest|pro-latest)|gemini-3-pro|gemma[-_]?4|claude|qwen-?3|doubao|grok-4|kimi-k2|kimi-k3|muse-spark|step-3|intern-s1|glm-4|glm-5|minimax-(?:m2|m3)|deepseek-(?:r1|v3|v4|flash)|deepseek-reasoner|mimo-v2|qwq|thinking|reasoner)""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private val KELIVO_TOOL_REGEX = Regex(
+        """(gpt-4o|gpt-4\.1|gpt-oss|gpt-5|gpt-6|o\d|gemini|claude|qwen-?3|doubao|grok-4|kimi-k2|kimi-k3|muse-spark|step-3|intern-s1|glm-4|glm-5|minimax|deepseek|mimo-v2|sensenova)""",
+        RegexOption.IGNORE_CASE
+    )
+
     fun isVisionSupported(rawModelId: String): Boolean {
         val normId = normalizeId(rawModelId)
         val bareId = if (normId.contains("/")) normId.substringAfterLast("/") else normId
         val catalogInfo = modelCache[normId] ?: modelCache[bareId]
-        if (catalogInfo != null) {
-            return catalogInfo.supportsVision
+        if (catalogInfo != null && catalogInfo.supportsVision) {
+            return true
         }
         return checkVisionHeuristics(normId)
     }
@@ -198,8 +213,8 @@ class ModelCatalogManager private constructor(context: Context) {
         val normId = normalizeId(rawModelId)
         val bareId = if (normId.contains("/")) normId.substringAfterLast("/") else normId
         val catalogInfo = modelCache[normId] ?: modelCache[bareId]
-        if (catalogInfo != null) {
-            return catalogInfo.supportsReasoning
+        if (catalogInfo != null && catalogInfo.supportsReasoning) {
+            return true
         }
         return checkReasoningHeuristics(normId)
     }
@@ -208,37 +223,30 @@ class ModelCatalogManager private constructor(context: Context) {
         val normId = normalizeId(rawModelId)
         val bareId = if (normId.contains("/")) normId.substringAfterLast("/") else normId
         val catalogInfo = modelCache[normId] ?: modelCache[bareId]
-        if (catalogInfo != null) {
-            return catalogInfo.supportsTools
+        if (catalogInfo != null && catalogInfo.supportsTools) {
+            return true
         }
         return checkToolHeuristics(normId)
     }
 
     private fun checkVisionHeuristics(normId: String): Boolean {
         // Exclude strictly text-only embeddings or non-vision
-        val nonVision = listOf("embedding", "text-embedding", "bge-", "tts", "whisper", "dall-e", "midjourney")
+        val nonVision = listOf("embedding", "text-embedding", "bge-", "tts", "whisper", "dall-e", "midjourney", "rerank", "moderation")
         if (nonVision.any { normId.contains(it) }) return false
 
-        // Known vision models
-        val visionKeywords = listOf(
-            "gemini", "gpt-4o", "gpt-4-turbo", "vision", "-vl", "claude-3", "omni",
-            "pixtral", "llava", "qwen-vl", "minicpm-v", "phi-3-vision", "internvl",
-            "glm-4v", "deepseek-vl", "o1", "o3"
-        )
-        return visionKeywords.any { normId.contains(it) }
+        return KELIVO_VISION_REGEX.containsMatchIn(normId)
     }
 
     private fun checkReasoningHeuristics(normId: String): Boolean {
-        val reasoningKeywords = listOf(
-            "o1", "o3", "r1", "reasoning", "thinking", "deepseek-r1", "qwq", "gemini-2.0-flash-thinking"
-        )
-        return reasoningKeywords.any { normId.contains(it) }
+        val nonReasoning = listOf("embedding", "moderation", "tts", "whisper", "dall-e")
+        if (nonReasoning.any { normId.contains(it) }) return false
+        return KELIVO_REASONING_REGEX.containsMatchIn(normId)
     }
 
     private fun checkToolHeuristics(normId: String): Boolean {
         val nonTool = listOf("embedding", "moderation", "tts", "whisper", "dall-e")
         if (nonTool.any { normId.contains(it) }) return false
-        return true
+        return KELIVO_TOOL_REGEX.containsMatchIn(normId) || true
     }
 
     private fun estimateContextLength(normId: String): Int {

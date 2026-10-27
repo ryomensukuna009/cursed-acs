@@ -73,6 +73,7 @@ class AboutActivity : EdgeToEdgeIDEActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    binding.aboutAppLogo?.let { com.tom.rv2ide.utils.AppLogoManager.bindLogo(it) }
 
     binding.apply {
       setSupportActionBar(toolbar)
