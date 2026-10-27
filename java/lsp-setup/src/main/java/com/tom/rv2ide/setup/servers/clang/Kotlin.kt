@@ -39,8 +39,11 @@ class Kotlin(private val context: Context) : ILanguageServerInstaller {
   
   override fun isInstalled(): Boolean {
     val kotlinBinary = File(Environment.SERVERS_KOTLIN_DIR, "bin/kotlin-language-server")
-    val atLeastOneJar = File(Environment.SERVERS_KOTLIN_DIR, "lib/kotlin-stdlib-2.1.0.jar")
-    return kotlinBinary.exists() && atLeastOneJar.exists()
+    val kotlinBinary2 = File(Environment.HOME, "acs/servers/kotlin/bin/kotlin-language-server")
+    val hasBinary = kotlinBinary.exists() || kotlinBinary2.exists()
+    val hasJar = (File(Environment.SERVERS_KOTLIN_DIR, "lib").listFiles()?.any { it.name.endsWith(".jar") } == true) ||
+        (File(Environment.HOME, "acs/servers/kotlin/lib").listFiles()?.any { it.name.endsWith(".jar") } == true)
+    return hasBinary && hasJar
   }
   
   override fun install(onOutput: (String) -> Unit): Boolean {

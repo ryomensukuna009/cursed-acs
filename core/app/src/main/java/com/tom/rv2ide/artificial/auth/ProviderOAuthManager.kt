@@ -32,6 +32,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.net.ServerSocket
+import java.net.InetSocketAddress
+import java.net.SocketTimeoutException
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.io.BufferedWriter
+import java.io.OutputStreamWriter
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -77,7 +85,7 @@ object ProviderOAuthManager {
         onSuccess: (String) -> Unit
     ) {
         when (providerId.lowercase()) {
-            "openai", "chatgpt" -> showOpenAiDeviceLogin(context, scope, onSuccess)
+            "openai", "chatgpt" -> showOpenAiBrowserLogin(context, scope, onSuccess)
             "claude", "anthropic" -> showClaudeLogin(context, scope, onSuccess)
             "grok", "xai" -> showGrokDeviceLogin(context, scope, onSuccess)
             "kimi", "kimi code", "moonshot" -> showKimiDeviceLogin(context, scope, onSuccess)
@@ -127,8 +135,8 @@ object ProviderOAuthManager {
         var hubDialog: androidx.appcompat.app.AlertDialog? = null
 
         val accounts = listOf(
-            AccountItem("openai", "ChatGPT", "OpenAI Codex Device Flow", "🤖") {
-                showOpenAiDeviceLogin(context, scope) { token ->
+            AccountItem("openai", "ChatGPT", "OpenAI Codex Direct Login", "✨") {
+                showOpenAiBrowserLogin(context, scope) { token ->
                     onAccountConnected("openai")
                     hubDialog?.dismiss()
                 }
@@ -238,7 +246,25 @@ object ProviderOAuthManager {
             .show()
     }
 
-    private fun showOpenAiDeviceLogin(
+    private fun generatePkceVerifier(): String {
+        val bytes = ByteArray(32)
+        java.security.SecureRandom().nextBytes(bytes)
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+    }
+
+    private fun generatePkceChallenge(verifier: String): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(verifier.toByteArray(Charsets.US_ASCII))
+        return android.util.Base64.encodeToString(digest, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+    }
+
+    private fun generateRandomState(): String {
+        val bytes = ByteArray(24)
+        java.security.SecureRandom().nextBytes(bytes)
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+    }
+
+    private fun showOpenAiBrowserLogin(
         context: Context,
         scope: CoroutineScope,
         onSuccess: (String) -> Unit
@@ -252,46 +278,11 @@ object ProviderOAuthManager {
         }
 
         val statusTv = TextView(context).apply {
-            text = "Requesting device login code from OpenAI..."
+            text = "Starting secure direct login...\n\nYour browser will open automatically. Simply select your OpenAI account and you will be signed in immediately."
             textSize = 13f
             setTextColor(resolveAttr(context, com.google.android.material.R.attr.colorOnSurface))
             setPadding(0, 0, 0, pad / 2)
             root.addView(this)
-        }
-
-        val codeCard = MaterialCardView(context).apply {
-            radius = 12 * density
-            strokeWidth = (1 * density).toInt()
-            strokeColor = resolveAttr(context, com.google.android.material.R.attr.colorOutlineVariant)
-            setCardBackgroundColor(resolveAttr(context, com.google.android.material.R.attr.colorSurfaceContainer))
-            visibility = View.GONE
-            val inner = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(pad, pad, pad, pad)
-            }
-            addView(inner)
-            root.addView(this)
-        }
-
-        val codeTv = TextView(context).apply {
-            text = ""
-            textSize = 24f
-            typeface = android.graphics.Typeface.MONOSPACE
-            setTextColor(resolveAttr(context, android.R.attr.colorPrimary))
-            gravity = Gravity.CENTER
-            (codeCard.getChildAt(0) as LinearLayout).addView(this)
-        }
-
-        val copyBtn = MaterialButton(context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-            text = "📋 Copy Code"
-            textSize = 12f
-            setOnClickListener {
-                val clip = android.content.ClipData.newPlainText("OpenAI Device Code", codeTv.text)
-                (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(clip)
-                Toast.makeText(context, "Copied code to clipboard!", Toast.LENGTH_SHORT).show()
-            }
-            (codeCard.getChildAt(0) as LinearLayout).addView(this)
         }
 
         val progressBar = ProgressBar(context).apply {
@@ -301,196 +292,221 @@ object ProviderOAuthManager {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = pad
-                bottomMargin = pad
+                topMargin = pad / 2
+                bottomMargin = pad / 2
             }
             root.addView(this)
         }
 
-        val openBrowserBtn = MaterialButton(context).apply {
-            text = "🌐 Open OpenAI Approval Page"
-            visibility = View.GONE
-            setOnClickListener {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(OPENAI_DEVICE_VERIFY_URL))
-                    context.startActivity(intent)
-                } catch (_: Exception) {
-                    Toast.makeText(context, "Unable to open browser", Toast.LENGTH_SHORT).show()
-                }
-            }
-            root.addView(this)
-        }
-
-        var pollJob: Job? = null
+        var authJob: Job? = null
+        var serverSocket: ServerSocket? = null
 
         val dialog = MaterialAlertDialogBuilder(context)
-            .setTitle("Sign in to OpenAI (ChatGPT)")
+            .setTitle("Sign in with ChatGPT")
             .setView(root)
             .setNegativeButton("Cancel") { d, _ ->
-                pollJob?.cancel()
+                authJob?.cancel()
+                try { serverSocket?.close() } catch (_: Exception) {}
                 d.dismiss()
             }
             .setOnDismissListener {
-                pollJob?.cancel()
+                authJob?.cancel()
+                try { serverSocket?.close() } catch (_: Exception) {}
             }
             .show()
 
-        pollJob = scope.launch(Dispatchers.IO) {
+        authJob = scope.launch(Dispatchers.IO) {
+            val loopbackPort = 1455
             try {
-                val jsonPayload = JSONObject().apply {
-                    put("client_id", OPENAI_CLIENT_ID)
-                }.toString()
+                serverSocket = ServerSocket().apply {
+                    reuseAddress = true
+                    bind(InetSocketAddress("127.0.0.1", loopbackPort))
+                    soTimeout = 300_000 // 5 minutes
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    statusTv.text = "❌ Failed to start local callback listener on port $loopbackPort: ${e.message}"
+                }
+                return@launch
+            }
 
-                val initReq = Request.Builder()
-                    .url(OPENAI_USER_CODE_URL)
-                    .header("Accept", "application/json")
-                    .header("Content-Type", "application/json")
-                    .header("originator", "kelivo")
-                    .header("User-Agent", "Kelivo")
-                    .post(jsonPayload.toRequestBody("application/json".toMediaType()))
-                    .build()
+            try {
+                val redirectUri = "http://localhost:$loopbackPort/auth/callback"
+                val verifier = generatePkceVerifier()
+                val challenge = generatePkceChallenge(verifier)
+                val state = generateRandomState()
 
-                val initResp = httpClient.newCall(initReq).execute()
-                val initBody = initResp.body?.string().orEmpty()
+                val authUrl = "https://auth.openai.com/oauth/authorize?" +
+                    "response_type=code" +
+                    "&client_id=" + OPENAI_CLIENT_ID +
+                    "&redirect_uri=" + java.net.URLEncoder.encode(redirectUri, "UTF-8") +
+                    "&scope=" + java.net.URLEncoder.encode("openid profile email offline_access api.connectors.read api.connectors.invoke", "UTF-8") +
+                    "&code_challenge=" + challenge +
+                    "&code_challenge_method=S256" +
+                    "&state=" + state +
+                    "&id_token_add_organizations=true" +
+                    "&codex_cli_simplified_flow=true" +
+                    "&originator=kelivo"
 
-                if (!initResp.isSuccessful) {
+                withContext(Dispatchers.Main) {
+                    statusTv.text = "🌐 Chrome opened!\n\n1. Tap your OpenAI account.\n2. Tap Authorize.\n3. You will be automatically returned here!"
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl)).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        Toast.makeText(context, "Could not open browser automatically", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                var receivedCode: String? = null
+                var receivedState: String? = null
+
+                // Wait for the browser redirect GET request
+                val client = serverSocket!!.accept()
+                val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.UTF_8))
+                val writer = PrintWriter(BufferedWriter(OutputStreamWriter(client.getOutputStream(), Charsets.UTF_8)), true)
+
+                val reqLine = reader.readLine()
+                if (!reqLine.isNullOrBlank() && reqLine.startsWith("GET ")) {
+                    val rawPath = reqLine.split(" ").getOrNull(1).orEmpty()
+                    val query = rawPath.substringAfter("?", "")
+                    val params = query.split("&").associate { p ->
+                        val parts = p.split("=")
+                        val k = parts.getOrNull(0)?.let { java.net.URLDecoder.decode(it, "UTF-8") }.orEmpty()
+                        val v = parts.getOrNull(1)?.let { java.net.URLDecoder.decode(it, "UTF-8") }.orEmpty()
+                        k to v
+                    }
+                    receivedCode = params["code"]
+                    receivedState = params["state"]
+                }
+
+                val htmlSuccess = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <meta charset="utf-8">
+                      <meta name="viewport" content="width=device-width, initial-scale=1">
+                      <title>Authentication Successful</title>
+                      <style>
+                        body { background: #0f1117; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+                        .card { background: #1a1d26; border: 1px solid #7c3aed; border-radius: 16px; padding: 32px 24px; text-align: center; max-width: 380px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+                        .icon { font-size: 48px; margin-bottom: 12px; }
+                        h2 { margin: 0 0 10px; font-size: 20px; font-weight: 700; color: #f1f5f9; }
+                        p { margin: 0; font-size: 14px; color: #94a3b8; line-height: 1.5; }
+                      </style>
+                    </head>
+                    <body>
+                      <div class="card">
+                        <div class="icon">✨</div>
+                        <h2>Successfully Signed In!</h2>
+                        <p>You have connected your OpenAI account to CURSED ACS.<br><br>You can close this tab and return to the app.</p>
+                      </div>
+                    </body>
+                    </html>
+                """.trimIndent()
+
+                val htmlBytes = htmlSuccess.toByteArray(Charsets.UTF_8)
+                val responseHeaders = "HTTP/1.1 200 OK\r\n" +
+                    "Content-Type: text/html; charset=utf-8\r\n" +
+                    "Content-Length: " + htmlBytes.size + "\r\n" +
+                    "Connection: close\r\n" +
+                    "Cache-Control: no-store\r\n\r\n"
+
+                writer.print(responseHeaders)
+                writer.print(htmlSuccess)
+                writer.flush()
+                try { client.close() } catch (_: Exception) {}
+                try { serverSocket?.close() } catch (_: Exception) {}
+
+                if (receivedState != state || receivedCode.isNullOrBlank()) {
                     withContext(Dispatchers.Main) {
                         progressBar.visibility = View.GONE
-                        statusTv.text = "❌ Failed to initiate OpenAI login: HTTP ${initResp.code}\n${initBody.take(150)}"
+                        statusTv.text = "⚠️ Authentication cancelled or state mismatched."
                     }
                     return@launch
                 }
 
-                val initJson = JSONObject(initBody)
-                val deviceAuthId = initJson.optString("device_auth_id")
-                val userCode = initJson.optString("user_code")
-                val intervalSec = initJson.optInt("interval", 5).coerceIn(3, 30)
-
                 withContext(Dispatchers.Main) {
-                    progressBar.visibility = View.VISIBLE
-                    codeTv.text = userCode
-                    codeCard.visibility = View.VISIBLE
-                    openBrowserBtn.visibility = View.VISIBLE
-                    statusTv.text = "1. Code $userCode copied to clipboard!\n2. Opening browser to verify...\n3. Approve access and return here once finished."
-
-                    // Auto copy code to clipboard
-                    try {
-                        val clip = android.content.ClipData.newPlainText("OpenAI Device Code", userCode)
-                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(clip)
-                        Toast.makeText(context, "Code $userCode copied to clipboard!", Toast.LENGTH_SHORT).show()
-                    } catch (_: Exception) {}
-
-                    // Auto launch verification page in browser
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(OPENAI_DEVICE_VERIFY_URL)).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
+                    statusTv.text = "Exchanging authorization token with OpenAI..."
                 }
 
-                val pollPayload = JSONObject().apply {
-                    put("device_auth_id", deviceAuthId)
-                    put("user_code", userCode)
-                }.toString()
+                // Step 2: Exchange authorization_code with token endpoint
+                val exchangeForm = FormBody.Builder()
+                    .add("grant_type", "authorization_code")
+                    .add("client_id", OPENAI_CLIENT_ID)
+                    .add("code", receivedCode)
+                    .add("code_verifier", verifier)
+                    .add("redirect_uri", redirectUri)
+                    .build()
 
-                var acquiredToken: String? = null
-                var acquiredRefreshToken: String? = null
-                for (poll in 0 until 120) {
-                    delay(intervalSec * 1000L)
-                    val tokenReq = Request.Builder()
-                        .url(OPENAI_TOKEN_URL)
-                        .header("Accept", "application/json")
-                        .header("Content-Type", "application/json")
-                        .header("originator", "kelivo")
-                        .header("User-Agent", "Kelivo")
-                        .post(pollPayload.toRequestBody("application/json".toMediaType()))
-                        .build()
+                val exchangeReq = Request.Builder()
+                    .url(OPENAI_TOKEN_URL)
+                    .header("Accept", "application/json")
+                    .header("originator", "kelivo")
+                    .header("User-Agent", "Kelivo")
+                    .post(exchangeForm)
+                    .build()
 
-                    val tokenResp = httpClient.newCall(tokenReq).execute()
-                    val tokenBody = tokenResp.body?.string().orEmpty()
+                val exchangeResp = httpClient.newCall(exchangeReq).execute()
+                val exchangeBody = exchangeResp.body?.string().orEmpty()
 
-                    if (tokenResp.code in listOf(403, 404)) {
-                        continue
+                if (!exchangeResp.isSuccessful) {
+                    withContext(Dispatchers.Main) {
+                        progressBar.visibility = View.GONE
+                        statusTv.text = "❌ Token exchange failed: HTTP ${exchangeResp.code}\n${exchangeBody.take(150)}"
                     }
+                    return@launch
+                }
 
-                    if (tokenResp.isSuccessful) {
-                        val tokenJson = JSONObject(tokenBody)
-                        // If direct access token returned
-                        val directToken = tokenJson.optString("access_token")
-                        if (directToken.isNotBlank()) {
-                            acquiredToken = directToken
-                            acquiredRefreshToken = tokenJson.optString("refresh_token")
-                            break
-                        }
+                val exchangeJson = JSONObject(exchangeBody)
+                val acquiredToken = exchangeJson.optString("access_token")
+                val acquiredRefreshToken = exchangeJson.optString("refresh_token")
 
-                        // Check authorization_code flow
-                        val authCode = tokenJson.optString("authorization_code")
-                        val codeVerifier = tokenJson.optString("code_verifier")
-                        if (authCode.isNotBlank() && codeVerifier.isNotBlank()) {
-                            // Step 2: Exchange authorization_code with token endpoint
-                            val exchangeForm = FormBody.Builder()
-                                .add("grant_type", "authorization_code")
-                                .add("client_id", OPENAI_CLIENT_ID)
-                                .add("code", authCode)
-                                .add("code_verifier", codeVerifier)
-                                .add("redirect_uri", "https://auth.openai.com/deviceauth/callback")
-                                .build()
-
-                            val exchangeReq = Request.Builder()
-                                .url("https://auth.openai.com/oauth/token")
-                                .header("Accept", "application/json")
-                                .header("originator", "kelivo")
-                                .header("User-Agent", "Kelivo")
-                                .post(exchangeForm)
-                                .build()
-
-                            val exchangeResp = httpClient.newCall(exchangeReq).execute()
-                            val exchangeBody = exchangeResp.body?.string().orEmpty()
-                            if (exchangeResp.isSuccessful) {
-                                val exchangeJson = JSONObject(exchangeBody)
-                                val finalToken = exchangeJson.optString("access_token")
-                                if (finalToken.isNotBlank()) {
-                                    acquiredToken = finalToken
-                                    acquiredRefreshToken = exchangeJson.optString("refresh_token")
-                                    break
-                                }
-                            }
-                        }
+                if (acquiredToken.isBlank()) {
+                    withContext(Dispatchers.Main) {
+                        progressBar.visibility = View.GONE
+                        statusTv.text = "❌ No access token returned by OpenAI."
                     }
+                    return@launch
                 }
 
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
-                    if (acquiredToken != null) {
-                        SecureKeyStore.putProviderApiKey(context, "openai", acquiredToken)
-                        val (email, plan) = extractJwtProfile(acquiredToken)
-                        val account = OAuthAccount(
-                            provider = "openai",
-                            email = email.ifBlank { "ChatGPT User" },
-                            plan = plan.ifBlank { "Codex" },
-                            accessToken = acquiredToken,
-                            refreshToken = acquiredRefreshToken.orEmpty(),
-                            expiresAt = System.currentTimeMillis() + 86400_000L * 30,
-                            isActive = true
-                        )
-                        OAuthAccountRegistry.getInstance(context).saveAccount(account)
-                        OAuthAccountRegistry.getInstance(context).setActiveAccount("openai", account.id)
-                        fetchAndRegisterCodexModels(context, acquiredToken)
-                        Toast.makeText(context, "✅ Signed in to OpenAI successfully! (${account.email})", Toast.LENGTH_LONG).show()
-                        dialog.dismiss()
-                        onSuccess(acquiredToken)
-                    } else {
-                        statusTv.text = "⚠️ Login timed out or cancelled. Tap cancel and try again."
-                    }
+                    SecureKeyStore.putProviderApiKey(context, "openai", acquiredToken)
+                    val (email, plan) = extractJwtProfile(acquiredToken)
+                    val account = OAuthAccount(
+                        provider = "openai",
+                        email = email.ifBlank { "ChatGPT User" },
+                        plan = plan.ifBlank { "Codex" },
+                        accessToken = acquiredToken,
+                        refreshToken = acquiredRefreshToken.orEmpty(),
+                        expiresAt = System.currentTimeMillis() + 86400_000L * 30,
+                        isActive = true
+                    )
+                    OAuthAccountRegistry.getInstance(context).saveAccount(account)
+                    OAuthAccountRegistry.getInstance(context).setActiveAccount("openai", account.id)
+                    fetchAndRegisterCodexModels(context, acquiredToken)
+                    Toast.makeText(context, "✅ Signed in to OpenAI successfully! (${account.email})", Toast.LENGTH_LONG).show()
+                    dialog.dismiss()
+                    onSuccess(acquiredToken)
                 }
 
+            } catch (_: SocketTimeoutException) {
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    statusTv.text = "⏱️ Sign-in timed out. Tap cancel and try again."
+                }
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     statusTv.text = "❌ Login error: ${e.message}"
                 }
+            } finally {
+                try { serverSocket?.close() } catch (_: Exception) {}
             }
         }
     }

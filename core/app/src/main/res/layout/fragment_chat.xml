@@ -125,7 +125,8 @@
                     app:icon="@drawable/ic_more_vert"
                     app:iconGravity="textStart"
                     app:iconPadding="0dp"
-                    style="@style/Widget.Material3.Button.IconButton" />
+                    app:iconTint="?attr/colorOnSurface"
+                    style="@style/Widget.Material3.Button.TonalButton" />
 
             </LinearLayout>
 
@@ -192,7 +193,7 @@
                             android:minWidth="32dp"
                             android:paddingHorizontal="8dp"
                             android:paddingVertical="0dp"
-                            android:text="🧠 Med"
+                            android:text="🧠 Auto"
                             android:textSize="11sp"
                             app:cornerRadius="8dp"
                             style="@style/Widget.Material3.Button.TonalButton" />
@@ -559,7 +560,7 @@
                                 android:paddingVertical="0dp"
                                 android:minWidth="32dp"
                                 android:layout_marginEnd="6dp"
-                                android:text="🧠 Med"
+                                android:text="🧠 Auto"
                                 android:textSize="11.5sp"
                                 app:cornerRadius="8dp"
                                 style="@style/Widget.Material3.Button.TonalButton" />

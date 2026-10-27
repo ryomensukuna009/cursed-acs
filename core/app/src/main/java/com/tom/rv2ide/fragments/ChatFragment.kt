@@ -1323,10 +1323,7 @@ class ChatFragment : Fragment() {
 
 
     private fun showChatOverflowMenu(anchorView: View) {
-
-        val themedContext = android.view.ContextThemeWrapper(requireContext(), R.style.Theme_AndroidIDE)
-
-        val popup = androidx.appcompat.widget.PopupMenu(themedContext, anchorView)
+        val popup = androidx.appcompat.widget.PopupMenu(requireContext(), anchorView)
 
         popup.menuInflater.inflate(R.menu.menu_chat_overflow, popup.menu)
 
@@ -1794,14 +1791,9 @@ class ChatFragment : Fragment() {
 
 
         val hasMessages = conversation.messages.isNotEmpty()
-
         emptyStateContainer.visibility = if (hasMessages) View.GONE else View.VISIBLE
-
-        chatRecyclerView.visibility = if (hasMessages) View.VISIBLE else View.GONE
-
-
-
-            chatMessageAdapter.submitMessages(conversation.messages)
+        chatRecyclerView.visibility = View.VISIBLE
+        chatMessageAdapter.submitMessages(conversation.messages)
 
 
 
@@ -2146,14 +2138,7 @@ class ChatFragment : Fragment() {
         val shortModel = modelId.substringAfterLast("/")
         val displayModel = if (shortModel.length > 10) shortModel.take(9) + "…" else shortModel
         btnComposerModel?.text = "📦 $displayModel"
-        val currentEffort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort(requireContext())
-        val shortEffort = when (currentEffort.name.lowercase()) {
-            "high" -> "Hi"
-            "medium" -> "Med"
-            "low" -> "Low"
-            else -> "Med"
-        }
-        btnComposerReasoning?.text = "🧠 $shortEffort"
+        updateReasoningEffortButton()
         val isWebSearchOn = explicitWebSearchActive || webSearchManager.getConfig().enabled
         btnComposerWebSearch?.let { btn ->
             if (isWebSearchOn) {

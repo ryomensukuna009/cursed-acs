@@ -597,10 +597,15 @@ class ChatMessageAdapter(
 
 
         fun bind(item: ChatMessageItem) {
-
-
-
             root.removeAllViews()
+            (root.layoutParams as? RecyclerView.LayoutParams)?.let {
+                it.width = ViewGroup.LayoutParams.MATCH_PARENT
+            } ?: run {
+                root.layoutParams = RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            }
 
 
 
@@ -877,7 +882,7 @@ class ChatMessageAdapter(
 
 
 
-                setTextIsSelectable(true)
+                // setTextIsSelectable(false)
 
 
 

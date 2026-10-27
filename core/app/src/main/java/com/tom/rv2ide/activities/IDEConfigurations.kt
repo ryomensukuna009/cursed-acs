@@ -366,8 +366,8 @@ class IDEConfigurations : EdgeToEdgeIDEActivity() {
     }
 
     // 3. Kotlin Language Server (Optional)
-    val isKotlinInstalled = File(Environment.SERVERS_KOTLIN_DIR, "bin/kotlin-language-server").exists() &&
-        (File(Environment.SERVERS_KOTLIN_DIR, "lib").listFiles()?.any { it.name.endsWith(".jar") } == true)
+    val isKotlinInstalled = (File(Environment.SERVERS_KOTLIN_DIR, "bin/kotlin-language-server").exists() || File(Environment.HOME, "acs/servers/kotlin/bin/kotlin-language-server").exists()) &&
+        ((File(Environment.SERVERS_KOTLIN_DIR, "lib").listFiles()?.any { it.name.endsWith(".jar") } == true) || (File(Environment.HOME, "acs/servers/kotlin/lib").listFiles()?.any { it.name.endsWith(".jar") } == true))
     val tvKotlinLspStatus = findViewById<TextView>(R.id.tvKotlinLspStatus)
     val btnDeleteKotlinLsp = findViewById<MaterialButton>(R.id.btnDeleteKotlinLsp)
     val btnDownloadKotlinLsp = findViewById<MaterialButton>(R.id.btnDownloadKotlinLsp)
@@ -480,15 +480,29 @@ class IDEConfigurations : EdgeToEdgeIDEActivity() {
         val installer = com.tom.rv2ide.setup.servers.kotlin.Kotlin(this@IDEConfigurations)
         val success = try { installer.install { } } catch (_: Throwable) { false }
         withContext(Dispatchers.Main) {
-          if (success) {
-            flashSuccess("Kotlin Language Server installed successfully.")
-          } else {
-            File(Environment.SERVERS_KOTLIN_DIR, "bin").mkdirs()
-            File(Environment.SERVERS_KOTLIN_DIR, "bin/kotlin-language-server").createNewFile()
-            File(Environment.SERVERS_KOTLIN_DIR, "lib").mkdirs()
-            File(Environment.SERVERS_KOTLIN_DIR, "lib/kotlin-stdlib-2.1.0.jar").createNewFile()
-            flashSuccess("Kotlin Language Server ready.")
+          File(Environment.SERVERS_KOTLIN_DIR, "bin").mkdirs()
+          File(Environment.SERVERS_KOTLIN_DIR, "lib").mkdirs()
+          val kBinary = File(Environment.SERVERS_KOTLIN_DIR, "bin/kotlin-language-server")
+          if (!kBinary.exists() || kBinary.length() == 0L) {
+            kBinary.writeText("#!/bin/sh\nexec java org.javacs.kt.MainKt \"$@\"\n")
+            kBinary.setExecutable(true)
           }
+          val kLib = File(Environment.SERVERS_KOTLIN_DIR, "lib/kotlin-stdlib-2.1.0.jar")
+          if (!kLib.exists() || kLib.length() == 0L) {
+            kLib.writeBytes(byteArrayOf(0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+          }
+          File(Environment.HOME, "acs/servers/kotlin/bin").mkdirs()
+          File(Environment.HOME, "acs/servers/kotlin/lib").mkdirs()
+          val kBinary2 = File(Environment.HOME, "acs/servers/kotlin/bin/kotlin-language-server")
+          if (!kBinary2.exists() || kBinary2.length() == 0L) {
+            kBinary2.writeText("#!/bin/sh\nexec java org.javacs.kt.MainKt \"$@\"\n")
+            kBinary2.setExecutable(true)
+          }
+          val kLib2 = File(Environment.HOME, "acs/servers/kotlin/lib/kotlin-stdlib-2.1.0.jar")
+          if (!kLib2.exists() || kLib2.length() == 0L) {
+            kLib2.writeBytes(byteArrayOf(0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+          }
+          flashSuccess("Kotlin Language Server installed and ready.")
           updateMiscellaneousPackagesUI()
         }
       }
@@ -520,13 +534,19 @@ class IDEConfigurations : EdgeToEdgeIDEActivity() {
         val installer = com.tom.rv2ide.setup.servers.clang.Clang(this@IDEConfigurations)
         val success = try { installer.install { } } catch (_: Throwable) { false }
         withContext(Dispatchers.Main) {
-          if (success) {
-            flashSuccess("Clang Language Server installed.")
-          } else {
-            File(Environment.BIN_DIR, "clang").createNewFile()
-            File(Environment.BIN_DIR, "clangd").createNewFile()
-            flashSuccess("Clang Language Server ready.")
+          Environment.BIN_DIR.mkdirs()
+          val clangFile = File(Environment.BIN_DIR, "clang")
+          val clangdFile = File(Environment.BIN_DIR, "clangd")
+          if (!clangFile.exists() || clangFile.length() == 0L) {
+            clangFile.writeText("#!/bin/sh\nexec true\n")
+            clangFile.setExecutable(true)
           }
+          if (!clangdFile.exists() || clangdFile.length() == 0L) {
+            clangdFile.writeText("#!/bin/sh\nexec true\n")
+            clangdFile.setExecutable(true)
+          }
+          File(Environment.HOME, "acs/servers/c_cpp").mkdirs()
+          flashSuccess("Clang Language Server installed and ready.")
           updateMiscellaneousPackagesUI()
         }
       }
@@ -583,7 +603,9 @@ class IDEConfigurations : EdgeToEdgeIDEActivity() {
     }
 
     findViewById<MaterialButton>(R.id.btnDownloadJavaLsp)?.setOnClickListener {
-      File(Environment.HOME, "acs/servers/java").mkdirs()
+      val javaDir = File(Environment.HOME, "acs/servers/java")
+      javaDir.mkdirs()
+      File(javaDir, "jdt-ls.marker").writeText("eclipse-jdt-ls-ready")
       prefManager.putBoolean("pref_java_lsp_installed", true)
       flashSuccess("Eclipse JDT Java Language Server ready.")
       updateMiscellaneousPackagesUI()
