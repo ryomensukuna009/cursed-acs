@@ -13,6 +13,17 @@ class SkillManager private constructor(context: Context) {
 
     private val appContext = context.applicationContext ?: context
     private val globalSkillsDir = File(appContext.filesDir, "skills")
+    private val prefs by lazy {
+        appContext.getSharedPreferences("agent_skills_prefs", Context.MODE_PRIVATE)
+    }
+
+    fun isSkillEnabled(skillId: String): Boolean {
+        return prefs.getBoolean("skill_enabled_$skillId", true)
+    }
+
+    fun setSkillEnabled(skillId: String, enabled: Boolean) {
+        prefs.edit().putBoolean("skill_enabled_$skillId", enabled).apply()
+    }
 
     init {
         if (!globalSkillsDir.exists()) globalSkillsDir.mkdirs()
@@ -69,7 +80,7 @@ class SkillManager private constructor(context: Context) {
                             description = desc,
                             dirPath = child.absolutePath,
                             skillMdPath = skillMd.absolutePath,
-                            enabled = true
+                            enabled = isSkillEnabled(skillId)
                         )
                     )
                 } catch (e: Exception) {

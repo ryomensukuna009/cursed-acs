@@ -224,9 +224,14 @@ class GeminiNativeAdapter : ProtocolAdapter {
             request.maxTokens?.let { genConfig.put("maxOutputTokens", it) }
             request.reasoningEffort?.let { effort ->
                 val thinkingConfig = JSONObject()
-                if (effort != com.tom.rv2ide.artificial.models.ReasoningEffort.OFF && effort.budgetTokens > 0) {
-                    thinkingConfig.put("thinkingBudget", effort.budgetTokens)
-                    thinkingConfig.put("includeThoughts", true)
+                if (effort != com.tom.rv2ide.artificial.models.ReasoningEffort.OFF) {
+                    if (effort == com.tom.rv2ide.artificial.models.ReasoningEffort.AUTO) {
+                        thinkingConfig.put("thinkingBudget", -1)
+                        thinkingConfig.put("includeThoughts", true)
+                    } else if (effort.budgetTokens > 0) {
+                        thinkingConfig.put("thinkingBudget", effort.budgetTokens)
+                        thinkingConfig.put("includeThoughts", true)
+                    }
                 } else {
                     thinkingConfig.put("thinkingBudget", 0)
                     thinkingConfig.put("includeThoughts", false)

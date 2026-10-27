@@ -15,6 +15,9 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.tom.rv2ide.artificial.secrets.SecureKeyStore
+import com.tom.rv2ide.artificial.auth.OAuthAccountRegistry
+import com.tom.rv2ide.artificial.auth.OAuthAccount
+import com.tom.rv2ide.artificial.models.ModelCatalogManager
 import com.tom.rv2ide.artificial.providers.ProviderRegistryManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -401,7 +404,18 @@ object ProviderOAuthManager {
                     progressBar.visibility = View.GONE
                     if (acquiredToken != null) {
                         SecureKeyStore.putProviderApiKey(context, "openai", acquiredToken)
-                        Toast.makeText(context, "✅ Signed in to OpenAI successfully!", Toast.LENGTH_LONG).show()
+                        val (email, plan) = extractJwtProfile(acquiredToken)
+                        val account = OAuthAccount(
+                            provider = "openai",
+                            email = email.ifBlank { "ChatGPT User" },
+                            plan = plan.ifBlank { "Codex" },
+                            accessToken = acquiredToken,
+                            expiresAt = System.currentTimeMillis() + 86400_000L * 30,
+                            isActive = true
+                        )
+                        OAuthAccountRegistry.getInstance(context).saveAccount(account)
+                        fetchAndRegisterCodexModels(context, acquiredToken)
+                        Toast.makeText(context, "✅ Signed in to OpenAI successfully! (${account.email})", Toast.LENGTH_LONG).show()
                         dialog.dismiss()
                         onSuccess(acquiredToken)
                     } else {
@@ -930,6 +944,53 @@ object ProviderOAuthManager {
             tv.data
         } else {
             android.graphics.Color.WHITE
+        }
+    }
+
+    private fun extractJwtProfile(token: String): Pair<String, String> {
+        try {
+            val parts = token.split(".")
+            if (parts.size >= 2) {
+                val decoded = String(android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING), Charsets.UTF_8)
+                val json = JSONObject(decoded)
+                val profile = json.optJSONObject("https://api.openai.com/profile")
+                val auth = json.optJSONObject("https://api.openai.com/auth")
+                val email = profile?.optString("email") ?: json.optString("email")
+                val plan = auth?.optString("chatgpt_plan_type") ?: json.optString("plan")
+                return Pair(email, plan)
+            }
+        } catch (_: Exception) {}
+        return Pair("", "")
+    }
+
+    private fun fetchAndRegisterCodexModels(context: Context, token: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val req = Request.Builder()
+                    .url("https://chatgpt.com/backend-api/codex/models")
+                    .header("Authorization", "Bearer $token")
+                    .header("originator", "kelivo")
+                    .header("User-Agent", "Kelivo")
+                    .get()
+                    .build()
+                val resp = httpClient.newCall(req).execute()
+                val body = resp.body?.string().orEmpty()
+                if (resp.isSuccessful && body.isNotBlank()) {
+                    val json = JSONObject(body)
+                    val data = json.optJSONArray("data") ?: json.optJSONArray("models")
+                    if (data != null) {
+                        val catalog = ModelCatalogManager.getInstance(context)
+                        for (i in 0 until data.length()) {
+                            val m = data.getJSONObject(i)
+                            val id = m.optString("id").ifBlank { m.optString("slug") }
+                            val name = m.optString("name", id)
+                            if (id.isNotBlank()) {
+                                catalog.registerModel("openai", id, name)
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
 }

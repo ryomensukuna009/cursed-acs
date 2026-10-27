@@ -176,10 +176,8 @@ class ChatMessageAdapter(
 
 
 
-    private val onReviewSessionChanges: ((messageId: String, sessionId: String, files: List<String>) -> Unit)? = null
-
-
-
+    private val onReviewSessionChanges: ((messageId: String, sessionId: String, files: List<String>) -> Unit)? = null,
+    private val onEditMessage: ((ChatMessageItem) -> Unit)? = null
 ) : RecyclerView.Adapter<ChatMessageAdapter.MessageViewHolder>() {
 
 
@@ -822,6 +820,11 @@ class ChatMessageAdapter(
                                 .setAllCornerSizes(dp(ctx, 8).toFloat())
                                 .build()
                             setImageBitmap(bmp)
+                            isClickable = true
+                            isFocusable = true
+                            setOnClickListener {
+                                showImagePreviewDialog(ctx, bmp)
+                            }
                         }
                         inner.addView(imgView)
                     }
@@ -911,114 +914,30 @@ class ChatMessageAdapter(
 
 
             inner.addView(contentView)
-
-
-
-
-
-
-
             val actionRow = LinearLayout(ctx).apply {
-
-
-
                 orientation = LinearLayout.HORIZONTAL
-
-
-
                 gravity = Gravity.END
-
-
-
                 layoutParams = LinearLayout.LayoutParams(
-
-
-
                     ViewGroup.LayoutParams.WRAP_CONTENT,
-
-
-
                     ViewGroup.LayoutParams.WRAP_CONTENT
-
-
-
                 ).apply {
-
-
-
                     topMargin = dp(ctx, 4)
-
-
-
                     gravity = Gravity.END
-
-
-
                 }
-
-
-
             }
-
-
-
-
-
-
-
             actionRow.addView(
-
-
-
+                createIconButtonChip(ctx, R.drawable.ic_edit, "Edit prompt") {
+                    onEditMessage?.invoke(item)
+                }
+            )
+            actionRow.addView(
                 createIconButtonChip(ctx, R.drawable.ic_copy, "Copy prompt") {
-
-
-
                     copyToClipboard(ctx, "User prompt", item.content)
-
-
-
                 }
-
-
-
             )
-
-
-
-            actionRow.addView(
-
-
-
-                createIconButtonChip(ctx, R.drawable.ic_update, "Retry") {
-
-
-
-                    onRetryMessage(item)
-
-
-
-                }
-
-
-
-            )
-
-
-
-            inner.addView(actionRow)
-
-
-
-
-
-
-
             card.addView(inner)
-
-
-
             root.addView(card)
+            root.addView(actionRow)
 
 
 
@@ -1875,226 +1794,56 @@ class ChatMessageAdapter(
 
 
             // 7. Assistant Action Footer (Copy Response + Regenerate/Retry + Revert Run)
-
-
-
-            if (!item.isStreaming) {
-
-
-
-                val footerRow = LinearLayout(ctx).apply {
-
-
-
-                    orientation = LinearLayout.HORIZONTAL
-
-
-
-                    gravity = Gravity.END
-
-
-
-                    layoutParams = LinearLayout.LayoutParams(
-
-
-
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-
-
-
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-
-
-
-                    ).apply {
-
-
-
-                        topMargin = dp(ctx, 8)
-
-
-
-                    }
-
-
-
-                }
-
-
-
-
-
-
-
-                val compReport = item.completionReport
-
-
-
-                val isRollbackEligible = compReport != null &&
-
-
-
-                    compReport.rollbackSessionId != null &&
-
-
-
-                    compReport.filesModified.isNotEmpty() &&
-
-
-
-                    !compReport.isRolledBack
-
-
-
-
-
-
-
-                if (isRollbackEligible) {
-
-
-
-                    footerRow.addView(
-
-
-
-                        createIconButtonChip(ctx, R.drawable.ic_search, "Review changes") {
-
-
-
-                            onReviewSessionChanges?.invoke(item.id, compReport!!.rollbackSessionId!!, compReport.filesModified)
-
-
-
-                        }
-
-
-
-                    )
-
-
-
-                    footerRow.addView(
-
-
-
-                        createIconButtonChip(ctx, R.drawable.ic_undo, "Revert changes") {
-
-
-
-                            onRollbackSession?.invoke(item.id, compReport!!.rollbackSessionId!!, compReport.filesModified)
-
-
-
-                        }
-
-
-
-                    )
-
-
-
-                } else if (compReport?.isRolledBack == true) {
-
-
-
-                    footerRow.addView(
-
-
-
-                        createIconButtonChip(ctx, R.drawable.ic_undo, "Changes reverted") {}
-
-
-
-                    )
-
-
-
-                }
-
-
-
-
-
-
-
-                if (item.content.isNotBlank()) {
-
-
-
-                    footerRow.addView(
-
-
-
-                        createIconButtonChip(ctx, R.drawable.ic_copy, "Copy response") {
-
-
-
-                            copyToClipboard(ctx, "AI Response", item.content)
-
-
-
-                        }
-
-
-
-                    )
-
-
-
-                }
-
-
-
-
-
-
-
-                val retryLabel = if (item.isError || item.isCancelled) "Retry" else "Regenerate"
-
-
-
-                footerRow.addView(
-
-
-
-                    createIconButtonChip(ctx, R.drawable.ic_update, retryLabel) {
-
-
-
-                        onRetryMessage(item)
-
-
-
-                    }
-
-
-
-                )
-
-
-
-
-
-
-
-                inner.addView(footerRow)
-
-
-
-            }
-
-
-
-
-
-
-
             card.addView(inner)
-
-
-
             root.addView(card)
+            if (!item.isStreaming) {
+                val footerRow = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.START
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = dp(ctx, 4)
+                        bottomMargin = dp(ctx, 4)
+                    }
+                }
+                val compReport = item.completionReport
+                val isRollbackEligible = compReport != null &&
+                    compReport.rollbackSessionId != null &&
+                    compReport.filesModified.isNotEmpty() &&
+                    !compReport.isRolledBack
+                if (isRollbackEligible) {
+                    footerRow.addView(
+                        createIconButtonChip(ctx, R.drawable.ic_search, "Review changes") {
+                            onReviewSessionChanges?.invoke(item.id, compReport.rollbackSessionId, compReport.filesModified)
+                        }
+                    )
+                    footerRow.addView(
+                        createIconButtonChip(ctx, R.drawable.ic_undo, "Revert changes") {
+                            onRollbackSession?.invoke(item.id, compReport.rollbackSessionId, compReport.filesModified)
+                        }
+                    )
+                } else if (compReport != null && compReport.isRolledBack) {
+                    footerRow.addView(
+                        createIconButtonChip(ctx, R.drawable.ic_undo, "Changes reverted") {}
+                    )
+                }
+                if (item.content.isNotBlank()) {
+                    footerRow.addView(
+                        createIconButtonChip(ctx, R.drawable.ic_copy, "Copy response") {
+                            copyToClipboard(ctx, "AI Response", item.content)
+                        }
+                    )
+                }
+                val retryLabel = if (item.isError || item.isCancelled) "Retry" else "Regenerate"
+                footerRow.addView(
+                    createIconButtonChip(ctx, R.drawable.ic_update, retryLabel) {
+                        onRetryMessage(item)
+                    }
+                )
+                root.addView(footerRow)
+            }
 
 
 
@@ -4120,7 +3869,7 @@ class ChatMessageAdapter(
 
 
 
-            val sizePx = dp(ctx, 36)
+            val sizePx = dp(ctx, 28)
 
 
 
@@ -4144,7 +3893,7 @@ class ChatMessageAdapter(
 
 
 
-                val iconPadding = dp(ctx, 8)
+                val iconPadding = dp(ctx, 5)
 
 
 
@@ -6143,6 +5892,34 @@ class ChatMessageAdapter(
 
 
 
+
+    private fun showImagePreviewDialog(context: Context, bmp: android.graphics.Bitmap) {
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
+            .create()
+        val scroll = android.widget.ScrollView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+        val img = android.widget.ImageView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            adjustViewBounds = true
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            setImageBitmap(bmp)
+            val pad = dp(context, 16)
+            setPadding(pad, pad, pad, pad)
+        }
+        scroll.addView(img)
+        dialog.setView(scroll)
+        dialog.setButton(android.content.DialogInterface.BUTTON_POSITIVE, context.getString(android.R.string.ok)) { d, _ ->
+            d.dismiss()
+        }
+        dialog.show()
+    }
 
     private fun dp(context: Context, value: Int): Int {
 

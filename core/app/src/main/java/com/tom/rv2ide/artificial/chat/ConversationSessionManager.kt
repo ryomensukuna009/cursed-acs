@@ -246,10 +246,19 @@ class ConversationSessionManager(
             conv.title.startsWith("Hello ") ||
             conv.title.startsWith("Hi ")
 
-        val derived = deriveConversationTitle(content)
+        val allUserMsgs = conv.messages.filter { it.role == ChatRole.USER }.map { it.content } + content
+        val shouldDeriveTitle = (allUserMsgs.size >= 2 || (content.length > 25 && !content.startsWith("hi", ignoreCase = true) && !content.startsWith("hello", ignoreCase = true)))
+        val derived = if (shouldDeriveTitle) {
+            val substantive = allUserMsgs.firstOrNull { 
+                val t = deriveConversationTitle(it)
+                t != "New Conversation" && t.length >= 4
+            } ?: content
+            deriveConversationTitle(substantive)
+        } else {
+            "New Conversation"
+        }
+
         val newTitle = if ((conv.messages.isEmpty() || isGenericTitle) && derived != "New Conversation") {
-            derived
-        } else if (conv.title == "New Conversation") {
             derived
         } else {
             conv.title

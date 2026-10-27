@@ -28,6 +28,20 @@ import com.tom.rv2ide.artificial.providers.TriStateCapability
 import com.tom.rv2ide.artificial.providers.ModelCapabilities
 import com.tom.rv2ide.artificial.tools.WebSearchManager
 import com.tom.rv2ide.managers.CodeCompletionManager
+import com.google.android.material.tabs.TabLayout
+import com.tom.rv2ide.artificial.auth.OAuthAccountRegistry
+import com.tom.rv2ide.artificial.auth.OAuthAccount
+import com.tom.rv2ide.artificial.auth.ProviderOAuthManager
+import com.tom.rv2ide.artificial.mcp.McpClientManager
+import com.tom.rv2ide.artificial.mcp.McpServerConfig
+import com.tom.rv2ide.artificial.mcp.McpTransportType
+import com.tom.rv2ide.artificial.skills.SkillManager
+import com.tom.rv2ide.artificial.skills.SkillRecord
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.card.MaterialCardView
+import android.widget.LinearLayout
+import android.view.Gravity
+import android.widget.EditText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -63,6 +77,17 @@ class AIPreferencesFragment(
     private lateinit var codeCompletionToggle: MaterialSwitch
     private lateinit var currentProviderText: MaterialTextView
     private lateinit var currentModelText: MaterialTextView
+
+    private lateinit var preferencesTabLayout: TabLayout
+    private lateinit var containerApiProviders: LinearLayout
+    private lateinit var containerAccountLogin: LinearLayout
+    private lateinit var containerMcp: LinearLayout
+    private lateinit var containerSkills: LinearLayout
+    private lateinit var accountCardsContainer: LinearLayout
+    private lateinit var mcpServersListContainer: LinearLayout
+    private lateinit var skillsListContainer: LinearLayout
+    private lateinit var btnAddMcpServer: MaterialButton
+    private lateinit var btnAddSkill: MaterialButton
 
     private val providerSwitchDialog by lazy { ProviderSwitchDialog(requireContext()) }
     private val registryManager by lazy { ProviderRegistryManager.getInstance(requireContext()) }
@@ -118,6 +143,20 @@ class AIPreferencesFragment(
         searchModelsBtn = view.findViewById(R.id.searchModelsBtn)
         modelDiscoveryStatusText = view.findViewById(R.id.modelDiscoveryStatusText)
         webSearchStatusText = view.findViewById(R.id.webSearchStatusText)
+
+        preferencesTabLayout = view.findViewById(R.id.preferencesTabLayout)
+        containerApiProviders = view.findViewById(R.id.containerApiProviders)
+        containerAccountLogin = view.findViewById(R.id.containerAccountLogin)
+        containerMcp = view.findViewById(R.id.containerMcp)
+        containerSkills = view.findViewById(R.id.containerSkills)
+        accountCardsContainer = view.findViewById(R.id.accountCardsContainer)
+        mcpServersListContainer = view.findViewById(R.id.mcpServersListContainer)
+        skillsListContainer = view.findViewById(R.id.skillsListContainer)
+        btnAddMcpServer = view.findViewById(R.id.btnAddMcpServer)
+        btnAddSkill = view.findViewById(R.id.btnAddSkill)
+
+        setupPreferencesTabs()
+        setupMcpAndSkillsButtons()
         configureWebSearchBtn = view.findViewById(R.id.configureWebSearchBtn)
         autoSwitchToggle = view.findViewById(R.id.autoSwitchToggle)
         codeCompletionToggle = view.findViewById(R.id.codeCompletionToggle)
@@ -166,19 +205,7 @@ class AIPreferencesFragment(
     }
 
     private fun setupProviderActionButtons() {
-        view?.findViewById<com.google.android.material.button.MaterialButton>(com.tom.rv2ide.R.id.btnAccountsHub)?.setOnClickListener {
-            com.tom.rv2ide.artificial.auth.ProviderOAuthManager.showOAuthAccountsHubDialog(
-                requireContext(),
-                viewLifecycleOwner.lifecycleScope
-            ) { connected ->
-                aiAgent.refreshRegisteredProfiles()
-                setupProviderDropdown()
-                val profile = registryManager.getProfile(connected)
-                if (profile != null) {
-                    handleProviderChange(profile.id, profile.displayName)
-                }
-            }
-        }
+// Accounts now accessed via Accounts Tab
         editProviderBtn.setOnClickListener {
             val currentId = agents.getProvider()
             val profile = registryManager.getProfile(currentId) ?: currentProfilesList.firstOrNull() ?: return@setOnClickListener
@@ -493,6 +520,477 @@ class AIPreferencesFragment(
         view?.let {
             Snackbar.make(it, message, Snackbar.LENGTH_SHORT).show()
         }
+    }
+
+    private fun resolveThemeColor(ctx: Context, attr: Int, defaultColor: Int): Int {
+        val typedValue = android.util.TypedValue()
+        return if (ctx.theme.resolveAttribute(attr, typedValue, true)) {
+            typedValue.data
+        } else {
+            defaultColor
+        }
+    }
+
+    private fun setupPreferencesTabs() {
+        preferencesTabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                when (tab?.position) {
+                    0 -> {
+                        containerApiProviders.visibility = View.VISIBLE
+                        containerAccountLogin.visibility = View.GONE
+                        containerMcp.visibility = View.GONE
+                        containerSkills.visibility = View.GONE
+                    }
+                    1 -> {
+                        containerApiProviders.visibility = View.GONE
+                        containerAccountLogin.visibility = View.VISIBLE
+                        containerMcp.visibility = View.GONE
+                        containerSkills.visibility = View.GONE
+                        renderAccountCards()
+                    }
+                    2 -> {
+                        containerApiProviders.visibility = View.GONE
+                        containerAccountLogin.visibility = View.GONE
+                        containerMcp.visibility = View.VISIBLE
+                        containerSkills.visibility = View.GONE
+                        renderMcpServers()
+                    }
+                    3 -> {
+                        containerApiProviders.visibility = View.GONE
+                        containerAccountLogin.visibility = View.GONE
+                        containerMcp.visibility = View.GONE
+                        containerSkills.visibility = View.VISIBLE
+                        renderSkills()
+                    }
+                }
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
+        })
+    }
+
+    private fun setupMcpAndSkillsButtons() {
+        btnAddMcpServer.setOnClickListener {
+            showAddMcpServerDialog()
+        }
+        btnAddSkill.setOnClickListener {
+            showAddSkillDialog()
+        }
+    }
+
+    private fun renderAccountCards() {
+        val ctx = context ?: return
+        accountCardsContainer.removeAllViews()
+        val density = resources.displayMetrics.density
+        val registry = OAuthAccountRegistry.getInstance(ctx)
+
+        data class ProviderMeta(val id: String, val name: String, val icon: String, val subtitle: String)
+        val providers = listOf(
+            ProviderMeta("openai", "ChatGPT", "🤖", "Codex Stream • Multiple Accounts"),
+            ProviderMeta("claude", "Claude", "🧠", "Anthropic Messages • PKCE"),
+            ProviderMeta("grok", "Grok", "⚡", "xAI Responses • Device Flow"),
+            ProviderMeta("kimi", "Kimi Code", "🌙", "Moonshot Kimi • Coding API"),
+            ProviderMeta("gemini", "Google Gemini", "🌐", "Google AI Studio • Live Connect")
+        )
+
+        for (p in providers) {
+            val accounts = registry.getAccounts(p.id)
+
+            val card = MaterialCardView(ctx).apply {
+                radius = 14 * density
+                strokeWidth = (1 * density).toInt()
+                strokeColor = resolveThemeColor(ctx, com.google.android.material.R.attr.colorOutlineVariant, android.graphics.Color.DKGRAY)
+                setCardBackgroundColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceContainer, android.graphics.Color.parseColor("#1E1E2E")))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = (12 * density).toInt()
+                }
+            }
+
+            val cardContent = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt())
+            }
+
+            // Header row
+            val headerRow = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            }
+
+            val iconTv = TextView(ctx).apply {
+                text = p.icon
+                textSize = 22f
+                setPadding(0, 0, (10 * density).toInt(), 0)
+            }
+            headerRow.addView(iconTv)
+
+            val titleCol = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            val titleTv = TextView(ctx).apply {
+                text = p.name
+                textSize = 15f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE))
+            }
+            val subTv = TextView(ctx).apply {
+                text = p.subtitle
+                textSize = 11.5f
+                setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
+            }
+            titleCol.addView(titleTv)
+            titleCol.addView(subTv)
+            headerRow.addView(titleCol)
+
+            val addBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                text = "+ Add"
+                textSize = 11.5f
+                insetTop = 0
+                insetBottom = 0
+                setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
+                setOnClickListener {
+                    ProviderOAuthManager.showOAuthAccountsHubDialog(ctx, lifecycleScope) { connected ->
+                        aiAgent.refreshRegisteredProfiles()
+                        renderAccountCards()
+                        showSnackbar("Account connected: $connected")
+                    }
+                }
+            }
+            headerRow.addView(addBtn)
+            cardContent.addView(headerRow)
+
+            // Accounts list inside card
+            if (accounts.isEmpty()) {
+                val emptyTv = TextView(ctx).apply {
+                    text = "No accounts connected yet. Tap '+ Add' to sign in."
+                    textSize = 12f
+                    setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
+                    setPadding(0, (10 * density).toInt(), 0, (4 * density).toInt())
+                }
+                cardContent.addView(emptyTv)
+            } else {
+                for (acc in accounts) {
+                    val accRow = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(0, (8 * density).toInt(), 0, (4 * density).toInt())
+                    }
+
+                    val infoCol = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    }
+
+                    val accEmailTv = TextView(ctx).apply {
+                        text = (acc.email.ifBlank { "Account ID: ${acc.id.take(8)}" }) + if (acc.plan.isNotBlank()) " [${acc.plan.uppercase()}]" else ""
+                        textSize = 13f
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE))
+                    }
+
+                    val statusTv = TextView(ctx).apply {
+                        text = when {
+                            acc.isQuotaExhausted -> "⚠️ Quota Exhausted (Auto-Fallback Ready)"
+                            acc.isActive -> "🟢 Active Account"
+                            else -> "⚪ Standby Account"
+                        }
+                        textSize = 11f
+                        setTextColor(if (acc.isQuotaExhausted) android.graphics.Color.parseColor("#EF4444") else if (acc.isActive) android.graphics.Color.parseColor("#10B981") else android.graphics.Color.GRAY)
+                    }
+
+                    infoCol.addView(accEmailTv)
+                    infoCol.addView(statusTv)
+                    accRow.addView(infoCol)
+
+                    if (!acc.isActive) {
+                        val makeActiveBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonTonalStyle).apply {
+                            text = "Use"
+                            textSize = 11f
+                            insetTop = 0
+                            insetBottom = 0
+                            setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
+                            setOnClickListener {
+                                registry.setActiveAccount(p.id, acc.id)
+                                renderAccountCards()
+                                showSnackbar("Active account set to ${acc.email.ifBlank { acc.id.take(8) }}")
+                            }
+                        }
+                        accRow.addView(makeActiveBtn)
+                    }
+
+                    val removeBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                        text = "✕"
+                        textSize = 11f
+                        insetTop = 0
+                        insetBottom = 0
+                        setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+                        setOnClickListener {
+                            registry.removeAccount(acc.id)
+                            renderAccountCards()
+                            showSnackbar("Removed account")
+                        }
+                    }
+                    accRow.addView(removeBtn)
+
+                    cardContent.addView(accRow)
+                }
+            }
+
+            card.addView(cardContent)
+            accountCardsContainer.addView(card)
+        }
+    }
+
+    private fun renderMcpServers() {
+        val ctx = context ?: return
+        mcpServersListContainer.removeAllViews()
+        val density = resources.displayMetrics.density
+        val mcpManager = McpClientManager.getInstance(ctx)
+        val servers = mcpManager.getServers()
+
+        if (servers.isEmpty()) {
+            val emptyTv = TextView(ctx).apply {
+                text = "No MCP servers configured. Tap '+ Add Server' to register an MCP tool server."
+                textSize = 13f
+                setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
+                setPadding(0, (12 * density).toInt(), 0, 0)
+            }
+            mcpServersListContainer.addView(emptyTv)
+            return
+        }
+
+        for (srv in servers) {
+            val card = MaterialCardView(ctx).apply {
+                radius = 12 * density
+                strokeWidth = (1 * density).toInt()
+                strokeColor = resolveThemeColor(ctx, com.google.android.material.R.attr.colorOutlineVariant, android.graphics.Color.DKGRAY)
+                setCardBackgroundColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceContainer, android.graphics.Color.parseColor("#1E1E2E")))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = (8 * density).toInt()
+                }
+            }
+
+            val cardContent = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((12 * density).toInt(), (12 * density).toInt(), (12 * density).toInt(), (12 * density).toInt())
+            }
+
+            val infoCol = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val titleTv = TextView(ctx).apply {
+                text = srv.name
+                textSize = 14f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE))
+            }
+
+            val subTv = TextView(ctx).apply {
+                val detail = if (srv.transportType == McpTransportType.STDIO) "STDIO: ${srv.command}" else "SSE: ${srv.endpointUrl}"
+                text = detail
+                textSize = 11.5f
+                setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
+            }
+
+            infoCol.addView(titleTv)
+            infoCol.addView(subTv)
+            cardContent.addView(infoCol)
+
+            val toggle = com.google.android.material.materialswitch.MaterialSwitch(ctx).apply {
+                isChecked = srv.enabled
+                setOnCheckedChangeListener { _, isChecked ->
+                    mcpManager.saveServer(srv.copy(enabled = isChecked))
+                    showSnackbar("MCP server ${srv.name} ${if (isChecked) "enabled" else "disabled"}")
+                }
+            }
+            cardContent.addView(toggle)
+
+            val deleteBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                text = "✕"
+                textSize = 11f
+                insetTop = 0
+                insetBottom = 0
+                setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+                setOnClickListener {
+                    mcpManager.deleteServer(srv.id)
+                    renderMcpServers()
+                    showSnackbar("Deleted server ${srv.name}")
+                }
+            }
+            cardContent.addView(deleteBtn)
+
+            card.addView(cardContent)
+            mcpServersListContainer.addView(card)
+        }
+    }
+
+    private fun showAddMcpServerDialog() {
+        val ctx = context ?: return
+        val density = resources.displayMetrics.density
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((16 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
+        }
+
+        val nameInput = EditText(ctx).apply {
+            hint = "Server Name (e.g. Git Tools)"
+            setSingleLine()
+        }
+        root.addView(nameInput)
+
+        val cmdInput = EditText(ctx).apply {
+            hint = "Command or URL (e.g. git-mcp or http://localhost:8080/sse)"
+            setSingleLine()
+        }
+        root.addView(cmdInput)
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle("Add MCP Server")
+            .setView(root)
+            .setPositiveButton("Add") { _, _ ->
+                val name = nameInput.text.toString().trim()
+                val target = cmdInput.text.toString().trim()
+                if (name.isNotBlank() && target.isNotBlank()) {
+                    val isUrl = target.startsWith("http://") || target.startsWith("https://")
+                    val cfg = McpServerConfig(
+                        name = name,
+                        transportType = if (isUrl) McpTransportType.SSE_HTTP else McpTransportType.STDIO,
+                        command = if (!isUrl) target else "",
+                        endpointUrl = if (isUrl) target else "",
+                        enabled = true
+                    )
+                    McpClientManager.getInstance(ctx).saveServer(cfg)
+                    renderMcpServers()
+                    showSnackbar("Added MCP server $name")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun renderSkills() {
+        val ctx = context ?: return
+        skillsListContainer.removeAllViews()
+        val density = resources.displayMetrics.density
+        val skillManager = SkillManager.getInstance(ctx)
+        val skills = skillManager.discoverSkills()
+
+        if (skills.isEmpty()) {
+            val emptyTv = TextView(ctx).apply {
+                text = "No skills discovered. Tap '+ Add Skill' to register custom skills."
+                textSize = 13f
+                setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
+                setPadding(0, (12 * density).toInt(), 0, 0)
+            }
+            skillsListContainer.addView(emptyTv)
+            return
+        }
+
+        for (sk in skills) {
+            val card = MaterialCardView(ctx).apply {
+                radius = 12 * density
+                strokeWidth = (1 * density).toInt()
+                strokeColor = resolveThemeColor(ctx, com.google.android.material.R.attr.colorOutlineVariant, android.graphics.Color.DKGRAY)
+                setCardBackgroundColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceContainer, android.graphics.Color.parseColor("#1E1E2E")))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = (8 * density).toInt()
+                }
+            }
+
+            val cardContent = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((12 * density).toInt(), (12 * density).toInt(), (12 * density).toInt(), (12 * density).toInt())
+            }
+
+            val infoCol = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val titleTv = TextView(ctx).apply {
+                text = sk.name
+                textSize = 14f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.WHITE))
+            }
+
+            val subTv = TextView(ctx).apply {
+                text = sk.description.ifBlank { "Custom Agent Workflow Skill" }
+                textSize = 11.5f
+                setTextColor(resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, android.graphics.Color.LTGRAY))
+            }
+
+            infoCol.addView(titleTv)
+            infoCol.addView(subTv)
+            cardContent.addView(infoCol)
+
+            val toggle = com.google.android.material.materialswitch.MaterialSwitch(ctx).apply {
+                isChecked = sk.enabled
+                setOnCheckedChangeListener { _, isChecked ->
+                    skillManager.setSkillEnabled(sk.id, isChecked)
+                    showSnackbar("Skill ${sk.name} ${if (isChecked) "enabled" else "disabled"}")
+                }
+            }
+            cardContent.addView(toggle)
+
+            card.addView(cardContent)
+            skillsListContainer.addView(card)
+        }
+    }
+
+    private fun showAddSkillDialog() {
+        val ctx = context ?: return
+        val density = resources.displayMetrics.density
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((16 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
+        }
+
+        val nameInput = EditText(ctx).apply {
+            hint = "Skill Name (e.g. NDK Architect)"
+            setSingleLine()
+        }
+        root.addView(nameInput)
+
+        val descInput = EditText(ctx).apply {
+            hint = "Instructions / Description"
+            minLines = 3
+        }
+        root.addView(descInput)
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle("Add Agent Skill")
+            .setView(root)
+            .setPositiveButton("Save") { _, _ ->
+                val name = nameInput.text.toString().trim()
+                val desc = descInput.text.toString().trim()
+                if (name.isNotBlank()) {
+                    val skillManager = SkillManager.getInstance(ctx)
+                    val globalDir = java.io.File(ctx.filesDir, "skills/" + name.lowercase().replace(" ", "-"))
+                    globalDir.mkdirs()
+                    val mdFile = java.io.File(globalDir, "SKILL.md")
+                    mdFile.writeText("---\nname: $name\ndescription: $desc\n---\n\n# $name\n$desc\n")
+                    renderSkills()
+                    showSnackbar("Created skill $name")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     override fun onDestroyView() {

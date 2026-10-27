@@ -146,6 +146,28 @@ class ModelCatalogManager private constructor(context: Context) {
         return rawId.trim().lowercase(Locale.ROOT).removePrefix("models/")
     }
 
+    fun registerModel(
+        providerId: String,
+        modelId: String,
+        displayName: String,
+        supportsVision: Boolean = false,
+        supportsReasoning: Boolean = false,
+        supportsTools: Boolean = true,
+        contextLength: Int = 128000
+    ) {
+        val normId = normalizeId(modelId)
+        modelCache[normId] = CatalogModelInfo(
+            id = modelId,
+            name = displayName,
+            family = providerId,
+            supportsVision = supportsVision || checkVisionHeuristics(normId),
+            supportsTools = supportsTools || checkToolHeuristics(normId),
+            supportsReasoning = supportsReasoning || checkReasoningHeuristics(normId),
+            contextLength = contextLength,
+            maxOutputTokens = 8192
+        )
+    }
+
     /**
      * Looks up capabilities from the catalog with intelligent pattern fallbacks.
      */

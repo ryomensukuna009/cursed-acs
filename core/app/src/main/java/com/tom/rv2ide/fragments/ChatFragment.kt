@@ -175,6 +175,9 @@ class ChatFragment : Fragment() {
         }
     }
 
+    private var classicPromptLayout: TextInputLayout? = null
+    private var kelivoComposerCard: View? = null
+    private var modeControlPanel: View? = null
     private lateinit var promptLayout: TextInputLayout
 
     private lateinit var promptInput: TextInputEditText
@@ -580,9 +583,26 @@ class ChatFragment : Fragment() {
 
     private fun initializeViews(view: View) {
 
-        promptLayout = view.findViewById(R.id.promptLayout)
+        classicPromptLayout = view.findViewById(R.id.classicPromptLayout)
+        kelivoComposerCard = view.findViewById(R.id.kelivoComposerCard)
+        modeControlPanel = view.findViewById(R.id.modeControlPanel)
 
-        promptInput = view.findViewById(R.id.anyText)
+        val isKelivoTheme = com.tom.rv2ide.ui.themes.ThemeManager().getCurrentTheme() == com.tom.rv2ide.ui.themes.IDETheme.KELIVO_SLEEK
+        if (isKelivoTheme) {
+            promptLayout = view.findViewById(R.id.promptLayout)
+            promptInput = view.findViewById(R.id.anyText)
+            promptLayout.isEndIconVisible = false
+            promptLayout.isStartIconVisible = false
+            classicPromptLayout?.visibility = View.GONE
+            kelivoComposerCard?.visibility = View.VISIBLE
+            modeControlPanel?.visibility = View.GONE
+        } else {
+            promptLayout = classicPromptLayout ?: view.findViewById(R.id.promptLayout)
+            promptInput = view.findViewById<com.tom.rv2ide.ui.ChatComposerEditText>(R.id.classicAnyText) ?: view.findViewById(R.id.anyText)
+            kelivoComposerCard?.visibility = View.GONE
+            classicPromptLayout?.visibility = View.VISIBLE
+            modeControlPanel?.visibility = View.VISIBLE
+        }
 
         activeModelChipBtn = view.findViewById(R.id.activeModelChipBtn)
 
@@ -782,6 +802,12 @@ class ChatFragment : Fragment() {
             onReviewSessionChanges = { messageId, sessionId, files ->
 
                 showReviewChangesDialog(messageId, sessionId, files)
+
+            },
+
+            onEditMessage = { msgItem ->
+
+                loadMessageForEditing(msgItem.content)
 
             }
 
@@ -1245,6 +1271,24 @@ class ChatFragment : Fragment() {
             }
         }
 
+        classicPromptLayout?.setStartIconOnClickListener {
+            if (checkCurrentModelSupportsVision()) {
+                pickImageLauncher.launch("image/*")
+            } else {
+                showSnackbar("Selected model (${agentsHelper.getAgent()}) does not support vision / images")
+            }
+        }
+        classicPromptLayout?.setEndIconOnClickListener {
+            if (aiRequestHandler.isGenerating()) {
+                aiRequestHandler.cancel()
+                com.tom.rv2ide.artificial.policy.ActionPolicyGate.cancelHold()
+                updateStopButtonState(false)
+                showSnackbar("Stopped generation")
+            } else {
+                executeBtn.performClick()
+            }
+        }
+
         promptLayout.setEndIconOnClickListener {
 
             if (aiRequestHandler.isGenerating()) {
@@ -1369,46 +1413,39 @@ class ChatFragment : Fragment() {
 
     private fun updateReasoningEffortButton() {
         val effort = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort(requireContext())
-        btnReasoningEffort.text = when (effort) {
+        val effortText = when (effort) {
+            com.tom.rv2ide.artificial.models.ReasoningEffort.AUTO -> "🧠 Auto"
             com.tom.rv2ide.artificial.models.ReasoningEffort.OFF -> "🧠 Off"
             com.tom.rv2ide.artificial.models.ReasoningEffort.LOW -> "🧠 Low"
             com.tom.rv2ide.artificial.models.ReasoningEffort.MEDIUM -> "🧠 Med"
             com.tom.rv2ide.artificial.models.ReasoningEffort.HIGH -> "🧠 High"
+            com.tom.rv2ide.artificial.models.ReasoningEffort.MAXIMUM -> "🧠 Max"
         }
+        btnReasoningEffort.text = effortText
+        btnComposerReasoning?.text = effortText
+    }
+
+    private fun loadMessageForEditing(content: String) {
+        promptInput.setText(content)
+        promptInput.setSelection(content.length)
+        promptInput.requestFocus()
+        try {
+            val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(promptInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        } catch (_: Exception) {}
+        showSnackbar("Prompt loaded for editing")
     }
 
     private fun showReasoningEffortDialog() {
         val current = com.tom.rv2ide.artificial.preferences.AIAgentPreferences.getReasoningEffort(requireContext())
-        val options = arrayOf(
-            "Off (Fast — standard response)",
-            "Low (~1,024 thinking tokens)",
-            "Medium (~4,096 thinking tokens — balanced)",
-            "High (~16,000 thinking tokens — deep reasoning)"
-        )
-        val selectedIdx = when (current) {
-            com.tom.rv2ide.artificial.models.ReasoningEffort.OFF -> 0
-            com.tom.rv2ide.artificial.models.ReasoningEffort.LOW -> 1
-            com.tom.rv2ide.artificial.models.ReasoningEffort.MEDIUM -> 2
-            com.tom.rv2ide.artificial.models.ReasoningEffort.HIGH -> 3
+        com.tom.rv2ide.artificial.dialogs.ReasoningEffortSliderDialog.show(
+            requireContext(),
+            current
+        ) { chosen ->
+            com.tom.rv2ide.artificial.preferences.AIAgentPreferences.setReasoningEffort(requireContext(), chosen)
+            updateReasoningEffortButton()
+            showSnackbar("Reasoning effort set to ${chosen.displayName}")
         }
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Reasoning Effort (Thinking Budget)")
-            .setSingleChoiceItems(options, selectedIdx) { d, which ->
-                val chosen = when (which) {
-                    0 -> com.tom.rv2ide.artificial.models.ReasoningEffort.OFF
-                    1 -> com.tom.rv2ide.artificial.models.ReasoningEffort.LOW
-                    2 -> com.tom.rv2ide.artificial.models.ReasoningEffort.MEDIUM
-                    3 -> com.tom.rv2ide.artificial.models.ReasoningEffort.HIGH
-                    else -> com.tom.rv2ide.artificial.models.ReasoningEffort.MEDIUM
-                }
-                com.tom.rv2ide.artificial.preferences.AIAgentPreferences.setReasoningEffort(requireContext(), chosen)
-                updateReasoningEffortButton()
-                showSnackbar("Reasoning effort set to ${chosen.displayName}")
-                d.dismiss()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun toggleApprovalMode() {
@@ -1785,16 +1822,19 @@ class ChatFragment : Fragment() {
 
         if (!isAdded || view == null) return
 
+        val isKelivoTheme = com.tom.rv2ide.ui.themes.ThemeManager().getCurrentTheme() == com.tom.rv2ide.ui.themes.IDETheme.KELIVO_SLEEK
         promptLayout.post {
-
             if (!isAdded || view == null) return@post
-
             val drawableRes = if (isRunning) R.drawable.ic_stop else R.drawable.ic_send
-
-            promptLayout.endIconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), drawableRes)
-
-            promptLayout.endIconContentDescription = if (isRunning) "Stop generation" else "Send message"
-
+            if (!isKelivoTheme) {
+                promptLayout.isEndIconVisible = true
+                promptLayout.endIconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), drawableRes)
+                promptLayout.endIconContentDescription = if (isRunning) "Stop generation" else "Send message"
+            } else {
+                promptLayout.isEndIconVisible = false
+            }
+            classicPromptLayout?.endIconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), drawableRes)
+            classicPromptLayout?.endIconContentDescription = if (isRunning) "Stop generation" else "Send message"
         }
         btnComposerSend?.let { btn ->
             btn.post {

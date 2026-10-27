@@ -136,7 +136,12 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
             request.maxTokens?.let { put("max_tokens", it) }
             request.reasoningEffort?.let { effort ->
                 if (effort != com.tom.rv2ide.artificial.models.ReasoningEffort.OFF) {
-                    put("reasoning_effort", effort.key)
+                    val effortStr = when (effort) {
+                        com.tom.rv2ide.artificial.models.ReasoningEffort.AUTO -> "auto"
+                        com.tom.rv2ide.artificial.models.ReasoningEffort.MAXIMUM -> "high"
+                        else -> effort.key
+                    }
+                    put("reasoning_effort", effortStr)
                 }
             }
 

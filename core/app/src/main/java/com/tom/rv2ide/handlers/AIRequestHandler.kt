@@ -113,6 +113,30 @@ class AIRequestHandler(
                     toolStatusBanner?.visibility = View.GONE
                 }
             } catch (e: Exception) {
+                val err = e.message.orEmpty().lowercase()
+                val isQuotaError = err.contains("quota") || err.contains("rate limit") || err.contains("429") || err.contains("credit") || err.contains("balance")
+                if (isQuotaError) {
+                    val ctx = executeBtn.context
+                    val providerId = aiAgent.getCurrentProviderId()
+                    val registry = com.tom.rv2ide.artificial.auth.OAuthAccountRegistry.getInstance(ctx)
+                    val currentAcc = registry.getActiveAccount(providerId)
+                    if (currentAcc != null) {
+                        registry.markQuotaExhausted(currentAcc.id)
+                    }
+                    val nextAcc = registry.getNextAvailableAccount(providerId)
+                    if (nextAcc != null) {
+                        withContext(Dispatchers.Main) {
+                            toolStatusBanner?.text = "⚠️ Quota reached. Auto-switching to ${nextAcc.email.ifBlank { "Fallback Account" }}..."
+                            statusText.text = "Switching to fallback account ${nextAcc.email}..."
+                        }
+                        com.tom.rv2ide.artificial.secrets.SecureKeyStore.putProviderApiKey(ctx, providerId, nextAcc.accessToken)
+                        aiAgent.reinitializeWithSelectedModel()
+                        try {
+                            executeAIRequest(userRequest, explicitWebSearch)
+                            return@launch
+                        } catch (_: Exception) {}
+                    }
+                }
                 withContext(Dispatchers.Main) {
                     activeAssistantMessageId?.let { msgId ->
                         sessionManager?.failAssistantMessage(
@@ -125,7 +149,6 @@ class AIRequestHandler(
                     activeAssistantMessageId = null
                     executeBtn.isEnabled = true
                     stopBtn?.visibility = View.GONE
-        onGenerationStateChanged?.invoke(false)
                     onGenerationStateChanged?.invoke(false)
                     progressIndicator.visibility = View.GONE
                     toolStatusBanner?.visibility = View.GONE

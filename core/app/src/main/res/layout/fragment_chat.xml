@@ -387,6 +387,39 @@
                 style="@style/Widget.Material3.Button.IconButton.Filled" />
         </FrameLayout>
 
+        <!-- Classic ACS Outlined Composer (Crimson, Cyan, Slate, etc.) -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/classicPromptLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Ask a question or describe code changes…"
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp"
+            app:startIconDrawable="@drawable/ic_add"
+            app:startIconContentDescription="Attach photo or screenshot"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_send"
+            app:endIconTint="?attr/colorPrimary"
+            app:endIconContentDescription="Send message"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+
+            <com.tom.rv2ide.ui.ChatComposerEditText
+                android:id="@+id/classicAnyText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textMultiLine|textCapSentences"
+                android:minLines="1"
+                android:maxLines="5"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:includeFontPadding="false"
+                android:gravity="center_vertical|start"
+                android:textSize="14sp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
         <!-- Kelivo-Style Sleek Floating Composer Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/kelivoComposerCard"
@@ -415,9 +448,7 @@
                     app:boxStrokeWidth="0dp"
                     app:boxStrokeWidthFocused="0dp"
                     app:hintEnabled="true"
-                    app:startIconDrawable="@drawable/ic_add"
-                    app:endIconMode="custom"
-                    app:endIconDrawable="@drawable/ic_send"
+                    app:endIconMode="none"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                     <com.tom.rv2ide.ui.ChatComposerEditText
