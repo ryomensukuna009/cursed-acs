@@ -84,7 +84,7 @@ object ProtocolAdapterHelper {
         if (isChatGptOAuth) {
             headers["Authorization"] = "Bearer $cleanKey"
             headers["Content-Type"] = "application/json"
-            headers["Accept"] = if (acceptSse) "text/event-stream" else "application/json"
+            headers["Accept"] = "text/event-stream"
             headers.remove("x-api-key")
             headers["originator"] = "kelivo"
             headers["version"] = "0.159.0"

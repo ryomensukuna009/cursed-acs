@@ -182,10 +182,21 @@ open class UnifiedTransportClient(
             val body = resp.body ?: throw NetworkErrorException("Empty response body from provider")
             val contentType = resp.header("Content-Type").orEmpty().lowercase()
 
-            val shouldParseStream = request.stream && (
+            val isChatGptOAuth = built.url.contains("backend-api/codex/responses") ||
+                ((request.profile.id.equals("openai", ignoreCase = true) ||
+                    request.profile.id.equals("chatgpt", ignoreCase = true) ||
+                    request.profile.baseUrl.contains("openai.com") ||
+                    request.profile.baseUrl.contains("chatgpt.com")) &&
+                    (request.modelId.contains("terra", ignoreCase = true) ||
+                        request.modelId.contains("codex", ignoreCase = true) ||
+                        request.modelId.startsWith("gpt-5", ignoreCase = true) ||
+                        secrets.any { it.startsWith("ey") || it.length > 150 }))
+
+            val shouldParseStream = (request.stream || isChatGptOAuth) && (
                 contentType.contains("text/event-stream") ||
                     contentType.contains("application/x-ndjson") ||
-                    request.profile.protocol == ApiProtocol.OLLAMA_NATIVE
+                    request.profile.protocol == ApiProtocol.OLLAMA_NATIVE ||
+                    isChatGptOAuth
                 )
 
             if (shouldParseStream) {
@@ -198,8 +209,9 @@ open class UnifiedTransportClient(
                 )
             } else {
                 val rawBody = body.string()
-                // Check if server returned SSE lines without text/event-stream header
-                if (request.stream && rawBody.trimStart().startsWith("data:")) {
+                val trimmed = rawBody.trimStart()
+                // Check if server returned SSE lines (data:, event:, or keep-alive comment) without text/event-stream header
+                if (trimmed.startsWith("data:") || trimmed.startsWith("event:") || trimmed.startsWith(":")) {
                     val reader = BufferedReader( rawBody.reader() )
                     adapter.parseStreamingResponse(
                         reader = reader,
@@ -209,7 +221,7 @@ open class UnifiedTransportClient(
                     )
                 } else {
                     val parsed = adapter.parseNonStreamingResponse(rawBody, request.modelId)
-                    if (request.stream) {
+                    if (request.stream || isChatGptOAuth) {
                         if (parsed.text.isNotEmpty()) {
                             onEvent(StreamEvent.TextDelta(parsed.text))
                         }

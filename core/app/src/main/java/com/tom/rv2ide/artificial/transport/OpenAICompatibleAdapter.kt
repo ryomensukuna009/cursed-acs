@@ -230,7 +230,7 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
                 put("model", request.modelId)
                 put("instructions", instructions)
                 put("input", inputArr)
-                put("stream", request.stream)
+                put("stream", true)
                 put("store", false)
                 headers["session_id"]?.let { sessId ->
                     put("prompt_cache_key", sessId)
@@ -309,6 +309,17 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
         responseBody: String,
         modelId: String
     ): UnifiedChatResponse {
+        val trimmed = responseBody.trimStart()
+        if (trimmed.startsWith("data:") || trimmed.startsWith("event:") || trimmed.startsWith(":")) {
+            val reader = BufferedReader(responseBody.reader())
+            return parseStreamingResponse(
+                reader = reader,
+                modelId = modelId,
+                isCancelled = { false },
+                onEvent = {}
+            )
+        }
+
         val root = try {
             JSONObject(responseBody)
         } catch (e: Exception) {
@@ -452,11 +463,11 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
                 }
             }
 
-            val frameType = obj.optString("type", "")
+            val frameType = obj.optString("type", "").ifBlank { frame.event.orEmpty() }
 
-            // 1. Responses API: response.output_text.delta
-            if (frameType == "response.output_text.delta") {
-                val delta = obj.optString("delta", "")
+            // 1. Responses API: response.output_text.delta / response.text.delta
+            if (frameType == "response.output_text.delta" || frameType == "response.text.delta") {
+                val delta = obj.optString("delta", "").ifEmpty { obj.optString("text", "") }
                 if (delta.isNotEmpty()) {
                     fullText.append(delta)
                     onEvent(StreamEvent.TextDelta(delta))
@@ -466,7 +477,7 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
 
             // 2. Responses API: response.reasoning_text.delta / response.reasoning_summary_text.delta
             if (frameType == "response.reasoning_text.delta" || frameType == "response.reasoning_summary_text.delta") {
-                val delta = obj.optString("delta", "")
+                val delta = obj.optString("delta", "").ifEmpty { obj.optString("text", "") }
                 if (delta.isNotEmpty()) {
                     onEvent(StreamEvent.StatusUpdate("Thinking: $delta"))
                 }
@@ -530,12 +541,38 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
                 return@parseSseStream true
             }
 
-            // 6. Responses API: response.completed
-            if (frameType == "response.completed") {
+            // 6. Responses API: response.completed / response.done
+            if (frameType == "response.completed" || frameType == "response.done") {
                 val respObj = obj.optJSONObject("response")
                 if (respObj != null) {
                     val u = parseOpenAiUsage(respObj.optJSONObject("usage"))
                     if (u != null) streamUsage = u
+                    if (fullText.isEmpty()) {
+                        val outputArr = respObj.optJSONArray("output")
+                        if (outputArr != null) {
+                            for (i in 0 until outputArr.length()) {
+                                val item = outputArr.optJSONObject(i) ?: continue
+                                if (item.optString("type") == "message") {
+                                    val content = item.opt("content")
+                                    if (content is JSONArray) {
+                                        for (k in 0 until content.length()) {
+                                            val part = content.optJSONObject(k) ?: continue
+                                            if (part.optString("type") == "output_text" || part.optString("type") == "text") {
+                                                val txt = part.optString("text", "")
+                                                if (txt.isNotEmpty()) {
+                                                    fullText.append(txt)
+                                                    onEvent(StreamEvent.TextDelta(txt))
+                                                }
+                                            }
+                                        }
+                                    } else if (content is String && content.isNotEmpty()) {
+                                        fullText.append(content)
+                                        onEvent(StreamEvent.TextDelta(content))
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 return@parseSseStream true
             }
