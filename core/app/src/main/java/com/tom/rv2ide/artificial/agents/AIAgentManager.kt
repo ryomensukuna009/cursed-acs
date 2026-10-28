@@ -257,9 +257,7 @@ class AIAgentManager(private val context: Context) {
 
                 result.fold(
                     onSuccess = { initialResponse ->
-                        val hasFileBlocks = initialResponse.contains("FILE_TO_MODIFY:") ||
-                            initialResponse.contains("FILE_TO_CREATE:") ||
-                            initialResponse.contains("FILE_TO_PATCH:")
+                        val hasFileBlocks = Regex("""(?m)^FILE_TO_(MODIFY|CREATE|PATCH):\s*\S+""").containsMatchIn(initialResponse)
 
                         val inspectedFiles = (agent as? StreamingToolCapableAgent)?.getLastInspectedFiles() ?: emptyList()
 

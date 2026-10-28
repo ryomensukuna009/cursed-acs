@@ -465,6 +465,11 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
 
             val frameType = obj.optString("type", "").ifBlank { frame.event.orEmpty() }
 
+            // Ignore initial response metadata envelope
+            if (frameType == "response.created") {
+                return@parseSseStream true
+            }
+
             // 1. Responses API: response.output_text.delta / response.text.delta
             if (frameType == "response.output_text.delta" || frameType == "response.text.delta") {
                 val delta = obj.optString("delta", "").ifEmpty { obj.optString("text", "") }
@@ -647,7 +652,7 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
                         }
                     }
                 }
-            } else if (obj.has("response") && !obj.isNull("response")) {
+            } else if (obj.opt("response") is String) {
                 val chunk = obj.optString("response", "")
                 if (chunk.isNotEmpty()) {
                     fullText.append(chunk)
