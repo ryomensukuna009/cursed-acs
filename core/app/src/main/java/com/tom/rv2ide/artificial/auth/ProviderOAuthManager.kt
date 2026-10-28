@@ -549,7 +549,7 @@ object ProviderOAuthManager {
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     SecureKeyStore.putProviderApiKey(context, "openai", acquiredToken)
-                    val (email, plan) = extractJwtProfile(acquiredToken)
+                    val (email, plan, accountId) = extractJwtProfile(acquiredToken)
                     val account = OAuthAccount(
                         provider = "openai",
                         email = email.ifBlank { "ChatGPT User" },
@@ -557,7 +557,8 @@ object ProviderOAuthManager {
                         accessToken = acquiredToken,
                         refreshToken = acquiredRefreshToken.orEmpty(),
                         expiresAt = System.currentTimeMillis() + 86400_000L * 30,
-                        isActive = true
+                        isActive = true,
+                        accountId = accountId.takeIf { it.isNotBlank() }
                     )
                     OAuthAccountRegistry.getInstance(context).saveAccount(account)
                     OAuthAccountRegistry.getInstance(context).setActiveAccount("openai", account.id)
@@ -793,7 +794,7 @@ object ProviderOAuthManager {
                         }
                     } catch (_: Exception) {}
                     if (userEmail.isBlank()) {
-                        val (jwtEmail, _) = extractJwtProfile(acquiredToken)
+                        val (jwtEmail, _, _) = extractJwtProfile(acquiredToken)
                         userEmail = jwtEmail
                     }
                 }
@@ -1238,7 +1239,7 @@ object ProviderOAuthManager {
         }
     }
 
-    private fun extractJwtProfile(token: String): Pair<String, String> {
+    private fun extractJwtProfile(token: String): Triple<String, String, String> {
         try {
             val parts = token.split(".")
             if (parts.size >= 2) {
@@ -1248,10 +1249,14 @@ object ProviderOAuthManager {
                 val auth = json.optJSONObject("https://api.openai.com/auth")
                 val email = profile?.optString("email") ?: json.optString("email")
                 val plan = auth?.optString("chatgpt_plan_type") ?: json.optString("plan")
-                return Pair(email, plan)
+                val accountId = auth?.optString("chatgpt_account_id")
+                    ?: profile?.optString("chatgpt_account_id")
+                    ?: json.optString("chatgpt_account_id")
+                    ?: json.optString("sub")
+                return Triple(email, plan, accountId)
             }
         } catch (_: Exception) {}
-        return Pair("", "")
+        return Triple("", "", "")
     }
 
     fun fetchAndRegisterCodexModels(context: Context, token: String) {

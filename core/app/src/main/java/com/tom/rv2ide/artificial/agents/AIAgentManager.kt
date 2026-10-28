@@ -196,6 +196,7 @@ class AIAgentManager(private val context: Context) {
         currentAgent?.resetAttemptCount()
         callback.onProcessing("Analyzing your request...")
 
+        var lastAttemptError: Throwable? = null
         while (!success && (currentAgent?.canRetry() == true)) {
             try {
                 val currentAttempt = currentAgent?.getCurrentAttemptCount() ?: 0
@@ -472,6 +473,7 @@ class AIAgentManager(private val context: Context) {
                                 success = true
                             }
                         } else if ((currentAgent?.canRetry() == true) && !providerSwitched) {
+                            lastAttemptError = error
                             val safeMsg = SecretRedactor.redact(error.message?.take(80) ?: "Unknown error")
                             callback.onRetry(
                                 currentAgent?.getCurrentAttemptCount() ?: 0,
@@ -491,6 +493,7 @@ class AIAgentManager(private val context: Context) {
                 success = true
             } catch (e: Exception) {
                 if (currentAgent?.canRetry() == true) {
+                    lastAttemptError = e
                     val safeMsg = SecretRedactor.redact(e.message?.take(80) ?: "Unknown")
                     callback.onRetry(
                         currentAgent?.getCurrentAttemptCount() ?: 0,
@@ -509,7 +512,8 @@ class AIAgentManager(private val context: Context) {
         if (!success) {
             val attemptCount = currentAgent?.getCurrentAttemptCount() ?: 0
             val agentName = getCurrentProviderName()
-            callback.onError("Failed after $attemptCount attempts with $agentName.\n\nPlease check your API key and endpoint settings.")
+            val detail = lastAttemptError?.let { formatErrorMessage(it) } ?: "Please check your API key and endpoint settings."
+            callback.onError("Failed after $attemptCount attempts with $agentName:\n$detail")
             undoLastModification()
         }
     }

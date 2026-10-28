@@ -21,18 +21,22 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
         apiKey: String?
     ): BuiltHttpRequest {
         val cleanKey = apiKey?.trim().orEmpty()
-        val isChatGptOAuth = (request.profile.id.equals("openai", ignoreCase = true) || request.profile.baseUrl.contains("openai.com")) &&
+        val isChatGptOAuth = (request.profile.id.equals("openai", ignoreCase = true) || request.profile.baseUrl.contains("openai.com") || request.profile.baseUrl.contains("chatgpt.com")) &&
                 (cleanKey.startsWith("ey") || cleanKey.length > 200)
 
-        val effectiveBaseUrl = if (isChatGptOAuth) "https://chatgpt.com/backend-api/codex" else request.profile.baseUrl
-        val rawUrl = UrlNormalizer.resolveChatEndpoint(
-            baseUrl = effectiveBaseUrl,
-            chatPathOverride = request.profile.chatEndpointPath,
-            protocol = request.profile.protocol,
-            modelId = request.modelId,
-            stream = request.stream
-        )
-        val url = ProtocolAdapterHelper.applyQueryParamAuthIfNeeded(rawUrl, request.profile, apiKey)
+        val url = if (isChatGptOAuth) {
+            "https://chatgpt.com/backend-api/codex/responses"
+        } else {
+            val rawUrl = UrlNormalizer.resolveChatEndpoint(
+                baseUrl = request.profile.baseUrl,
+                chatPathOverride = request.profile.chatEndpointPath,
+                protocol = request.profile.protocol,
+                modelId = request.modelId,
+                stream = request.stream
+            )
+            ProtocolAdapterHelper.applyQueryParamAuthIfNeeded(rawUrl, request.profile, apiKey)
+        }
+
         val headers = ProtocolAdapterHelper.buildCommonHeaders(
             profile = request.profile,
             apiKey = apiKey,
@@ -133,48 +137,138 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
             }
         }
 
-        val body = JSONObject().apply {
-            put("model", request.modelId)
-            put("messages", messagesArray)
-            put("stream", request.stream)
-            if (isChatGptOAuth || request.profile.id.equals("grok", ignoreCase = true)) {
-                put("store", false)
-            }
-            if (request.stream) {
-                put("stream_options", JSONObject().apply { put("include_usage", true) })
-            }
-            request.temperature?.let { put("temperature", it) }
-            request.maxTokens?.let { put("max_tokens", it) }
-            request.reasoningEffort?.let { effort ->
-                if (effort != com.tom.rv2ide.artificial.models.ReasoningEffort.OFF) {
-                    val effortStr = when (effort) {
-                        com.tom.rv2ide.artificial.models.ReasoningEffort.AUTO -> "auto"
-                        com.tom.rv2ide.artificial.models.ReasoningEffort.MAXIMUM -> "high"
-                        else -> effort.key
+        val body = if (isChatGptOAuth) {
+            val inputArr = JSONArray()
+            var instructions = request.systemPrompt.orEmpty()
+
+            for (msg in request.messages) {
+                when (msg.role) {
+                    ChatRole.SYSTEM -> {
+                        if (msg.content.isNotBlank()) {
+                            instructions = if (instructions.isEmpty()) msg.content else "$instructions\n\n${msg.content}"
+                        }
                     }
-                    put("reasoning_effort", effortStr)
+                    ChatRole.USER -> {
+                        val contentArr = JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("type", "input_text")
+                                put("text", msg.content)
+                            })
+                            if (!msg.imageBase64.isNullOrBlank()) {
+                                val mime = msg.imageMimeType ?: "image/jpeg"
+                                put(JSONObject().apply {
+                                    put("type", "image_url")
+                                    put("image_url", JSONObject().apply {
+                                        put("url", "data:$mime;base64,${msg.imageBase64}")
+                                    })
+                                })
+                            }
+                        }
+                        inputArr.put(JSONObject().apply {
+                            put("type", "message")
+                            put("role", "user")
+                            put("content", contentArr)
+                        })
+                    }
+                    ChatRole.ASSISTANT -> {
+                        val contentArr = JSONArray().apply {
+                            if (msg.content.isNotEmpty()) {
+                                put(JSONObject().apply {
+                                    put("type", "output_text")
+                                    put("text", msg.content)
+                                })
+                            }
+                        }
+                        inputArr.put(JSONObject().apply {
+                            put("type", "message")
+                            put("role", "assistant")
+                            put("content", contentArr)
+                        })
+                        for (tc in msg.toolCalls) {
+                            inputArr.put(JSONObject().apply {
+                                put("type", "function_call")
+                                put("call_id", tc.id)
+                                put("name", tc.name)
+                                put("arguments", tc.argumentsJson.ifBlank { "{}" })
+                            })
+                        }
+                    }
+                    ChatRole.TOOL -> {
+                        val tr = msg.toolResult
+                        inputArr.put(JSONObject().apply {
+                            put("type", "function_call_output")
+                            put("call_id", tr?.toolCallId ?: "call_0")
+                            put("output", tr?.content ?: msg.content)
+                        })
+                    }
                 }
             }
 
-            if (request.tools.isNotEmpty()) {
-                val toolsArr = JSONArray()
-                for (tool in request.tools) {
-                    toolsArr.put(
-                        JSONObject().apply {
+            JSONObject().apply {
+                put("model", request.modelId)
+                put("instructions", instructions)
+                put("input", inputArr)
+                put("stream", request.stream)
+                put("store", false)
+                put("include", JSONArray().apply { put("reasoning.encrypted_content") })
+
+                if (request.tools.isNotEmpty()) {
+                    val toolsArr = JSONArray()
+                    for (tool in request.tools) {
+                        toolsArr.put(JSONObject().apply {
                             put("type", "function")
-                            put(
-                                "function",
-                                JSONObject().apply {
-                                    put("name", tool.name)
-                                    put("description", tool.description)
-                                    put("parameters", tool.toJsonSchemaObject())
-                                }
-                            )
-                        }
-                    )
+                            put("name", tool.name)
+                            put("description", tool.description)
+                            put("parameters", tool.toJsonSchemaObject())
+                        })
+                    }
+                    put("tools", toolsArr)
                 }
-                put("tools", toolsArr)
-                put("tool_choice", "auto")
+            }
+        } else {
+            JSONObject().apply {
+                put("model", request.modelId)
+                put("messages", messagesArray)
+                put("stream", request.stream)
+                if (request.profile.id.equals("grok", ignoreCase = true)) {
+                    put("store", false)
+                }
+                if (request.stream) {
+                    put("stream_options", JSONObject().apply { put("include_usage", true) })
+                }
+                request.temperature?.let { put("temperature", it) }
+                request.maxTokens?.let { put("max_tokens", it) }
+                request.reasoningEffort?.let { effort ->
+                    if (effort != com.tom.rv2ide.artificial.models.ReasoningEffort.OFF) {
+                        val effortStr = when (effort) {
+                            com.tom.rv2ide.artificial.models.ReasoningEffort.AUTO -> "auto"
+                            com.tom.rv2ide.artificial.models.ReasoningEffort.MAXIMUM -> "high"
+                            else -> effort.key
+                        }
+                        put("reasoning_effort", effortStr)
+                    }
+                }
+
+                if (request.tools.isNotEmpty()) {
+                    val toolsArr = JSONArray()
+                    for (tool in request.tools) {
+                        toolsArr.put(
+                            JSONObject().apply {
+                                put("type", "function")
+                                put(
+                                    "function",
+                                    JSONObject().apply {
+                                        put("name", tool.name)
+                                        put("description", tool.description)
+                                        put("parameters", tool.toJsonSchemaObject())
+                                    }
+                                )
+                            }
+                        )
+                    }
+                    put("tools", toolsArr)
+                    put("tool_choice", "auto")
+                }
             }
         }
 
@@ -227,12 +321,61 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
             )
         }
 
-        // Custom generic fallback shapes: {"response": "..."} or {"content": "..."} or {"output": "..."}
+        // Check Responses API output format: {"output": [{"type": "message", "content": [{"type": "output_text", "text": "..."}]}]}
+        val outputArr = root.optJSONArray("output")
+        if (outputArr != null && outputArr.length() > 0) {
+            val fullOutText = StringBuilder()
+            val toolCalls = mutableListOf<ToolCall>()
+
+            for (i in 0 until outputArr.length()) {
+                val item = outputArr.optJSONObject(i) ?: continue
+                val itemType = item.optString("type", "")
+                if (itemType == "message") {
+                    val content = item.opt("content")
+                    if (content is JSONArray) {
+                        for (j in 0 until content.length()) {
+                            val part = content.optJSONObject(j)
+                            if (part != null) {
+                                val partType = part.optString("type", "")
+                                if (partType == "output_text" || partType == "text") {
+                                    fullOutText.append(part.optString("text", ""))
+                                }
+                            } else if (content.opt(j) is String) {
+                                fullOutText.append(content.optString(j))
+                            }
+                        }
+                    } else if (content is String) {
+                        fullOutText.append(content)
+                    }
+                } else if (itemType == "function_call") {
+                    toolCalls.add(
+                        ToolCall(
+                            id = item.optString("call_id", item.optString("id", "call_$i")),
+                            name = item.optString("name", ""),
+                            argumentsJson = item.optString("arguments", "{}")
+                        )
+                    )
+                }
+            }
+
+            if (fullOutText.isNotEmpty() || toolCalls.isNotEmpty()) {
+                return UnifiedChatResponse(
+                    text = fullOutText.toString(),
+                    toolCalls = toolCalls,
+                    citations = citations,
+                    finishReason = "stop",
+                    modelUsed = modelUsed,
+                    usage = usage
+                )
+            }
+        }
+
+        // Custom generic fallback shapes: {"response": "..."} or {"content": "..."}
         val genericText = when {
             root.has("response") && !root.isNull("response") -> root.optString("response", "")
             root.has("content") && !root.isNull("content") -> root.optString("content", "")
-            root.has("output") && !root.isNull("output") -> root.optString("output", "")
-            else -> throw MalformedApiResponseException("Response JSON missing 'choices' array")
+            root.has("output") && !root.isNull("output") && root.get("output") is String -> root.optString("output", "")
+            else -> throw MalformedApiResponseException("Response JSON missing 'choices' or 'output' array")
         }
 
         return UnifiedChatResponse(
@@ -281,6 +424,104 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
                     citations.add(c)
                     onEvent(StreamEvent.CitationAdded(c))
                 }
+            }
+
+            val frameType = obj.optString("type", "")
+
+            // 1. Responses API: response.output_text.delta
+            if (frameType == "response.output_text.delta") {
+                val delta = obj.optString("delta", "")
+                if (delta.isNotEmpty()) {
+                    fullText.append(delta)
+                    onEvent(StreamEvent.TextDelta(delta))
+                }
+                return@parseSseStream true
+            }
+
+            // 2. Responses API: response.reasoning_text.delta / response.reasoning_summary_text.delta
+            if (frameType == "response.reasoning_text.delta" || frameType == "response.reasoning_summary_text.delta") {
+                val delta = obj.optString("delta", "")
+                if (delta.isNotEmpty()) {
+                    onEvent(StreamEvent.StatusUpdate("Thinking: $delta"))
+                }
+                return@parseSseStream true
+            }
+
+            // 3. Responses API: response.output_item.added (function_call initialization)
+            if (frameType == "response.output_item.added") {
+                val item = obj.optJSONObject("item")
+                val outIdx = obj.optInt("output_index", 0)
+                if (item != null && item.optString("type") == "function_call") {
+                    val callId = item.optString("call_id", item.optString("id", ""))
+                    val name = item.optString("name", "")
+                    val args = item.optString("arguments", "")
+                    val b = toolCallBuilders.getOrPut(outIdx) { MutableToolCall() }
+                    if (callId.isNotBlank()) b.id = callId
+                    if (name.isNotBlank()) b.name.append(name)
+                    if (args.isNotBlank()) b.arguments.append(args)
+                }
+                return@parseSseStream true
+            }
+
+            // 4. Responses API: response.function_call_arguments.delta
+            if (frameType == "response.function_call_arguments.delta") {
+                val outIdx = obj.optInt("output_index", 0)
+                val delta = obj.optString("delta", "")
+                val b = toolCallBuilders.getOrPut(outIdx) { MutableToolCall() }
+                if (delta.isNotEmpty()) {
+                    b.arguments.append(delta)
+                }
+                return@parseSseStream true
+            }
+
+            // 5. Responses API: response.output_item.done
+            if (frameType == "response.output_item.done") {
+                val item = obj.optJSONObject("item")
+                val outIdx = obj.optInt("output_index", 0)
+                if (item != null && item.optString("type") == "function_call") {
+                    val callId = item.optString("call_id", "")
+                    val name = item.optString("name", "")
+                    val args = item.optString("arguments", "")
+                    val b = toolCallBuilders.getOrPut(outIdx) { MutableToolCall() }
+                    if (callId.isNotBlank() && b.id.isBlank()) b.id = callId
+                    if (name.isNotBlank() && b.name.isEmpty()) b.name.append(name)
+                    if (args.isNotBlank() && b.arguments.isEmpty()) b.arguments.append(args)
+                } else if (item != null && item.optString("type") == "message" && fullText.isEmpty()) {
+                    val content = item.opt("content")
+                    if (content is JSONArray) {
+                        for (k in 0 until content.length()) {
+                            val part = content.optJSONObject(k)
+                            if (part != null && (part.optString("type") == "output_text" || part.optString("type") == "text")) {
+                                val t = part.optString("text", "")
+                                if (t.isNotEmpty()) {
+                                    fullText.append(t)
+                                    onEvent(StreamEvent.TextDelta(t))
+                                }
+                            }
+                        }
+                    }
+                }
+                return@parseSseStream true
+            }
+
+            // 6. Responses API: response.completed
+            if (frameType == "response.completed") {
+                val respObj = obj.optJSONObject("response")
+                if (respObj != null) {
+                    val u = parseOpenAiUsage(respObj.optJSONObject("usage"))
+                    if (u != null) streamUsage = u
+                }
+                return@parseSseStream true
+            }
+
+            // 7. Responses API: error / response.failed
+            if (frameType == "response.failed" || frameType == "error") {
+                val errObj = obj.optJSONObject("error") ?: obj.optJSONObject("response")?.optJSONObject("error")
+                val errMsg = errObj?.optString("message", "") ?: obj.optString("message", "Responses API error")
+                if (errMsg.isNotEmpty()) {
+                    onEvent(StreamEvent.StatusUpdate("❌ $errMsg"))
+                }
+                return@parseSseStream true
             }
 
             val choices = obj.optJSONArray("choices")

@@ -86,6 +86,32 @@ object ProtocolAdapterHelper {
             headers.putIfAbsent("version", "0.159.0")
             headers.putIfAbsent("User-Agent", "Kelivo")
             headers.putIfAbsent("OpenAI-Beta", "responses=experimental")
+            val sessId = java.util.UUID.randomUUID().toString()
+            headers.putIfAbsent("session_id", sessId)
+            headers.putIfAbsent("conversation_id", sessId)
+            headers.putIfAbsent("x-client-request-id", sessId)
+
+            try {
+                val parts = cleanKey.split(".")
+                if (parts.size >= 2) {
+                    val decoded = String(android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING), Charsets.UTF_8)
+                    val json = org.json.JSONObject(decoded)
+                    val auth = json.optJSONObject("https://api.openai.com/auth")
+                    val profileObj = json.optJSONObject("https://api.openai.com/profile")
+                    val accId = auth?.optString("chatgpt_account_id")
+                        ?: profileObj?.optString("chatgpt_account_id")
+                        ?: json.optString("chatgpt_account_id")
+                        ?: json.optString("sub")
+                    if (!accId.isNullOrBlank()) {
+                        headers.putIfAbsent("chatgpt-account-id", accId)
+                    }
+                    val residency = auth?.optString("chatgpt_data_residency")
+                        ?: auth?.optString("chatgpt_compute_residency")
+                    if (!residency.isNullOrBlank()) {
+                        headers.putIfAbsent("x-openai-internal-codex-residency", residency)
+                    }
+                }
+            } catch (_: Exception) {}
         }
 
         return headers
