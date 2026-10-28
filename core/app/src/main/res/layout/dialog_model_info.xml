@@ -217,6 +217,142 @@
             app:trackThickness="6dp"
             style="@style/Widget.Material3.LinearProgressIndicator" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Available Budget Remaining"
+                android:textAppearance="?attr/textAppearanceLabelMedium"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/dialogRemainingBudgetText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="32,000 tk (100% free)"
+                android:textAppearance="?attr/textAppearanceLabelSmall"
+                android:textColor="#22C55E" />
+
+        </LinearLayout>
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/dialogRemainingBudgetProgress"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="10dp"
+            android:max="100"
+            android:progress="100"
+            app:indicatorColor="#22C55E"
+            app:trackCornerRadius="2dp"
+            app:trackThickness="4dp"
+            style="@style/Widget.Material3.LinearProgressIndicator" />
+
+        <!-- Model Capabilities Badges -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model Capabilities"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnSurface"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="6dp" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginBottom="8dp">
+
+            <LinearLayout
+                android:id="@+id/dialogCapabilitiesLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/chipToolCalling"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🛠️ Tools Active"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:background="@drawable/bg_code_tag"
+                    android:textSize="11sp"
+                    android:textColor="#22C55E"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/chipVision"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👁️ Multimodal"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:background="@drawable/bg_code_tag"
+                    android:textSize="11sp"
+                    android:textColor="#3B82F6"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/chipStreaming"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚡ Realtime Stream"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:background="@drawable/bg_code_tag"
+                    android:textSize="11sp"
+                    android:textColor="#EAB308"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/chipReasoning"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🧠 Extended CoT"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:background="@drawable/bg_code_tag"
+                    android:textSize="11sp"
+                    android:textColor="#EC4899"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/chipCodeEdit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💻 Auto-Patch"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:background="@drawable/bg_code_tag"
+                    android:textSize="11sp"
+                    android:textColor="#A855F7"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/chipWebSearch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🌐 Web Grounding"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:background="@drawable/bg_code_tag"
+                    android:textSize="11sp"
+                    android:textColor="#06B6D4" />
+
+            </LinearLayout>
+        </HorizontalScrollView>
+
         <TextView
             android:id="@+id/dialogTokenBreakdownText"
             android:layout_width="match_parent"

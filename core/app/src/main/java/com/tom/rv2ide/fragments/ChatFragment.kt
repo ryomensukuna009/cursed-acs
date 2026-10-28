@@ -602,26 +602,13 @@ class ChatFragment : Fragment() {
         classicTopChipRow = view.findViewById(R.id.classicTopChipRow)
         modeChipScrollView = view.findViewById(R.id.modeChipScrollView)
 
-        val isKelivoTheme = com.tom.rv2ide.ui.themes.ThemeManager().getCurrentTheme() == com.tom.rv2ide.ui.themes.IDETheme.KELIVO_SLEEK
-        if (isKelivoTheme) {
-            promptLayout = view.findViewById(R.id.promptLayout)
-            promptInput = view.findViewById(R.id.anyText)
-            promptLayout.isEndIconVisible = false
-            promptLayout.isStartIconVisible = false
-            classicPromptLayout?.visibility = View.GONE
-            kelivoComposerCard?.visibility = View.VISIBLE
-            modeControlPanel?.visibility = View.GONE
-            classicTopChipRow?.visibility = View.GONE
-            modeChipScrollView?.visibility = View.GONE
-        } else {
-            promptLayout = classicPromptLayout ?: view.findViewById(R.id.promptLayout)
-            promptInput = view.findViewById<com.tom.rv2ide.ui.ChatComposerEditText>(R.id.classicAnyText) ?: view.findViewById(R.id.anyText)
-            kelivoComposerCard?.visibility = View.GONE
-            classicPromptLayout?.visibility = View.VISIBLE
-            modeControlPanel?.visibility = View.VISIBLE
-            classicTopChipRow?.visibility = View.VISIBLE
-            modeChipScrollView?.visibility = View.VISIBLE
-        }
+        promptLayout = classicPromptLayout ?: view.findViewById(R.id.classicPromptLayout)
+        promptInput = view.findViewById<com.tom.rv2ide.ui.ChatComposerEditText>(R.id.classicAnyText) ?: view.findViewById(R.id.anyText)
+        kelivoComposerCard?.visibility = View.GONE
+        classicPromptLayout?.visibility = View.VISIBLE
+        modeControlPanel?.visibility = View.VISIBLE
+        classicTopChipRow?.visibility = View.VISIBLE
+        modeChipScrollView?.visibility = View.VISIBLE
 
         activeModelChipBtn = view.findViewById(R.id.activeModelChipBtn)
 
@@ -1903,17 +1890,13 @@ class ChatFragment : Fragment() {
 
         if (!isAdded || view == null) return
 
-        val isKelivoTheme = com.tom.rv2ide.ui.themes.ThemeManager().getCurrentTheme() == com.tom.rv2ide.ui.themes.IDETheme.KELIVO_SLEEK
         promptLayout.post {
             if (!isAdded || view == null) return@post
             val drawableRes = if (isRunning) R.drawable.ic_stop else R.drawable.ic_send
-            if (!isKelivoTheme) {
-                promptLayout.isEndIconVisible = true
-                promptLayout.endIconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), drawableRes)
-                promptLayout.endIconContentDescription = if (isRunning) "Stop generation" else "Send message"
-            } else {
-                promptLayout.isEndIconVisible = false
-            }
+            promptLayout.isEndIconVisible = true
+            promptLayout.endIconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), drawableRes)
+            promptLayout.endIconContentDescription = if (isRunning) "Stop generation" else "Send message"
+            classicPromptLayout?.isEndIconVisible = true
             classicPromptLayout?.endIconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), drawableRes)
             classicPromptLayout?.endIconContentDescription = if (isRunning) "Stop generation" else "Send message"
         }
@@ -2282,14 +2265,31 @@ class ChatFragment : Fragment() {
 
 
 
-        webSearchToggleBtn.text = when (searchStatus) {
+        val tvSearch = android.util.TypedValue()
+        val searchPrimary = if (requireContext().theme.resolveAttribute(android.R.attr.colorPrimary, tvSearch, true)) tvSearch.data else android.graphics.Color.parseColor("#06B6D4")
+        val searchOnPrimary = if (requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorOnPrimary, tvSearch, true)) tvSearch.data else android.graphics.Color.WHITE
+        val searchContainer = if (requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorSurfaceContainerHighest, tvSearch, true)) tvSearch.data else android.graphics.Color.parseColor("#2A2F3D")
+        val searchOnVariant = if (requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, tvSearch, true)) tvSearch.data else android.graphics.Color.parseColor("#94A3B8")
 
-            WebSearchStatus.DISABLED -> "🌐 Off"
-
-            WebSearchStatus.NEEDS_CONFIG -> "🌐 Setup"
-
-            WebSearchStatus.READY -> "🌐 On"
-
+        when (searchStatus) {
+            WebSearchStatus.READY -> {
+                webSearchToggleBtn.text = "🌐 On"
+                webSearchToggleBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(searchPrimary)
+                webSearchToggleBtn.setTextColor(searchOnPrimary)
+                webSearchToggleBtn.strokeColor = android.content.res.ColorStateList.valueOf(searchPrimary)
+            }
+            WebSearchStatus.NEEDS_CONFIG -> {
+                webSearchToggleBtn.text = "🌐 Setup"
+                webSearchToggleBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#F59E0B"))
+                webSearchToggleBtn.setTextColor(android.graphics.Color.BLACK)
+                webSearchToggleBtn.strokeColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#F59E0B"))
+            }
+            WebSearchStatus.DISABLED -> {
+                webSearchToggleBtn.text = "🌐 Off"
+                webSearchToggleBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(searchContainer)
+                webSearchToggleBtn.setTextColor(searchOnVariant)
+                webSearchToggleBtn.strokeColor = android.content.res.ColorStateList.valueOf(searchContainer)
+            }
         }
 
     }
@@ -2331,6 +2331,36 @@ class ChatFragment : Fragment() {
         val meterText = dialogView.findViewById<TextView>(R.id.dialogContextMeterText)
 
         val progressBar = dialogView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.dialogContextProgress)
+
+        val remainingMeterText = dialogView.findViewById<TextView>(R.id.dialogRemainingBudgetText)
+
+        val remainingProgressBar = dialogView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.dialogRemainingBudgetProgress)
+
+        val chipTool = dialogView.findViewById<TextView>(R.id.chipToolCalling)
+        val chipVis = dialogView.findViewById<TextView>(R.id.chipVision)
+        val chipStream = dialogView.findViewById<TextView>(R.id.chipStreaming)
+        val chipReason = dialogView.findViewById<TextView>(R.id.chipReasoning)
+        val chipCode = dialogView.findViewById<TextView>(R.id.chipCodeEdit)
+        val chipSearch = dialogView.findViewById<TextView>(R.id.chipWebSearch)
+
+        val hasTools = caps.supportsTools != TriStateCapability.UNSUPPORTED
+        chipTool?.visibility = if (hasTools) View.VISIBLE else View.GONE
+
+        val hasVision = caps.inputModalities?.any { it.contains("vision", true) || it.contains("image", true) } == true ||
+            modelId.contains("vision", true) || modelId.contains("omni", true) || modelId.contains("gpt-4o", true) || modelId.contains("gemini", true)
+        chipVis?.visibility = if (hasVision) View.VISIBLE else View.GONE
+
+        val hasStreaming = profile?.streamingEnabled == true
+        chipStream?.visibility = if (hasStreaming) View.VISIBLE else View.GONE
+
+        val hasReasoning = modelId.contains("o1", true) || modelId.contains("o3", true) || modelId.contains("r1", true) ||
+            modelId.contains("reason", true) || modelId.contains("thinking", true) || modelId.contains("terra", true)
+        chipReason?.visibility = if (hasReasoning) View.VISIBLE else View.GONE
+
+        val searchConfig = webSearchManager.getConfig()
+        val hasSearch = searchConfig.enabled || explicitWebSearchActive
+        chipSearch?.visibility = if (hasSearch) View.VISIBLE else View.GONE
+        chipCode?.visibility = View.VISIBLE
 
         val breakdownText = dialogView.findViewById<TextView>(R.id.dialogTokenBreakdownText)
 
@@ -2401,6 +2431,19 @@ class ChatFragment : Fragment() {
             meterText?.text = String.format(Locale.US, "%,d / %,d tk (%d%%)", estTokens, limit, pct)
 
             progressBar?.progress = pct
+
+            val remainingTokens = maxOf(0, limit - estTokens)
+            val remainingPct = (100 - pct).coerceIn(0, 100)
+            remainingMeterText?.text = String.format(Locale.US, "%,d tk remaining (%d%% free)", remainingTokens, remainingPct)
+            remainingProgressBar?.progress = remainingPct
+
+            val remainingColor = when {
+                remainingPct > 35 -> android.graphics.Color.parseColor("#22C55E")
+                remainingPct > 15 -> android.graphics.Color.parseColor("#F59E0B")
+                else -> android.graphics.Color.parseColor("#EF4444")
+            }
+            remainingMeterText?.setTextColor(remainingColor)
+            remainingProgressBar?.setIndicatorColor(remainingColor)
 
 
 

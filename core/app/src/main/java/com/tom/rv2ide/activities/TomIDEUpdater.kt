@@ -285,8 +285,20 @@ class TomIDEUpdater(private val context: Context) {
         } catch (_: Exception) {
           ""
         }
-        val isNewer = isSemanticVersionNewer(availableVariant.versionName, currentVersionName) ||
-            (availableVariant.versionCode > currentVersionCode)
+
+        // If local semantic version is strictly newer than remote release, never downgrade or prompt update
+        if (isSemanticVersionNewer(currentVersionName, availableVariant.versionName)) {
+          Log.d(
+              TAG,
+              "Update check: local version ($currentVersionName) is newer than remote (${availableVariant.versionName}). No update needed."
+          )
+          return false
+        }
+
+        val isSemanticNewer = isSemanticVersionNewer(availableVariant.versionName, currentVersionName)
+        val isCodeNewer = availableVariant.versionCode > currentVersionCode
+        val isNewer = isSemanticNewer || isCodeNewer
+
         Log.d(
             TAG,
             "Update check: currentVersionName=$currentVersionName, remoteVersionName=${availableVariant.versionName}, currentCode=$currentVersionCode, remoteCode=${availableVariant.versionCode} -> isNewer=$isNewer"

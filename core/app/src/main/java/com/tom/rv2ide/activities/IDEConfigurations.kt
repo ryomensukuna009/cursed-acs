@@ -240,18 +240,50 @@ class IDEConfigurations : EdgeToEdgeIDEActivity() {
     val hasGradle = File(Environment.HOME, ".gradle").exists() || hasSdk
     val isGradleOperational = hasSdk && jvms.isNotEmpty()
 
-    tvGradleRuntime?.text = if (hasGradle) "• Gradle Distribution: Installed & Ready" else "• Gradle Distribution: Not Installed"
-    tvJdkRuntime?.text = if (jvms.isNotEmpty()) "• OpenJDK 17: Installed (${jvms.first().javaVersion})" else "• OpenJDK 17: Not Installed"
-    tvGit?.text = if (hasGit) "• Git Version Control: Installed & Ready" else "• Git Version Control: Not Installed"
-    tvOpenssh?.text = if (hasSsh) "• OpenSSH Shell: Installed & Ready" else "• OpenSSH Shell: Not Installed"
+    val greenColor = android.graphics.Color.parseColor("#4CAF50")
+    val greyColor = android.graphics.Color.parseColor("#9E9E9E")
+
+    if (hasGradle) {
+      tvGradleRuntime?.text = "● Gradle Distribution: Installed & Ready"
+      tvGradleRuntime?.setTextColor(greenColor)
+    } else {
+      tvGradleRuntime?.text = "○ Gradle Distribution: Not Installed"
+      tvGradleRuntime?.setTextColor(greyColor)
+    }
+
+    if (jvms.isNotEmpty()) {
+      tvJdkRuntime?.text = "● OpenJDK 17: Installed (${jvms.first().javaVersion})"
+      tvJdkRuntime?.setTextColor(greenColor)
+    } else {
+      tvJdkRuntime?.text = "○ OpenJDK 17: Not Installed"
+      tvJdkRuntime?.setTextColor(greyColor)
+    }
+
+    if (hasGit) {
+      tvGit?.text = "● Git Version Control: Installed & Ready"
+      tvGit?.setTextColor(greenColor)
+    } else {
+      tvGit?.text = "○ Git Version Control: Not Installed"
+      tvGit?.setTextColor(greyColor)
+    }
+
+    if (hasSsh) {
+      tvOpenssh?.text = "● OpenSSH Shell: Installed & Ready"
+      tvOpenssh?.setTextColor(greenColor)
+    } else {
+      tvOpenssh?.text = "○ OpenSSH Shell: Not Installed"
+      tvOpenssh?.setTextColor(greyColor)
+    }
 
     if (isGradleOperational) {
       tvGradleSummary?.text = "Gradle development environment is installed and operational."
+      tvGradleSummary?.setTextColor(greenColor)
       btnRemove?.isEnabled = true
       btnRemove?.alpha = 1.0f
       btnDownload?.text = "Re-download Setup"
     } else {
       tvGradleSummary?.text = "Inspect and download packages required for Gradle Android builds."
+      tvGradleSummary?.setTextColor(greyColor)
       btnRemove?.isEnabled = false
       btnRemove?.alpha = 0.4f
       btnDownload?.text = "Download Gradle Setup"

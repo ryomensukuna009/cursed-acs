@@ -1,18 +1,18 @@
 {
-  "baseVersionCode": 1025,
-  "baseVersionName": "1.0.0+gh.r4",
-  "baseUrl": "https://github.com/Mohammed-Baqer-null/AndroidIDE-Rv2/releases/download/v{versionName}",
+  "baseVersionCode": 20000,
+  "baseVersionName": "2.0.0+gh.r04",
+  "baseUrl": "https://github.com/ryomensukuna009/cursed-acs/releases/download/v{versionName}",
   "variants": {
     "armeabi-v7a": {
-      "versionCode": 1025,
-      "versionName": "1.0.0+gh.r4",
+      "versionCode": 20000,
+      "versionName": "2.0.0+gh.r04",
       "apkUrl": "{baseUrl}/android-code-studio-armeabi-v7a-{versionName}.apk"
     },
     "arm64-v8a": {
-      "versionCode": 1025,
-      "versionName": "1.0.0+gh.r4", 
-      "apkUrl": "{baseUrl}/android-code-studio-aarch64-{versionName}.apk"
+      "versionCode": 20000,
+      "versionName": "2.0.0+gh.r04",
+      "apkUrl": "{baseUrl}/android-code-studio-arm64-v8a-{versionName}.apk"
     }
   },
-  "changelog": "https://raw.githubusercontent.com/AndroidCSOfficial/android-code-studio/refs/heads/dev/whatsnew/v1.0.0+gh.r3.md"
+  "changelog": "https://raw.githubusercontent.com/ryomensukuna009/cursed-acs/main/CHANGELOG.md"
 }
