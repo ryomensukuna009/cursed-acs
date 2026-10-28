@@ -79,17 +79,21 @@ object ProtocolAdapterHelper {
             headers.putIfAbsent("X-XAI-Token-Auth", "xai-grok-cli")
             headers.putIfAbsent("x-grok-conv-id", java.util.UUID.randomUUID().toString())
         }
-        val isChatGptOAuth = (profile.id.equals("openai", ignoreCase = true) || profile.baseUrl.contains("openai.com") || profile.baseUrl.contains("chatgpt.com")) &&
-                (cleanKey.startsWith("ey") || cleanKey.length > 200)
+        val isChatGptOAuth = (profile.id.equals("openai", ignoreCase = true) || profile.id.equals("chatgpt", ignoreCase = true) || profile.baseUrl.contains("openai.com") || profile.baseUrl.contains("chatgpt.com")) &&
+                (cleanKey.startsWith("ey") || cleanKey.length > 150)
         if (isChatGptOAuth) {
-            headers.putIfAbsent("originator", "kelivo")
-            headers.putIfAbsent("version", "0.159.0")
-            headers.putIfAbsent("User-Agent", "Kelivo")
-            headers.putIfAbsent("OpenAI-Beta", "responses=experimental")
+            headers["Authorization"] = "Bearer $cleanKey"
+            headers["Content-Type"] = "application/json"
+            headers["Accept"] = if (acceptSse) "text/event-stream" else "application/json"
+            headers.remove("x-api-key")
+            headers["originator"] = "kelivo"
+            headers["version"] = "0.159.0"
+            headers["User-Agent"] = "Kelivo"
+            headers["OpenAI-Beta"] = "responses=experimental"
             val sessId = java.util.UUID.randomUUID().toString()
-            headers.putIfAbsent("session_id", sessId)
-            headers.putIfAbsent("conversation_id", sessId)
-            headers.putIfAbsent("x-client-request-id", sessId)
+            headers["session_id"] = sessId
+            headers["conversation_id"] = sessId
+            headers["x-client-request-id"] = sessId
 
             try {
                 val parts = cleanKey.split(".")
@@ -98,17 +102,16 @@ object ProtocolAdapterHelper {
                     val json = org.json.JSONObject(decoded)
                     val auth = json.optJSONObject("https://api.openai.com/auth")
                     val profileObj = json.optJSONObject("https://api.openai.com/profile")
-                    val accId = auth?.optString("chatgpt_account_id")
-                        ?: profileObj?.optString("chatgpt_account_id")
-                        ?: json.optString("chatgpt_account_id")
-                        ?: json.optString("sub")
-                    if (!accId.isNullOrBlank()) {
-                        headers.putIfAbsent("chatgpt-account-id", accId)
+                    val accId = auth?.optString("chatgpt_account_id")?.takeIf { it.isNotBlank() }
+                        ?: profileObj?.optString("chatgpt_account_id")?.takeIf { it.isNotBlank() }
+                        ?: json.optString("chatgpt_account_id")?.takeIf { it.isNotBlank() }
+                    if (!accId.isNullOrBlank() && !accId.startsWith("auth0|")) {
+                        headers["chatgpt-account-id"] = accId
                     }
                     val residency = auth?.optString("chatgpt_data_residency")
                         ?: auth?.optString("chatgpt_compute_residency")
                     if (!residency.isNullOrBlank()) {
-                        headers.putIfAbsent("x-openai-internal-codex-residency", residency)
+                        headers["x-openai-internal-codex-residency"] = residency
                     }
                 }
             } catch (_: Exception) {}

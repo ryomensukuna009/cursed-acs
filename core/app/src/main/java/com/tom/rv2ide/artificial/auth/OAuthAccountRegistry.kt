@@ -79,6 +79,35 @@ class OAuthAccountRegistry private constructor(private val appContext: Context) 
                 }
             }
         }
+
+        fun canonicalProvider(provider: String): String {
+            return when (provider.lowercase().trim()) {
+                "chatgpt", "openai" -> "openai"
+                "claude", "anthropic" -> "claude"
+                "grok", "xai" -> "grok"
+                "kimi", "kimi code", "moonshot" -> "kimi"
+                "gemini", "google" -> "gemini"
+                else -> provider.lowercase().trim()
+            }
+        }
+
+        fun providerAliases(provider: String): List<String> {
+            return when (canonicalProvider(provider)) {
+                "openai" -> listOf("openai", "chatgpt")
+                "claude" -> listOf("claude", "anthropic")
+                "grok" -> listOf("grok", "xai")
+                "kimi" -> listOf("kimi", "moonshot")
+                "gemini" -> listOf("gemini", "google")
+                else -> listOf(provider.lowercase().trim())
+            }
+        }
+    }
+
+    private fun syncActiveAccountWithKeyStore(account: OAuthAccount) {
+        val aliases = providerAliases(account.provider)
+        for (alias in aliases) {
+            SecureKeyStore.putProviderApiKey(appContext, alias, account.accessToken)
+        }
     }
 
     @Synchronized
@@ -88,7 +117,8 @@ class OAuthAccountRegistry private constructor(private val appContext: Context) 
 
     @Synchronized
     fun getAccounts(provider: String): List<OAuthAccount> {
-        return accounts.filter { it.provider.equals(provider, ignoreCase = true) }
+        val target = canonicalProvider(provider)
+        return accounts.filter { canonicalProvider(it.provider) == target }
     }
 
     @Synchronized
@@ -99,33 +129,36 @@ class OAuthAccountRegistry private constructor(private val appContext: Context) 
 
     @Synchronized
     fun setActiveAccount(provider: String, accountId: String) {
+        val target = canonicalProvider(provider)
         for (i in accounts.indices) {
             val acc = accounts[i]
-            if (acc.provider.equals(provider, ignoreCase = true)) {
+            if (canonicalProvider(acc.provider) == target) {
                 accounts[i] = acc.copy(isActive = (acc.id == accountId))
             }
         }
         val active = accounts.firstOrNull { it.id == accountId }
         if (active != null) {
-            SecureKeyStore.putProviderApiKey(appContext, active.provider, active.accessToken)
+            syncActiveAccountWithKeyStore(active)
         }
         saveToDisk()
     }
 
     @Synchronized
     fun saveAccount(account: OAuthAccount) {
-        val existingIndex = accounts.indexOfFirst { it.id == account.id }
+        val canonical = canonicalProvider(account.provider)
+        val normalized = account.copy(provider = canonical)
+        val existingIndex = accounts.indexOfFirst { it.id == normalized.id }
         if (existingIndex >= 0) {
-            accounts[existingIndex] = account
+            accounts[existingIndex] = normalized
         } else {
             // If this is the first account for this provider, mark as active
-            val hasActive = accounts.any { it.provider.equals(account.provider, ignoreCase = true) && it.isActive }
-            val toAdd = if (!hasActive) account.copy(isActive = true) else account
+            val hasActive = accounts.any { canonicalProvider(it.provider) == canonical && it.isActive }
+            val toAdd = if (!hasActive) normalized.copy(isActive = true) else normalized
             accounts.add(toAdd)
         }
-        val active = getActiveAccount(account.provider)
+        val active = getActiveAccount(canonical)
         if (active != null) {
-            SecureKeyStore.putProviderApiKey(appContext, active.provider, active.accessToken)
+            syncActiveAccountWithKeyStore(active)
         }
         saveToDisk()
     }
@@ -134,12 +167,15 @@ class OAuthAccountRegistry private constructor(private val appContext: Context) 
     fun removeAccount(accountId: String) {
         val removed = accounts.find { it.id == accountId }
         accounts.removeAll { it.id == accountId }
-        if (removed != null && removed.isActive) {
-            val next = accounts.firstOrNull { it.provider.equals(removed.provider, ignoreCase = true) }
+        if (removed != null) {
+            val canonical = canonicalProvider(removed.provider)
+            val next = accounts.firstOrNull { canonicalProvider(it.provider) == canonical }
             if (next != null) {
-                setActiveAccount(next.provider, next.id)
+                setActiveAccount(canonical, next.id)
             } else {
-                SecureKeyStore.clearProviderApiKey(removed.provider)
+                for (alias in providerAliases(canonical)) {
+                    SecureKeyStore.clearProviderApiKey(alias)
+                }
             }
         }
         saveToDisk()
@@ -160,13 +196,13 @@ class OAuthAccountRegistry private constructor(private val appContext: Context) 
 
     @Synchronized
     fun getNextAvailableAccount(provider: String): OAuthAccount? {
+        val target = canonicalProvider(provider)
         val now = System.currentTimeMillis()
-        val list = getAccounts(provider)
-        
+
         // Reset quota for accounts that have passed the cooldown window (e.g. 1 hour)
         for (i in accounts.indices) {
             val acc = accounts[i]
-            if (acc.provider.equals(provider, ignoreCase = true) && acc.isQuotaExhausted) {
+            if (canonicalProvider(acc.provider) == target && acc.isQuotaExhausted) {
                 if (now - acc.quotaExhaustedAt > 3600_000L) {
                     accounts[i] = acc.copy(isQuotaExhausted = false, quotaExhaustedAt = 0L)
                 }
@@ -174,11 +210,11 @@ class OAuthAccountRegistry private constructor(private val appContext: Context) 
         }
 
         val available = accounts.firstOrNull { 
-            it.provider.equals(provider, ignoreCase = true) && !it.isQuotaExhausted 
+            canonicalProvider(it.provider) == target && !it.isQuotaExhausted 
         }
 
         if (available != null && !available.isActive) {
-            setActiveAccount(provider, available.id)
+            setActiveAccount(target, available.id)
         }
         return available
     }
@@ -192,6 +228,10 @@ class OAuthAccountRegistry private constructor(private val appContext: Context) 
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 accounts.add(OAuthAccount.fromJson(obj))
+            }
+            // Sync all active accounts into SecureKeyStore immediately
+            for (acc in accounts.filter { it.isActive }) {
+                syncActiveAccountWithKeyStore(acc)
             }
         } catch (_: Exception) {}
     }

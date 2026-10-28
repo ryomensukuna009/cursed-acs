@@ -21,8 +21,14 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
         apiKey: String?
     ): BuiltHttpRequest {
         val cleanKey = apiKey?.trim().orEmpty()
-        val isChatGptOAuth = (request.profile.id.equals("openai", ignoreCase = true) || request.profile.baseUrl.contains("openai.com") || request.profile.baseUrl.contains("chatgpt.com")) &&
-                (cleanKey.startsWith("ey") || cleanKey.length > 200)
+        val isChatGptOAuth = (request.profile.id.equals("openai", ignoreCase = true) ||
+                request.profile.id.equals("chatgpt", ignoreCase = true) ||
+                request.profile.baseUrl.contains("openai.com") ||
+                request.profile.baseUrl.contains("chatgpt.com")) &&
+                (cleanKey.startsWith("ey") || cleanKey.length > 150 ||
+                 request.modelId.contains("terra", ignoreCase = true) ||
+                 request.modelId.contains("codex", ignoreCase = true) ||
+                 request.modelId.startsWith("gpt-5", ignoreCase = true))
 
         val url = if (isChatGptOAuth) {
             "https://chatgpt.com/backend-api/codex/responses"
@@ -171,19 +177,21 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
                         })
                     }
                     ChatRole.ASSISTANT -> {
-                        val contentArr = JSONArray().apply {
-                            if (msg.content.isNotEmpty()) {
+                        val text = msg.content.trim()
+                        if (text.isNotEmpty() && text != "\n\n") {
+                            val contentArr = JSONArray().apply {
                                 put(JSONObject().apply {
                                     put("type", "output_text")
-                                    put("text", msg.content)
+                                    put("text", text)
                                 })
                             }
+                            inputArr.put(JSONObject().apply {
+                                put("type", "message")
+                                put("role", "assistant")
+                                put("status", "completed")
+                                put("content", contentArr)
+                            })
                         }
-                        inputArr.put(JSONObject().apply {
-                            put("type", "message")
-                            put("role", "assistant")
-                            put("content", contentArr)
-                        })
                         for (tc in msg.toolCalls) {
                             inputArr.put(JSONObject().apply {
                                 put("type", "function_call")
@@ -204,12 +212,29 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
                 }
             }
 
+            if (inputArr.length() == 0) {
+                val fallbackText = instructions.takeIf { it.isNotBlank() } ?: "Hello"
+                inputArr.put(JSONObject().apply {
+                    put("type", "message")
+                    put("role", "user")
+                    put("content", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("type", "input_text")
+                            put("text", fallbackText)
+                        })
+                    })
+                })
+            }
+
             JSONObject().apply {
                 put("model", request.modelId)
                 put("instructions", instructions)
                 put("input", inputArr)
                 put("stream", request.stream)
                 put("store", false)
+                headers["session_id"]?.let { sessId ->
+                    put("prompt_cache_key", sessId)
+                }
                 put("include", JSONArray().apply { put("reasoning.encrypted_content") })
 
                 if (request.tools.isNotEmpty()) {
@@ -223,6 +248,7 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
                         })
                     }
                     put("tools", toolsArr)
+                    put("tool_choice", "auto")
                 }
             }
         } else {

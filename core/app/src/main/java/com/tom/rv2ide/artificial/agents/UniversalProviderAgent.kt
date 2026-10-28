@@ -254,7 +254,9 @@ class UniversalProviderAgent(
                     IllegalStateException("Provider profile '$providerId' not found")
                 )
 
+            val oauthToken = com.tom.rv2ide.artificial.auth.OAuthAccountRegistry.getInstance(appContext).getActiveAccount(providerId)?.accessToken?.takeIf { it.isNotBlank() }
             val effectiveKey = apiKey?.takeIf { it.isNotBlank() }
+                ?: oauthToken
                 ?: SecureKeyStore.getProviderApiKey(appContext, providerId)
 
             if (profile.authStyle != AuthStyle.NONE && effectiveKey.isNullOrBlank()) {
@@ -388,7 +390,9 @@ class UniversalProviderAgent(
         try {
             val profile = registryManager.getProfile(providerId)
                 ?: return@withContext Result.failure(IllegalStateException("Provider profile not found"))
+            val oauthToken = com.tom.rv2ide.artificial.auth.OAuthAccountRegistry.getInstance(appContext).getActiveAccount(providerId)?.accessToken?.takeIf { it.isNotBlank() }
             val effectiveKey = apiKey?.takeIf { it.isNotBlank() }
+                ?: oauthToken
                 ?: SecureKeyStore.getProviderApiKey(appContext, providerId)
             val agents = Agents(appContext)
             val modelId = resolveModelId(profile, agents)
@@ -599,7 +603,8 @@ class UniversalProviderAgent(
                         if (profile.authStyle == AuthStyle.NONE) {
                             return profile.baseUrl.isNotBlank()
                         }
-                        return SecureKeyStore.hasProviderApiKey(appCtx, profileId)
+                        val hasOAuth = com.tom.rv2ide.artificial.auth.OAuthAccountRegistry.getInstance(appCtx).getActiveAccount(profileId)?.accessToken?.isNotBlank() == true
+                        return hasOAuth || SecureKeyStore.hasProviderApiKey(appCtx, profileId)
                     }
 
                     override fun getApiKey(): String? {
@@ -608,6 +613,8 @@ class UniversalProviderAgent(
                         if (profile?.authStyle == AuthStyle.NONE) {
                             return ""
                         }
+                        val oauthKey = com.tom.rv2ide.artificial.auth.OAuthAccountRegistry.getInstance(appCtx).getActiveAccount(profileId)?.accessToken?.takeIf { it.isNotBlank() }
+                        if (oauthKey != null) return oauthKey
                         return SecureKeyStore.getProviderApiKey(appCtx, profileId)
                     }
                 }

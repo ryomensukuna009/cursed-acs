@@ -240,21 +240,27 @@ object ProviderOAuthManager {
                 setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
                 setOnClickListener {
                     if (hasKey) {
-                        val actions = arrayOf(
-                            "Use ${acc.name} in Chat",
-                            "Select / Search Models",
-                            "+ Add Another Account",
-                            "Log Out / Remove Account"
-                        )
+                        val actionList = mutableListOf<String>()
+                        actionList.add("Use ${acc.name} in Chat")
+                        actionList.add("Select / Search Models")
+                        actionList.add("Fetch / Refresh Available Models")
+                        if (providerAccounts.size > 1) {
+                            actionList.add("Switch Active Account (${providerAccounts.size} added)")
+                        }
+                        actionList.add("+ Add Another Account")
+                        actionList.add("Log Out / Remove Account")
+
+                        val actions = actionList.toTypedArray()
                         MaterialAlertDialogBuilder(context)
                             .setTitle("${acc.name} Account Options")
                             .setItems(actions) { _, which ->
-                                when (which) {
-                                    0 -> {
+                                val selected = actions[which]
+                                when {
+                                    selected.startsWith("Use") -> {
                                         onAccountConnected(acc.id)
                                         hubDialog?.dismiss()
                                     }
-                                    1 -> {
+                                    selected.startsWith("Select") -> {
                                         com.tom.rv2ide.artificial.dialogs.ProviderProfileDialogs.showSearchableModelPickerDialog(
                                             context = context,
                                             scope = scope,
@@ -264,8 +270,38 @@ object ProviderOAuthManager {
                                             hubDialog?.dismiss()
                                         }
                                     }
-                                    2 -> acc.action()
-                                    3 -> {
+                                    selected.startsWith("Fetch") -> {
+                                        val activeKey = activeAcc?.accessToken ?: SecureKeyStore.getProviderApiKey(context, acc.id).orEmpty()
+                                        when (acc.id.lowercase()) {
+                                            "openai" -> fetchAndRegisterCodexModels(context, activeKey)
+                                            "grok" -> fetchAndRegisterGrokModels(context, activeKey)
+                                            "kimi" -> fetchAndRegisterKimiModels(context, activeKey)
+                                            "claude" -> fetchAndRegisterClaudeModels(context, activeKey)
+                                            "gemini" -> fetchAndRegisterGeminiModels(context, activeKey)
+                                        }
+                                        Toast.makeText(context, "🔄 Fetching latest ${acc.name} models...", Toast.LENGTH_SHORT).show()
+                                    }
+                                    selected.startsWith("Switch Active") -> {
+                                        val accNames = providerAccounts.map { item ->
+                                            val mark = if (item.isActive) "✓ (Active) " else ""
+                                            val mail = item.email.ifBlank { item.id }
+                                            "$mark$mail [${item.plan.ifBlank { "Standard" }}]"
+                                        }.toTypedArray()
+
+                                        MaterialAlertDialogBuilder(context)
+                                            .setTitle("Select Active ${acc.name} Account")
+                                            .setItems(accNames) { _, idx ->
+                                                val chosen = providerAccounts[idx]
+                                                registry.setActiveAccount(acc.id, chosen.id)
+                                                Toast.makeText(context, "Active ${acc.name} set to ${chosen.email.ifBlank { chosen.id }}", Toast.LENGTH_SHORT).show()
+                                                hubDialog?.dismiss()
+                                                showOAuthAccountsHubDialog(context, scope, onAccountConnected)
+                                            }
+                                            .setNegativeButton("Cancel", null)
+                                            .show()
+                                    }
+                                    selected.startsWith("+ Add") -> acc.action()
+                                    selected.startsWith("Log Out") -> {
                                         if (activeAcc != null) {
                                             registry.removeAccount(activeAcc.id)
                                         } else {
@@ -549,6 +585,7 @@ object ProviderOAuthManager {
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     SecureKeyStore.putProviderApiKey(context, "openai", acquiredToken)
+                    SecureKeyStore.putProviderApiKey(context, "chatgpt", acquiredToken)
                     val (email, plan, accountId) = extractJwtProfile(acquiredToken)
                     val account = OAuthAccount(
                         provider = "openai",
@@ -815,6 +852,8 @@ object ProviderOAuthManager {
                             isActive = true,
                             accountId = accountSub.takeIf { it.isNotBlank() }
                         )
+                        SecureKeyStore.putProviderApiKey(context, "grok", acquiredToken)
+                        SecureKeyStore.putProviderApiKey(context, "xai", acquiredToken)
                         OAuthAccountRegistry.getInstance(context).saveAccount(account)
                         OAuthAccountRegistry.getInstance(context).setActiveAccount("grok", account.id)
 
@@ -1046,6 +1085,8 @@ object ProviderOAuthManager {
                             expiresAt = System.currentTimeMillis() + 86400_000L * 30,
                             isActive = true
                         )
+                        SecureKeyStore.putProviderApiKey(context, "grok", acquiredToken)
+                        SecureKeyStore.putProviderApiKey(context, "xai", acquiredToken)
                         OAuthAccountRegistry.getInstance(context).saveAccount(account)
                         OAuthAccountRegistry.getInstance(context).setActiveAccount("kimi", account.id)
 
@@ -1249,10 +1290,10 @@ object ProviderOAuthManager {
                 val auth = json.optJSONObject("https://api.openai.com/auth")
                 val email = profile?.optString("email") ?: json.optString("email")
                 val plan = auth?.optString("chatgpt_plan_type") ?: json.optString("plan")
-                val accountId = auth?.optString("chatgpt_account_id")
-                    ?: profile?.optString("chatgpt_account_id")
-                    ?: json.optString("chatgpt_account_id")
-                    ?: json.optString("sub")
+                val accountId = auth?.optString("chatgpt_account_id")?.takeIf { it.isNotBlank() }
+                    ?: profile?.optString("chatgpt_account_id")?.takeIf { it.isNotBlank() }
+                    ?: json.optString("chatgpt_account_id")?.takeIf { it.isNotBlank() }
+                    ?: ""
                 return Triple(email, plan, accountId)
             }
         } catch (_: Exception) {}
@@ -1266,9 +1307,10 @@ object ProviderOAuthManager {
 
             try {
                 val req = Request.Builder()
-                    .url("https://chatgpt.com/backend-api/codex/models")
+                    .url("https://chatgpt.com/backend-api/codex/models?client_version=0.159.0")
                     .header("Authorization", "Bearer $token")
                     .header("originator", "kelivo")
+                    .header("version", "0.159.0")
                     .header("User-Agent", "Kelivo")
                     .get()
                     .build()
