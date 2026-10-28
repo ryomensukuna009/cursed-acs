@@ -2911,18 +2911,51 @@ class ToolOrchestrator(
         onEvent: (StreamEvent) -> Unit,
         recordCitation: (CitationItem) -> Unit
     ): UnifiedChatResponse {
-        return transportClient.executeChat(
-            request = request,
-            apiKey = apiKey,
-            cancellationToken = cancellationToken
-        ) { event ->
-            when (event) {
-                is StreamEvent.CitationAdded -> recordCitation(event.citation)
-                is StreamEvent.Completed -> {
-                    // Suppress intermediate Completed events until turn/loop finishes
+        try {
+            return transportClient.executeChat(
+                request = request,
+                apiKey = apiKey,
+                cancellationToken = cancellationToken
+            ) { event ->
+                when (event) {
+                    is StreamEvent.CitationAdded -> recordCitation(event.citation)
+                    is StreamEvent.Completed -> {
+                        // Suppress intermediate Completed events until turn/loop finishes
+                    }
+                    else -> onEvent(event)
                 }
-                else -> onEvent(event)
             }
+        } catch (e: com.tom.rv2ide.artificial.exceptions.RateLimitException) {
+            val provider = request.profile.id
+            val ctx = try { com.tom.rv2ide.app.IDEApplication.instance.applicationContext } catch (_: Exception) { null }
+            if (ctx != null) {
+                val reg = com.tom.rv2ide.artificial.auth.OAuthAccountRegistry.getInstance(ctx)
+                val current = reg.getActiveAccount(provider)
+                if (current != null) {
+                    reg.markQuotaExhausted(current.id)
+                    val next = reg.getNextAvailableAccount(provider)
+                    if (next != null && next.accessToken.isNotBlank() && next.id != current.id) {
+                        return transportClient.executeChat(
+                            request = request,
+                            apiKey = next.accessToken,
+                            cancellationToken = cancellationToken
+                        ) { event ->
+                            when (event) {
+                                is StreamEvent.CitationAdded -> recordCitation(event.citation)
+                                is StreamEvent.Completed -> {}
+                                else -> onEvent(event)
+                            }
+                        }
+                    }
+                }
+            }
+            if (provider.equals("grok", ignoreCase = true)) {
+                throw com.tom.rv2ide.artificial.exceptions.RateLimitException(
+                    "⚠️ Grok Free Account Quota Limit (HTTP 429): You have reached the free-tier rate limit on xAI. You can add another Grok account in Settings > Accounts for auto-fallback, or switch to a paid API key / different model.",
+                    e.retryAfterSeconds
+                )
+            }
+            throw e
         }
     }
 

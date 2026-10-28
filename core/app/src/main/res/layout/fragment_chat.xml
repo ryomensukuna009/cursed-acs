@@ -565,6 +565,38 @@
                                 app:cornerRadius="8dp"
                                 style="@style/Widget.Material3.Button.TonalButton" />
 
+                            <!-- Execution Mode Button (Auto / Plan / Side) -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnComposerMode"
+                                android:layout_width="wrap_content"
+                                android:layout_height="32dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="0dp"
+                                android:minWidth="32dp"
+                                android:layout_marginEnd="6dp"
+                                android:text="🤖 Auto"
+                                android:textSize="11.5sp"
+                                app:cornerRadius="8dp"
+                                style="@style/Widget.Material3.Button.TonalButton" />
+
+                            <!-- Approval Mode Button (Turbo / Approve) -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnComposerApproval"
+                                android:layout_width="wrap_content"
+                                android:layout_height="32dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="0dp"
+                                android:minWidth="32dp"
+                                android:layout_marginEnd="6dp"
+                                android:text="⚡ Turbo"
+                                android:textSize="11.5sp"
+                                app:cornerRadius="8dp"
+                                style="@style/Widget.Material3.Button.TonalButton" />
+
                         </LinearLayout>
                     </HorizontalScrollView>
 

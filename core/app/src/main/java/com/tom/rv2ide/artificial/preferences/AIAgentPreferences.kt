@@ -10,9 +10,9 @@ object AIAgentPreferences {
     fun getReasoningEffort(context: Context? = null): ReasoningEffort {
         val ctx = context?.applicationContext
             ?: try { com.tom.rv2ide.app.IDEApplication.instance.applicationContext } catch (_: Exception) { null }
-        if (ctx == null) return ReasoningEffort.MEDIUM
+        if (ctx == null) return ReasoningEffort.AUTO
         val pref = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val key = pref.getString(KEY_REASONING_EFFORT, ReasoningEffort.MEDIUM.key)
+        val key = pref.getString(KEY_REASONING_EFFORT, ReasoningEffort.AUTO.key)
         return ReasoningEffort.fromKey(key)
     }
 

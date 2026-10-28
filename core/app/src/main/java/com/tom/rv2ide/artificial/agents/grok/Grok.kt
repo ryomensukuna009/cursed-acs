@@ -268,6 +268,8 @@ class Grok : AIAgent {
       connection.requestMethod = "POST"
       connection.setRequestProperty("Content-Type", "application/json")
       connection.setRequestProperty("Authorization", "Bearer $apiKey")
+      connection.setRequestProperty("X-XAI-Token-Auth", "xai-grok-cli")
+      connection.setRequestProperty("x-grok-conv-id", java.util.UUID.randomUUID().toString())
       connection.doOutput = true
       connection.connectTimeout = 30000
       connection.readTimeout = 30000

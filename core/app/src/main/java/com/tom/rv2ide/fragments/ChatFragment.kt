@@ -68,6 +68,16 @@ import android.widget.LinearLayout
 
 import android.widget.TextView
 
+import android.graphics.Typeface
+
+import android.view.Gravity
+
+import android.widget.FrameLayout
+
+import android.widget.ScrollView
+
+import com.google.android.material.card.MaterialCardView
+
 import androidx.activity.OnBackPressedCallback
 
 import androidx.core.view.ViewCompat
@@ -227,6 +237,8 @@ class ChatFragment : Fragment() {
     private var btnComposerModel: com.google.android.material.button.MaterialButton? = null
     private var btnComposerWebSearch: com.google.android.material.button.MaterialButton? = null
     private var btnComposerReasoning: com.google.android.material.button.MaterialButton? = null
+    private var btnComposerMode: com.google.android.material.button.MaterialButton? = null
+    private var btnComposerApproval: com.google.android.material.button.MaterialButton? = null
     private var btnComposerAttach: com.google.android.material.button.MaterialButton? = null
     private var btnComposerSend: com.google.android.material.button.MaterialButton? = null
 
@@ -648,6 +660,8 @@ class ChatFragment : Fragment() {
         btnComposerModel = view.findViewById(R.id.btnComposerModel)
         btnComposerWebSearch = view.findViewById(R.id.btnComposerWebSearch)
         btnComposerReasoning = view.findViewById(R.id.btnComposerReasoning)
+        btnComposerMode = view.findViewById(R.id.btnComposerMode)
+        btnComposerApproval = view.findViewById(R.id.btnComposerApproval)
         btnComposerAttach = view.findViewById(R.id.btnComposerAttach)
         btnComposerSend = view.findViewById(R.id.btnComposerSend)
 
@@ -1232,7 +1246,13 @@ class ChatFragment : Fragment() {
 
 
         btnComposerModel?.setOnClickListener {
-            showQuickProviderModelMenu()
+            showModelInformationDialog()
+        }
+        btnComposerMode?.setOnClickListener {
+            toggleAgentExecutionMode()
+        }
+        btnComposerApproval?.setOnClickListener {
+            toggleApprovalMode()
         }
         btnComposerWebSearch?.setOnClickListener {
             webSearchToggleBtn.performClick()
@@ -1396,17 +1416,15 @@ class ChatFragment : Fragment() {
         val isTurbo = com.tom.rv2ide.artificial.policy.ApprovalManager.isTurbo(requireContext())
 
         if (isTurbo) {
-
             btnApprovalMode.text = "⚡ Turbo"
-
             btnApprovalMode.alpha = 0.85f
-
+            btnComposerApproval?.text = "⚡ Turbo"
+            btnComposerApproval?.alpha = 0.85f
         } else {
-
             btnApprovalMode.text = "🛡️ Approve"
-
             btnApprovalMode.alpha = 1.0f
-
+            btnComposerApproval?.text = "🛡️ Approve"
+            btnComposerApproval?.alpha = 1.0f
         }
 
     }
@@ -1491,6 +1509,7 @@ class ChatFragment : Fragment() {
 
     private fun updateModeSwitcherButton(mode: com.tom.rv2ide.artificial.policy.AgentExecutionMode) {
         modeSwitcherChipBtn.text = mode.shortBadge
+        btnComposerMode?.text = mode.shortBadge
         when (mode) {
             com.tom.rv2ide.artificial.policy.AgentExecutionMode.AUTONOMOUS ->
                 modeSwitcherChipBtn.setIconResource(R.drawable.ic_nav_ai_agent_badass)
@@ -2142,12 +2161,8 @@ class ChatFragment : Fragment() {
                 }
 
             }
-
             .show()
-
     }
-
-
 
     private fun confirmClearConversation() {
 
@@ -2477,44 +2492,8 @@ class ChatFragment : Fragment() {
 
 
         dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.dialogBtnSwitchProvider).setOnClickListener {
-
             dialog.dismiss()
-
-            val profiles = registryManager.getEnabledProfiles()
-
-            val names = profiles.map { p ->
-
-                val k = registryManager.hasProviderApiKey(p.id) || p.authStyle.name == "NONE"
-
-                "${p.displayName} (${if (k) "✓" else "key needed"})"
-
-            }.toTypedArray()
-
-
-
-            MaterialAlertDialogBuilder(requireContext())
-
-                .setTitle("Switch AI Provider")
-
-                .setItems(names) { _, idx ->
-
-                    val chosen = profiles[idx]
-
-                    agentsHelper.setProvider(chosen.id)
-
-                    aiAgent.setProvider(chosen.id)
-
-                    aiAgent.reinitializeWithSelectedModel()
-                updateVisionButtonState()
-
-                    refreshHeaderBar()
-
-                    showSnackbar("Provider: ${chosen.displayName} (conversation preserved)")
-
-                }
-
-                .show()
-
+            showDualTabSwitchProviderDialog()
         }
 
 
@@ -2620,42 +2599,7 @@ class ChatFragment : Fragment() {
                     }
 
                     2 -> {
-
-                        val profiles = registryManager.getEnabledProfiles()
-
-                        val names = profiles.map { p ->
-
-                            val hasKey = registryManager.hasProviderApiKey(p.id) || p.authStyle.name == "NONE"
-
-                            "${p.displayName} (${if (hasKey) "✓" else "key needed"})"
-
-                        }.toTypedArray()
-
-
-
-                        MaterialAlertDialogBuilder(requireContext())
-
-                            .setTitle("Switch AI Provider")
-
-                            .setItems(names) { _, idx ->
-
-                                val chosen = profiles[idx]
-
-                                agentsHelper.setProvider(chosen.id)
-
-                                aiAgent.setProvider(chosen.id)
-
-                                aiAgent.reinitializeWithSelectedModel()
-                updateVisionButtonState()
-
-                                refreshHeaderBar()
-
-                                showSnackbar("Provider: ${chosen.displayName} (conversation preserved)")
-
-                            }
-
-                            .show()
-
+                        showDualTabSwitchProviderDialog()
                     }
 
                     3 -> {
@@ -2713,9 +2657,367 @@ class ChatFragment : Fragment() {
                 }
 
             }
-
             .show()
+    }
 
+    private fun resolveAttrColor(ctx: Context, attr: Int, fallback: Int): Int {
+        val tv = android.util.TypedValue()
+        return if (ctx.theme.resolveAttribute(attr, tv, true)) {
+            if (tv.resourceId != 0) {
+                androidx.core.content.ContextCompat.getColor(ctx, tv.resourceId)
+            } else {
+                tv.data
+            }
+        } else {
+            fallback
+        }
+    }
+
+    private fun showDualTabSwitchProviderDialog() {
+        val context = requireContext()
+        val density = context.resources.displayMetrics.density
+        val pad = (14 * density).toInt()
+
+        val rootLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, (10 * density).toInt(), pad, (8 * density).toInt())
+        }
+
+        val tabLayout = com.google.android.material.tabs.TabLayout(context).apply {
+            tabMode = com.google.android.material.tabs.TabLayout.MODE_FIXED
+            tabGravity = com.google.android.material.tabs.TabLayout.GRAVITY_FILL
+            setSelectedTabIndicatorColor(resolveAttrColor(context, android.R.attr.colorPrimary, Color.CYAN))
+            setTabTextColors(
+                resolveAttrColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, Color.GRAY),
+                resolveAttrColor(context, android.R.attr.colorPrimary, Color.CYAN)
+            )
+            addTab(newTab().setText("🔑 API Providers"))
+            addTab(newTab().setText("👤 Account Login"))
+        }
+        rootLayout.addView(tabLayout)
+
+        val container = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (380 * density).toInt()
+            )
+        }
+        rootLayout.addView(container)
+
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+
+        fun renderApiTab(): View {
+            val scroll = ScrollView(context).apply { isFillViewport = true }
+            val list = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
+            }
+            scroll.addView(list)
+
+            val profiles = registryManager.getAllProfiles().filter { it.enabled }
+            val currentProv = agentsHelper.getProvider()
+
+            for (p in profiles) {
+                val hasKey = registryManager.hasProviderApiKey(p.id) || p.authStyle.name == "NONE"
+                val isActive = p.id.equals(currentProv, ignoreCase = true)
+
+                val card = MaterialCardView(context).apply {
+                    radius = 12 * density
+                    strokeWidth = (1 * density).toInt()
+                    strokeColor = if (isActive) {
+                        resolveAttrColor(context, android.R.attr.colorPrimary, Color.CYAN)
+                    } else {
+                        resolveAttrColor(context, com.google.android.material.R.attr.colorOutlineVariant, Color.DKGRAY)
+                    }
+                    setCardBackgroundColor(resolveAttrColor(context, com.google.android.material.R.attr.colorSurfaceContainer, Color.parseColor("#1E222A")))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = (8 * density).toInt()
+                    }
+                    isClickable = true
+                    isFocusable = true
+                }
+
+                val row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+                }
+
+                val iconTv = TextView(context).apply {
+                    text = when {
+                        p.id.contains("gemini") -> "🌐"
+                        p.id.contains("claude") || p.id.contains("anthropic") -> "🧠"
+                        p.id.contains("openai") || p.id.contains("chatgpt") -> "✨"
+                        p.id.contains("deepseek") -> "🐳"
+                        p.id.contains("openrouter") -> "🔀"
+                        p.id.contains("ollama") || p.id.contains("local") -> "💻"
+                        else -> "⚡"
+                    }
+                    textSize = 20f
+                    setPadding(0, 0, (10 * density).toInt(), 0)
+                }
+                row.addView(iconTv)
+
+                val info = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val title = TextView(context).apply {
+                    text = p.displayName
+                    textSize = 14f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(resolveAttrColor(context, com.google.android.material.R.attr.colorOnSurface, Color.WHITE))
+                }
+                info.addView(title)
+
+                val sub = TextView(context).apply {
+                    val statusText = when {
+                        isActive -> "● Active in Chat"
+                        hasKey -> "✓ Configured & Ready"
+                        else -> "⚠️ API Key Required"
+                    }
+                    text = "$statusText • Model: ${p.selectedModelId}"
+                    textSize = 11.5f
+                    setTextColor(
+                        if (isActive) resolveAttrColor(context, android.R.attr.colorPrimary, Color.CYAN)
+                        else if (hasKey) Color.parseColor("#4CAF50")
+                        else Color.parseColor("#FFA726")
+                    )
+                }
+                info.addView(sub)
+                row.addView(info)
+
+                val actionBtn = MaterialButton(context).apply {
+                    text = if (isActive) "Active" else "Switch"
+                    isEnabled = !isActive
+                    textSize = 11.5f
+                    cornerRadius = (8 * density).toInt()
+                    setOnClickListener {
+                        dialog?.dismiss()
+                        agentsHelper.setProvider(p.id)
+                        aiAgent.setProvider(p.id)
+                        if (p.selectedModelId.isNotBlank()) {
+                            agentsHelper.setAgent(p.selectedModelId)
+                        }
+                        aiAgent.reinitializeWithSelectedModel()
+                        updateVisionButtonState()
+                        updateReasoningEffortButton()
+                        refreshHeaderBar()
+                        showSnackbar("Switched to ${p.displayName} (${p.selectedModelId})")
+                    }
+                }
+                row.addView(actionBtn)
+
+                card.addView(row)
+                card.setOnClickListener {
+                    actionBtn.performClick()
+                }
+                list.addView(card)
+            }
+            return scroll
+        }
+
+        fun renderAccountTab(): View {
+            val scroll = ScrollView(context).apply { isFillViewport = true }
+            val list = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
+            }
+            scroll.addView(list)
+
+            val registry = com.tom.rv2ide.artificial.auth.OAuthAccountRegistry.getInstance(context)
+            val currentProv = agentsHelper.getProvider()
+
+            data class AccountProviderMeta(
+                val providerId: String,
+                val displayName: String,
+                val emoji: String,
+                val defaultModel: String
+            )
+
+            val accountProviders = listOf(
+                AccountProviderMeta("openai", "ChatGPT", "✨", "gpt-4o"),
+                AccountProviderMeta("grok", "Grok", "⚡", "grok-2-latest"),
+                AccountProviderMeta("claude", "Claude", "🧠", "claude-3-7-sonnet-20250219"),
+                AccountProviderMeta("kimi", "Kimi Code", "🌙", "kimi-k1.5-preview"),
+                AccountProviderMeta("gemini", "Google Gemini", "🌐", "gemini-2.5-flash")
+            )
+
+            for (meta in accountProviders) {
+                val accs = registry.getAccounts(meta.providerId)
+                val active = registry.getActiveAccount(meta.providerId)
+                val isProviderActive = meta.providerId.equals(currentProv, ignoreCase = true)
+
+                val card = MaterialCardView(context).apply {
+                    radius = 12 * density
+                    strokeWidth = (1 * density).toInt()
+                    strokeColor = if (isProviderActive) {
+                        resolveAttrColor(context, android.R.attr.colorPrimary, Color.CYAN)
+                    } else {
+                        resolveAttrColor(context, com.google.android.material.R.attr.colorOutlineVariant, Color.DKGRAY)
+                    }
+                    setCardBackgroundColor(resolveAttrColor(context, com.google.android.material.R.attr.colorSurfaceContainer, Color.parseColor("#1E222A")))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = (8 * density).toInt()
+                    }
+                    isClickable = true
+                    isFocusable = true
+                }
+
+                val row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+                }
+
+                val iconTv = TextView(context).apply {
+                    text = meta.emoji
+                    textSize = 20f
+                    setPadding(0, 0, (10 * density).toInt(), 0)
+                }
+                row.addView(iconTv)
+
+                val info = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val title = TextView(context).apply {
+                    text = meta.displayName
+                    textSize = 14f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(resolveAttrColor(context, com.google.android.material.R.attr.colorOnSurface, Color.WHITE))
+                }
+                info.addView(title)
+
+                val sub = TextView(context).apply {
+                    text = when {
+                        isProviderActive && active != null -> "● Active: ${active.email.ifBlank { active.plan }} (${accs.size} connected)"
+                        active != null -> "✓ Logged In: ${active.email.ifBlank { active.plan }} (${accs.size} account${if (accs.size > 1) "s" else ""})"
+                        else -> "➕ Tap to login / connect account"
+                    }
+                    textSize = 11.5f
+                    setTextColor(
+                        if (isProviderActive) resolveAttrColor(context, android.R.attr.colorPrimary, Color.CYAN)
+                        else if (active != null) Color.parseColor("#4CAF50")
+                        else Color.parseColor("#90CAF9")
+                    )
+                }
+                info.addView(sub)
+                row.addView(info)
+
+                val actionBtn = MaterialButton(context).apply {
+                    text = when {
+                        isProviderActive -> "Active"
+                        active != null -> "Switch"
+                        else -> "Login"
+                    }
+                    isEnabled = !isProviderActive
+                    textSize = 11.5f
+                    cornerRadius = (8 * density).toInt()
+                    setOnClickListener {
+                        if (active != null) {
+                            dialog?.dismiss()
+                            agentsHelper.setProvider(meta.providerId)
+                            aiAgent.setProvider(meta.providerId)
+                            val prof = registryManager.getProfile(meta.providerId)
+                            val model = prof?.selectedModelId?.takeIf { it.isNotBlank() } ?: meta.defaultModel
+                            agentsHelper.setAgent(model)
+                            aiAgent.reinitializeWithSelectedModel()
+                            updateVisionButtonState()
+                            updateReasoningEffortButton()
+                            refreshHeaderBar()
+                            showSnackbar("Switched to ${meta.displayName} ($model)")
+                        } else {
+                            dialog?.dismiss()
+                            com.tom.rv2ide.artificial.auth.ProviderOAuthManager.showAccountLoginDialog(
+                                context,
+                                viewLifecycleOwner.lifecycleScope,
+                                meta.providerId
+                            ) { connectedProv ->
+                                aiAgent.refreshRegisteredProfiles()
+                                agentsHelper.setProvider(connectedProv)
+                                aiAgent.setProvider(connectedProv)
+                                val p = registryManager.getProfile(connectedProv)
+                                val mod = p?.selectedModelId?.takeIf { it.isNotBlank() } ?: meta.defaultModel
+                                agentsHelper.setAgent(mod)
+                                aiAgent.reinitializeWithSelectedModel()
+                                updateVisionButtonState()
+                                updateReasoningEffortButton()
+                                refreshHeaderBar()
+                                showSnackbar("Logged in & switched to $connectedProv ($mod)")
+                            }
+                        }
+                    }
+                }
+                row.addView(actionBtn)
+
+                card.addView(row)
+                card.setOnClickListener { actionBtn.performClick() }
+                list.addView(card)
+            }
+
+            val manageBtn = MaterialButton(context).apply {
+                text = "⚙️ Manage Accounts & Multi-Account Fallback"
+                textSize = 12f
+                cornerRadius = (8 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = (10 * density).toInt()
+                }
+                setOnClickListener {
+                    dialog?.dismiss()
+                    com.tom.rv2ide.artificial.auth.ProviderOAuthManager.showOAuthAccountsHubDialog(
+                        context,
+                        viewLifecycleOwner.lifecycleScope
+                    ) { connected ->
+                        if (connected.isNotBlank()) {
+                            agentsHelper.setProvider(connected)
+                            aiAgent.setProvider(connected)
+                            aiAgent.reinitializeWithSelectedModel()
+                            updateVisionButtonState()
+                            updateReasoningEffortButton()
+                            refreshHeaderBar()
+                            showSnackbar("Switched to $connected")
+                        }
+                    }
+                }
+            }
+            list.addView(manageBtn)
+
+            return scroll
+        }
+
+        container.removeAllViews()
+        container.addView(renderApiTab())
+
+        tabLayout.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab?) {
+                container.removeAllViews()
+                if (tab?.position == 0) {
+                    container.addView(renderApiTab())
+                } else {
+                    container.addView(renderAccountTab())
+                }
+            }
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab?) {}
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab?) {}
+        })
+
+        dialog = MaterialAlertDialogBuilder(context)
+            .setTitle("Switch AI Provider")
+            .setView(rootLayout)
+            .setNegativeButton("Close", null)
+            .show()
     }
 
 

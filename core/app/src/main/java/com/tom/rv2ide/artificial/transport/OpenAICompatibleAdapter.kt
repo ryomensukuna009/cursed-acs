@@ -20,8 +20,13 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
         request: UnifiedChatRequest,
         apiKey: String?
     ): BuiltHttpRequest {
+        val cleanKey = apiKey?.trim().orEmpty()
+        val isChatGptOAuth = (request.profile.id.equals("openai", ignoreCase = true) || request.profile.baseUrl.contains("openai.com")) &&
+                (cleanKey.startsWith("ey") || cleanKey.length > 200)
+
+        val effectiveBaseUrl = if (isChatGptOAuth) "https://chatgpt.com/backend-api/codex" else request.profile.baseUrl
         val rawUrl = UrlNormalizer.resolveChatEndpoint(
-            baseUrl = request.profile.baseUrl,
+            baseUrl = effectiveBaseUrl,
             chatPathOverride = request.profile.chatEndpointPath,
             protocol = request.profile.protocol,
             modelId = request.modelId,
@@ -33,6 +38,9 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
             apiKey = apiKey,
             acceptSse = request.stream
         )
+        if (isChatGptOAuth) {
+            headers["x-codex-routing-hint"] = "model=${request.modelId}"
+        }
 
         val messagesArray = JSONArray()
         val hasSystemMessage = request.messages.any { it.role == ChatRole.SYSTEM }
@@ -129,6 +137,9 @@ class OpenAICompatibleAdapter : ProtocolAdapter {
             put("model", request.modelId)
             put("messages", messagesArray)
             put("stream", request.stream)
+            if (isChatGptOAuth || request.profile.id.equals("grok", ignoreCase = true)) {
+                put("store", false)
+            }
             if (request.stream) {
                 put("stream_options", JSONObject().apply { put("include_usage", true) })
             }

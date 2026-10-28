@@ -642,45 +642,25 @@ class ChatMessageAdapter(
 
 
         private fun bindUserMessage(ctx: Context, item: ChatMessageItem) {
+            root.gravity = Gravity.END or Gravity.RIGHT
+            root.layoutDirection = View.LAYOUT_DIRECTION_LOCALE
 
-
-
-            root.gravity = Gravity.END
-
-
-
-
-
-
+            val userRow = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.END or Gravity.RIGHT
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            }
 
             val card = MaterialCardView(ctx).apply {
-
-
-
                 layoutParams = LinearLayout.LayoutParams(
-
-
-
                     ViewGroup.LayoutParams.WRAP_CONTENT,
-
-
-
                     ViewGroup.LayoutParams.WRAP_CONTENT
-
-
-
                 ).apply {
-
-
-
-                    marginStart = dp(ctx, 40)
-
-
-
-                    gravity = Gravity.END
-
-
-
+                    marginStart = dp(ctx, 48)
+                    gravity = Gravity.END or Gravity.RIGHT
                 }
 
 
@@ -921,13 +901,13 @@ class ChatMessageAdapter(
             inner.addView(contentView)
             val actionRow = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.END
+                gravity = Gravity.END or Gravity.RIGHT
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 ).apply {
                     topMargin = dp(ctx, 4)
-                    gravity = Gravity.END
+                    gravity = Gravity.END or Gravity.RIGHT
                 }
             }
             actionRow.addView(
@@ -941,8 +921,9 @@ class ChatMessageAdapter(
                 }
             )
             card.addView(inner)
-            root.addView(card)
-            root.addView(actionRow)
+            userRow.addView(card)
+            userRow.addView(actionRow)
+            root.addView(userRow)
 
 
 
@@ -955,10 +936,8 @@ class ChatMessageAdapter(
 
 
         private fun bindAssistantMessage(ctx: Context, item: ChatMessageItem) {
-
-
-
-            root.gravity = Gravity.START
+            root.gravity = Gravity.START or Gravity.LEFT
+            root.layoutDirection = View.LAYOUT_DIRECTION_LOCALE
 
 
 
@@ -1087,17 +1066,12 @@ class ChatMessageAdapter(
 
 
             val inner = LinearLayout(ctx).apply {
-
-
-
                 orientation = LinearLayout.VERTICAL
-
-
-
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
                 setPadding(dp(ctx, 14), dp(ctx, 12), dp(ctx, 14), dp(ctx, 10))
-
-
-
             }
 
 

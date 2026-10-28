@@ -75,6 +75,18 @@ object ProtocolAdapterHelper {
         if (profile.protocol == ApiProtocol.ANTHROPIC_MESSAGES) {
             headers.putIfAbsent("anthropic-version", "2023-06-01")
         }
+        if (profile.id.equals("grok", ignoreCase = true) || profile.baseUrl.contains("x.ai") || profile.baseUrl.contains("grok.com")) {
+            headers.putIfAbsent("X-XAI-Token-Auth", "xai-grok-cli")
+            headers.putIfAbsent("x-grok-conv-id", java.util.UUID.randomUUID().toString())
+        }
+        val isChatGptOAuth = (profile.id.equals("openai", ignoreCase = true) || profile.baseUrl.contains("openai.com") || profile.baseUrl.contains("chatgpt.com")) &&
+                (cleanKey.startsWith("ey") || cleanKey.length > 200)
+        if (isChatGptOAuth) {
+            headers.putIfAbsent("originator", "kelivo")
+            headers.putIfAbsent("version", "0.159.0")
+            headers.putIfAbsent("User-Agent", "Kelivo")
+            headers.putIfAbsent("OpenAI-Beta", "responses=experimental")
+        }
 
         return headers
     }

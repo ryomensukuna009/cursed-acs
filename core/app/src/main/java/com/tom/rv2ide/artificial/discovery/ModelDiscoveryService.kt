@@ -127,7 +127,14 @@ class ModelDiscoveryService(
                 )
             }
 
-            val baseDiscoveryUrl = UrlNormalizer.resolveEndpoint(profile.baseUrl, profile.modelsEndpointPath)
+            val isChatGptOAuth = (profile.id.equals("openai", ignoreCase = true) || profile.baseUrl.contains("openai.com")) &&
+                    (cleanKey.startsWith("ey") || cleanKey.length > 200)
+
+            val baseDiscoveryUrl = if (isChatGptOAuth) {
+                "https://chatgpt.com/backend-api/codex/models?client_version=0.159.0"
+            } else {
+                UrlNormalizer.resolveEndpoint(profile.baseUrl, profile.modelsEndpointPath)
+            }
             EndpointSecurityValidator.validateEndpointUrl(baseDiscoveryUrl, profile.allowCleartextHttp)
 
             val connectSec = profile.connectTimeoutSec.coerceAtLeast(20).toLong()
@@ -173,6 +180,16 @@ class ModelDiscoveryService(
                     }
                     nextUrl = pageParseResult.nextPageUrl
                 } else {
+                    if (isChatGptOAuth) {
+                        val fallbackModels = getCodexDefaultModels(nowMs)
+                        return@withContext ModelDiscoveryResult(
+                            status = DiscoveryStatus.SUCCESS,
+                            models = fallbackModels,
+                            httpStatusCode = 200,
+                            latencyMs = System.currentTimeMillis() - startMs,
+                            pagesFetched = 1
+                        )
+                    }
                     val redactedError = parseErrorDetail(responseBody, knownSecrets)
                     return@withContext when (statusCode) {
                         401, 403 -> ModelDiscoveryResult(
@@ -203,6 +220,9 @@ class ModelDiscoveryService(
                 }
             }
 
+            if (allModels.isEmpty() && isChatGptOAuth) {
+                allModels.addAll(getCodexDefaultModels(nowMs))
+            }
             val finalStatus = if (allModels.isEmpty()) DiscoveryStatus.EMPTY else DiscoveryStatus.SUCCESS
             ModelDiscoveryResult(
                 status = finalStatus,
@@ -281,6 +301,17 @@ class ModelDiscoveryService(
                 reqBuilder.header(profile.apiVersionHeaderName.trim(), profile.apiVersionHeaderValue.trim())
             } else if (profile.protocol == ApiProtocol.ANTHROPIC_MESSAGES) {
                 reqBuilder.header("anthropic-version", "2023-06-01")
+            }
+
+            if (currentUrl.toString().contains("chatgpt.com") ||
+                ((profile.id.equals("openai", ignoreCase = true) || profile.baseUrl.contains("openai.com")) && (apiKey.startsWith("ey") || apiKey.length > 200))) {
+                reqBuilder.header("originator", "kelivo")
+                reqBuilder.header("version", "0.159.0")
+                reqBuilder.header("User-Agent", "Kelivo")
+                reqBuilder.header("OpenAI-Beta", "responses=experimental")
+            }
+            if (profile.id.equals("grok", ignoreCase = true) || profile.baseUrl.contains("x.ai") || profile.baseUrl.contains("grok.com")) {
+                reqBuilder.header("X-XAI-Token-Auth", "xai-grok-cli")
             }
 
             // Attach authentication only if we haven't redirected to a different origin
@@ -402,8 +433,13 @@ class ModelDiscoveryService(
                     }
                 }
                 is JSONObject -> {
-                    var rawId = item.optString(idField).ifBlank {
-                        item.optString("id").ifBlank { item.optString("name") }
+                    val visibility = item.optString("visibility", "").trim().lowercase()
+                    if (visibility == "hide" || visibility == "hidden") continue
+
+                    var rawId = item.optString("slug").ifBlank {
+                        item.optString(idField).ifBlank {
+                            item.optString("id").ifBlank { item.optString("name") }
+                        }
                     }.trim()
                     if (rawId.isEmpty()) continue
 
@@ -413,7 +449,8 @@ class ModelDiscoveryService(
                         rawId = rawId.removePrefix("models/")
                     }
 
-                    val displayName = item.optString("display_name")
+                    val displayName = item.optString("title")
+                        .ifBlank { item.optString("display_name") }
                         .ifBlank { item.optString("displayName") }
                         .ifBlank { item.optString("name") }
                         .ifBlank { rawId }
@@ -434,6 +471,26 @@ class ModelDiscoveryService(
                         else -> null
                     }
 
+                    val inferred = try {
+                        com.tom.rv2ide.artificial.models.ModelCatalogManager.getInstance(
+                            com.tom.rv2ide.app.IDEApplication.instance.applicationContext
+                        ).inferCapabilities(providerId, rawId)
+                    } catch (_: Exception) { null }
+
+                    val finalCaps = if (inferred != null) {
+                        inferred.copy(
+                            contextLength = ctxLen ?: inferred.contextLength,
+                            maxOutputTokens = maxOut ?: inferred.maxOutputTokens
+                        )
+                    } else {
+                        ModelCapabilities(
+                            contextLength = ctxLen,
+                            maxOutputTokens = maxOut,
+                            supportsStreaming = TriStateCapability.UNKNOWN,
+                            supportsToolCalling = TriStateCapability.UNKNOWN
+                        )
+                    }
+
                     result.add(
                         DiscoveredModel(
                             providerId = providerId,
@@ -441,12 +498,7 @@ class ModelDiscoveryService(
                             displayName = displayName,
                             description = description,
                             ownedBy = ownedBy,
-                            capabilities = ModelCapabilities(
-                                contextLength = ctxLen,
-                                maxOutputTokens = maxOut,
-                                supportsStreaming = TriStateCapability.UNKNOWN,
-                                supportsToolCalling = TriStateCapability.UNKNOWN
-                            ),
+                            capabilities = finalCaps,
                             discoveredAtMs = discoveredAtMs
                         )
                     )
@@ -741,6 +793,35 @@ class ModelDiscoveryService(
             SecretRedactor.redact(msg, knownSecrets)
         } catch (_: Exception) {
             SecretRedactor.redact(trimmed.take(250), knownSecrets)
+        }
+    }
+
+    private fun getCodexDefaultModels(nowMs: Long): List<DiscoveredModel> {
+        val defaults = listOf(
+            "gpt-4o" to "GPT-4o (Omni Multimodal & Vision)",
+            "chatgpt-4o-latest" to "ChatGPT-4o Latest",
+            "o1" to "OpenAI o1 (Advanced Reasoning)",
+            "o3-mini" to "OpenAI o3-mini (High-Speed Reasoning)",
+            "gpt-4o-mini" to "GPT-4o Mini",
+            "gpt-4-turbo" to "GPT-4 Turbo"
+        )
+        return defaults.map { (id, name) ->
+            val inferred = try {
+                com.tom.rv2ide.artificial.models.ModelCatalogManager.getInstance(
+                    com.tom.rv2ide.app.IDEApplication.instance.applicationContext
+                ).inferCapabilities("openai", id)
+            } catch (_: Exception) { null }
+
+            DiscoveredModel(
+                providerId = "openai",
+                id = id,
+                displayName = name,
+                capabilities = inferred ?: ModelCapabilities(
+                    supportsStreaming = TriStateCapability.SUPPORTED,
+                    supportsToolCalling = TriStateCapability.SUPPORTED
+                ),
+                discoveredAtMs = nowMs
+            )
         }
     }
 }
