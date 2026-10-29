@@ -21,7 +21,7 @@
 
 ## ⚡ What's New in V2.0
 
-- **🚀 Direct OAuth & Account Integration:** Full ChatGPT subscriber account login via direct Codex wire protocol (`backend-api/codex/responses`) and xAI Grok login with seamless session persistence via hardware Keystore.
+- **🚀 Direct OAuth & Account Integration:** Full ChatGPT subscriber/free account login via direct Codex wire protocol and xAI Grok login with seamless session persistence via hardware Keystore.
 - **🎨 Unified Theming & Ergonomics:** Seamless layout parity across **Violet**, **Cyan**, and **Crimson** themes with standardized button positioning and clean prompt composer cards.
 - **📊 Model Telemetry & Capability Badges:** Real-time usage budget tracking with sleek progress indicators and live capability chips (Tool Calling, Vision, Streaming, Reasoning, Auto-Patch, Web Grounding).
 - **🌐 Dynamic Glowing Web Grounding:** Theme-aware glowing indicator for active web search grounding.
