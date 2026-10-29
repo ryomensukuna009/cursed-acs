@@ -34,7 +34,7 @@
 
 - **🛠️ Standalone Offline Native NDK & CMake:** Zero-internet C/C++ compilation via embedded Clang, LLVM, and CMake. Direct `.zip` / `.tar.gz` NDK archive import with zip-slip protection.
 - **📦 Full Gradle Build System & OpenJDK 17:** Compiles production Java & Kotlin Android apps with official AGP 7.2–8.x, AAPT2, D8/R8, and one-tap on-device APK signing.
-- **🧠 Jujutsu Cursed AI Coding Agent:**
+- **🧠 Cursed AI Coding Agent:**
   - Multiple API Support: Google Gemini, Anthropic Claude, OpenAI / ChatGPT OAuth, DeepSeek-R1, xAI Grok, and Custom Providers.
   - Advance errors detection: Advance Error Detection system and fix them with AI in one click.
   - Collapsible `<thought>` Block: Clean separation between reasoning CoT and response text.
@@ -47,7 +47,7 @@
 - **🔒 Hardened Security & R8 Optimization:** Hardware-backed Keystore AES-256-GCM encryption for credentials, unexported sensitive services, and full R8 bytecode shrinkage.
 
 **BEST FOR MODDERS, CHEAT MAKERS**
-
+-There is NDK and Gradle build you will not get any error like - No application module found.....
 **for NDK BUILD - aide_ndk_arm64.tar.gz or aide_ndk_arm32.tar.gz**
 
 ---
