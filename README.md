@@ -5,7 +5,7 @@
 <h1 align="center">CURSED ACS</h1>
 
 <p align="center">
-  <b>Advanced On-Device Android IDE with Offline Native NDK Toolchains, Full Gradle Build System & Jujutsu AI Agent</b>
+  <b>Advanced On-Device Android IDE with Offline Native NDK Toolchains, Full Gradle Build System & Powerful AI Agent</b>
 </p>
 
 <p align="center">
@@ -33,17 +33,22 @@
 ## ⚡ Core Capabilities
 
 - **🛠️ Standalone Offline Native NDK & CMake:** Zero-internet C/C++ compilation via embedded Clang, LLVM, and CMake. Direct `.zip` / `.tar.gz` NDK archive import with zip-slip protection.
+- **📦 Full Gradle Build System & OpenJDK 17:** Compiles production Java & Kotlin Android apps with official AGP 7.2–8.x, AAPT2, D8/R8, and one-tap on-device APK signing.
 - **🧠 Jujutsu Cursed AI Coding Agent:**
-  - Multi-Provider Support: Google Gemini, Anthropic Claude, OpenAI / ChatGPT OAuth, DeepSeek-R1, and xAI Grok.
+  - Multiple API Support: Google Gemini, Anthropic Claude, OpenAI / ChatGPT OAuth, DeepSeek-R1, xAI Grok, and Custom Providers.
+  - Advance errors detection: Advance Error Detection system and fix them with AI in one click.
   - Collapsible `<thought>` Block: Clean separation between reasoning CoT and response text.
   - Autonomous Multi-File Editing: Context-aware codebase indexing and atomic code diff application.
   - One-Tap Compiler Diagnostics: Ingests Gradle/NDK build failures and auto-generates contextual fixes.
   - Token Telemetry: Live context usage metering, budget remaining progress bar, and auto-compaction.
-- **📦 Full Gradle Build System & OpenJDK 17:** Compiles production Java & Kotlin Android apps with official AGP 7.2–8.x, AAPT2, D8/R8, and one-tap on-device APK signing.
 - **💻 Embedded Linux Terminal & Git:** Full Termux bash environment with package manager (`clang`, `make`, `git`, `openssh`). Built-in Git client for branches, diffs, commits, and remotes.
 - **🩺 Build Toolchain Doctor:** 10-point automated IDE diagnostic auditing SDK, Java runtime, Gradle, NDK versions, CMake, storage, and permissions.
 - **🎨 Modern Editor & Material 3 UI:** Sora Editor with Tree-Sitter highlighting, Eclipse JDT (Java) / Kotlin / Clangd LSP, visual XML layout designer, dynamic Day/Night theming, and edge-to-edge support.
 - **🔒 Hardened Security & R8 Optimization:** Hardware-backed Keystore AES-256-GCM encryption for credentials, unexported sensitive services, and full R8 bytecode shrinkage.
+
+**BEST FOR MODDERS, CHEAT MAKERS**
+
+**for NDK BUILD - aide_ndk_arm64.tar.gz or aide_ndk_arm32.tar.gz**
 
 ---
 
@@ -51,10 +56,10 @@
 
 | Parameter | Specification |
 | :--- | :--- |
-| **Android Version** | Android 8.0 (API 26) through Android 15+ |
+| **Android Version** | Android 8.0 (API 26) through Android 17 (tested on Android 10 to Android 17) |
 | **Supported ABIs** | `arm64-v8a` (Primary), `armeabi-v7a` (32-bit legacy) |
-| **RAM** | 3 GB minimum (4 GB+ recommended for large Gradle/NDK builds) |
-| **Storage** | 3 GB free storage for SDK, compilers, and dependencies |
+| **RAM** | 2 GB minimum (4 GB+ recommended for large Gradle/NDK builds) |
+| **Storage** | 3 GB free storage for SDK, compilers, and dependencies [Gradle (~1.5 GB) & NDK (~1.5 GB)] |
 
 ---
 
